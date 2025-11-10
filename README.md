@@ -66,3 +66,23 @@ npm install
 cd ../frontend
 npm install
 ```
+### 3. Setup Environment Variables
+Create .env files in backend and frontend (if needed) with:
+Backend example:
+```bash
+PORT=5000
+MONGO_URI=<your-mongodb-uri>
+JWT_SECRET=<your-jwt-secret>
+RAZORPAY_KEY_ID=<your-razorpay-key>
+RAZORPAY_KEY_SECRET=<your-razorpay-secret>
+```
+### 4. Run the application
+```bash
+# Backend
+cd backend
+npm run dev
+
+# Frontend
+cd ../frontend
+npm start
+```
