@@ -54,3 +54,15 @@
 ```bash
 git clone https://github.com/yarrowtech/Raphaaa_new.git
 cd Raphaaa
+```
+
+### 2. Install dependencies
+```bash
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+```
