@@ -1,0 +1,107 @@
+/* BestSellersSection.css */
+
+/* Container */
+.best-seller-wrapper {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  background: transparent;
+  padding: 0.5rem 0;
+}
+
+/* Marquee */
+.best-seller-marquee {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+  animation: scroll-marquee 45s linear infinite;
+  will-change: transform;
+}
+.best-seller-wrapper:hover .best-seller-marquee {
+  animation-play-state: paused;
+}
+
+/* Edge fades */
+.bs-fade {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  z-index: 2;
+}
+/* .bs-fade-left {
+  left: 0;
+  background: linear-gradient(to right, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+}
+.bs-fade-right {
+  right: 0;
+  background: linear-gradient(to left, rgba(240, 249, 255, 1), rgba(240, 249, 255, 0));
+} */
+
+/* Card sizing + hover motion */
+.product-card-wrapper {
+  min-width: 250px;
+  flex-shrink: 0;
+}
+.bs-card-fx {
+  transition: transform 220ms ease, filter 220ms ease;
+}
+.best-seller-wrapper:hover .bs-card-fx {
+  filter: saturate(1.05);
+}
+.bs-card-fx:hover {
+  transform: translateY(-4px);
+}
+
+/* Skeleton states */
+.bs-skeleton {
+  display: grid;
+  gap: 1rem;
+}
+.bs-skel-title {
+  height: 28px;
+  width: 240px;
+  margin: 0 auto 8px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-size: 400% 100%;
+  animation: bs-shimmer 1.2s ease-in-out infinite;
+}
+.bs-skel-row {
+  display: flex;
+  gap: 1rem;
+  overflow: hidden;
+}
+.bs-skel-card {
+  height: 280px;
+  width: 250px;
+  border-radius: 1rem;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-size: 400% 100%;
+  animation: bs-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes bs-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Marquee keyframes */
+@keyframes scroll-marquee {
+  0%   { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Speed + spacing on small screens */
+@media (max-width: 1024px) {
+  .best-seller-marquee { animation-duration: 36s; }
+}
+@media (max-width: 768px) {
+  .best-seller-marquee { animation-duration: 28s; gap: 0.75rem; }
+  .product-card-wrapper { min-width: 220px; }
+}
+@media (max-width: 480px) {
+  .best-seller-marquee { animation-duration: 22s; gap: 0.6rem; }
+  .product-card-wrapper { min-width: 200px; }
+}
