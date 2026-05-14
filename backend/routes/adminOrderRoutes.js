@@ -207,6 +207,11 @@ const router = express.Router();
 const Order = require('../models/Order');
 const { protect, adminOrMerchantise } = require('../middleware/authMiddleware');
 const { sendMail } = require("../utils/sendMail");
+const {
+  createShiprocketOrder,
+  syncOrderTrackingStatus,
+  syncShiprocketStatusesForOpenOrders,
+} = require("../utils/shiprocket");
 
 // Middleware to check if user is admin or merchantise
 const adminOrMerchantiseMiddleware = (req, res, next) => {
@@ -231,6 +236,7 @@ const adminOnly = (req, res, next) => {
 // @access  Private/Admin/Merchantise
 router.get('/', protect, adminOrMerchantiseMiddleware, async (req, res) => {
   try {
+    await syncShiprocketStatusesForOpenOrders(20);
     let orders;
     
     // If user is admin, show all orders
@@ -291,6 +297,25 @@ router.put('/:id', protect, adminOrMerchantiseMiddleware, async (req, res) => {
       newStatus = status;
       shouldSendStatusEmail = ['Shipped', 'Delivered', 'Cancelled'].includes(status);
 
+      if (status === "Shipped") {
+        try {
+          const shipment = await createShiprocketOrder(order);
+          order.shiprocket = {
+            ...(order.shiprocket || {}),
+            shipmentId: shipment?.shipmentId || order.shiprocket?.shipmentId,
+            shiprocketOrderId: shipment?.shiprocketOrderId || order.shiprocket?.shiprocketOrderId,
+            awbCode: shipment?.awbCode || order.shiprocket?.awbCode,
+            courierName: shipment?.courierName || order.shiprocket?.courierName,
+            lastSyncAt: new Date(),
+          };
+        } catch (shipErr) {
+          return res.status(400).json({
+            message: "Failed to create shipment in Shiprocket. Order status not updated.",
+            error: shipErr.message,
+          });
+        }
+      }
+
       if (status === 'Delivered') {
         order.isDelivered = true;
         order.deliveredAt = Date.now();
@@ -312,6 +337,9 @@ router.put('/:id', protect, adminOrMerchantiseMiddleware, async (req, res) => {
     }
 
     const updatedOrder = await order.save();
+    if (updatedOrder.status === "Shipped" && updatedOrder?.shiprocket?.awbCode) {
+      await syncOrderTrackingStatus(updatedOrder);
+    }
     
     // Populate the updated order before sending response
     await updatedOrder.populate('user', 'name email');
@@ -323,7 +351,7 @@ router.put('/:id', protect, adminOrMerchantiseMiddleware, async (req, res) => {
       `).join("");
 
       const statusMessages = {
-        Shipped: "Your order has been shipped and is on its way to you.",
+        Shipped: `Your order has been shipped and is on its way to you.${updatedOrder?.shiprocket?.awbCode ? ` AWB: ${updatedOrder.shiprocket.awbCode}` : ""}`,
         Delivered: "Your order has been delivered. We hope you enjoy it!",
         Cancelled: "Your order has been cancelled. If this was unexpected, please contact support.",
       };
@@ -419,6 +447,22 @@ router.get('/stats', protect, adminOrMerchantiseMiddleware, async (req, res) => 
     res.status(500).json({
       message: 'Failed to fetch order statistics',
       error: error.message
+    });
+  }
+});
+
+// @desc    Force sync Shiprocket tracking statuses
+// @route   POST /api/admin/orders/shiprocket/sync
+// @access  Private/Admin/Merchantise
+router.post('/shiprocket/sync', protect, adminOrMerchantiseMiddleware, async (req, res) => {
+  try {
+    const limit = Number(req.body?.limit || 50);
+    await syncShiprocketStatusesForOpenOrders(Number.isFinite(limit) ? limit : 50);
+    res.json({ message: "Shiprocket status sync completed" });
+  } catch (error) {
+    res.status(500).json({
+      message: "Shiprocket status sync failed",
+      error: error.message,
     });
   }
 });

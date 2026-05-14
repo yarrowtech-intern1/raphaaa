@@ -153,7 +153,9 @@ const AdminHomePage = () => {
     },
     {
       name: "Shipped",
-      value: orders.filter((order) => order.status === "Shipped").length,
+      value: orders.filter((order) =>
+        ["Shipped", "Pickup Scheduled", "Picked Up", "In Transit", "Out For Delivery"].includes(order.status)
+      ).length,
     },
     {
       name: "Delivered",
@@ -480,7 +482,7 @@ const AdminHomePage = () => {
                             ? "bg-green-100 text-green-700"
                             : order.status === "Processing"
                               ? "bg-yellow-100 text-yellow-700"
-                              : order.status === "Shipped"
+                              : ["Shipped", "Pickup Scheduled", "Picked Up", "In Transit", "Out For Delivery"].includes(order.status)
                                 ? "bg-blue-100 text-blue-700"
                                 : "bg-red-100 text-red-700"
                             }`}

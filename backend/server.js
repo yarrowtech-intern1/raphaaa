@@ -39,6 +39,7 @@ sendScheduledEmails(); // Run once on startup
 const metaOptionRoutes = require("./routes/metaOptionRoutes");
 const campaignsRoutes = require("./routes/campaignRoutes");
 const complaintRoutes = require("./routes/complaintRoutes");
+const { syncShiprocketStatusesForOpenOrders } = require("./utils/shiprocket");
 
 // Run every day at 7:00 PM IST
 cron.schedule("0 19 * * *", async () => {
@@ -151,6 +152,15 @@ setInterval(() => {
     .then(() => console.log("[SELF-PING] Success. Server responding OK."))
     .catch((err) => console.error("[SELF-PING ERROR]:", err.message));
 }, 10 * 60 * 1000); // every 1 minute
+
+// Sync shipped orders with Shiprocket tracking updates every 15 minutes
+setInterval(async () => {
+  try {
+    await syncShiprocketStatusesForOpenOrders(100);
+  } catch (error) {
+    console.error("[SHIPROCKET SYNC ERROR]:", error.message);
+  }
+}, 15 * 60 * 1000);
 // const webpush = require("web-push");
 // const vapidKeys = webpush.generateVAPIDKeys();
 // console.log(vapidKeys);

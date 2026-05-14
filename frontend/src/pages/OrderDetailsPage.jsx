@@ -305,20 +305,23 @@ const OrderDetailsPage = () => {
               <span
                 className={`px-3 py-1 rounded-full text-sm font-medium ${orderDetails?.status === "Delivered"
                   ? "bg-emerald-50 text-emerald-700"
-                  : orderDetails?.status === "Shipped"
+                  : ["Shipped", "In Transit", "Out For Delivery", "Picked Up", "Pickup Scheduled"].includes(orderDetails?.status)
                     ? "bg-amber-50 text-amber-700"
+                    : ["Cancelled", "RTO Initiated", "RTO Delivered"].includes(orderDetails?.status)
+                      ? "bg-rose-50 text-rose-700"
                     : "bg-gray-100 text-gray-700"
                   }`}
-              ><div className="text-right">
-              {/* <p className="text-sm text-gray-500">Total</p>
-              <p className="text-xl font-semibold text-gray-900">
-                ₹{orderDetails?.totalPrice?.toLocaleString("en-IN")}
-              </p> */}
-            </div>
+              >
                 {orderDetails?.status || "Pending"}
               </span>
             </div>
           </div>
+
+          {orderDetails?.shiprocket?.trackingStatus && (
+            <div className="mb-5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              Shiprocket Status: {orderDetails.shiprocket.trackingStatus}
+            </div>
+          )}
 
           {/* Customer Info */}
           {orderDetails?.user && (

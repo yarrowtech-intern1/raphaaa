@@ -123,6 +123,17 @@ const MyOrders = () => {
     });
   };
 
+  const getDeliveryStatusClass = (status) => {
+    if (status === "Delivered") return "text-green-600 bg-green-50 border-green-200";
+    if (["Cancelled", "RTO Initiated", "RTO Delivered"].includes(status)) {
+      return "text-red-600 bg-red-50 border-red-200";
+    }
+    if (["Shipped", "Pickup Scheduled", "Picked Up", "In Transit", "Out For Delivery"].includes(status)) {
+      return "text-amber-700 bg-amber-50 border-amber-200";
+    }
+    return "text-gray-700 bg-gray-50 border-gray-200";
+  };
+
   const getReviewButtonText = (order) => {
     const unreviewed = order.orderItems.filter((item) => {
       const productId = item.productId || item.product;
@@ -254,11 +265,9 @@ const MyOrders = () => {
                   <td className="py-3 px-4">
                     <div className="flex flex-col gap-2">
                       <span
-                        className={`text-xs w-fit font-medium px-2 py-1 rounded border ${
-                          order.status === "Delivered"
-                            ? "text-green-600 bg-green-50 border-green-200"
-                            : "text-orange-600 bg-orange-50 border-orange-200"
-                        }`}
+                        className={`text-xs w-fit font-medium px-2 py-1 rounded border ${getDeliveryStatusClass(
+                          order.status
+                        )}`}
                       >
                         {order.status}
                       </span>

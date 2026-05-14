@@ -584,8 +584,15 @@ const OrderManagement = () => {
         >
           <option value="">All Statuses</option>
           <option value="Processing">Processing</option>
+          <option value="Packed">Packed</option>
+          <option value="Pickup Scheduled">Pickup Scheduled</option>
+          <option value="Picked Up">Picked Up</option>
           <option value="Shipped">Shipped</option>
+          <option value="In Transit">In Transit</option>
+          <option value="Out For Delivery">Out For Delivery</option>
           <option value="Delivered">Delivered</option>
+          <option value="RTO Initiated">RTO Initiated</option>
+          <option value="RTO Delivered">RTO Delivered</option>
           <option value="Cancelled">Cancelled</option>
         </select>
       </div>
@@ -628,7 +635,7 @@ const OrderManagement = () => {
                         className={`px-2 py-1 text-xs font-semibold rounded-full ${
                           order.status === "Delivered"
                             ? "bg-green-100 text-green-700"
-                            : order.status === "Shipped"
+                            : ["Shipped", "In Transit", "Out For Delivery", "Picked Up", "Pickup Scheduled"].includes(order.status)
                             ? "bg-yellow-100 text-yellow-700"
                             : order.status === "Cancelled"
                             ? "bg-red-100 text-red-700"
@@ -646,8 +653,15 @@ const OrderManagement = () => {
                         className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block p-2 w-full"
                       >
                         <option value="Processing">Processing</option>
+                        <option value="Packed">Packed</option>
+                        <option value="Pickup Scheduled">Pickup Scheduled</option>
+                        <option value="Picked Up">Picked Up</option>
                         <option value="Shipped">Shipped</option>
+                        <option value="In Transit">In Transit</option>
+                        <option value="Out For Delivery">Out For Delivery</option>
                         <option value="Delivered">Delivered</option>
+                        <option value="RTO Initiated">RTO Initiated</option>
+                        <option value="RTO Delivered">RTO Delivered</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
                     )}
@@ -668,7 +682,7 @@ const OrderManagement = () => {
                         <FaEye className="inline mr-1" /> View
                       </button>
                       {user.role === "delivery_boy" ? (
-                        order.status === "Shipped" && (
+                        ["Shipped", "In Transit", "Out For Delivery", "Picked Up", "Pickup Scheduled"].includes(order.status) && (
                           <button
                             onClick={() =>
                               handleStatusChange(order._id, "Delivered")
