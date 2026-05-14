@@ -1,636 +1,577 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { FaShoppingCart, FaBoxOpen, FaUsers, FaRupeeSign } from "react-icons/fa";
+import {
+  FaShoppingCart, FaBoxOpen, FaUsers, FaRupeeSign,
+  FaArrowUp, FaArrowDown,
+} from "react-icons/fa";
 import { fetchAllOrders } from "../redux/slices/adminOrderSlice";
-import { fetchUsers } from "../redux/slices/adminSlice";
+import { fetchUsers }     from "../redux/slices/adminSlice";
 import { fetchAdminProducts } from "../redux/slices/adminProductSlice";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  AreaChart, Area,
+  XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
 } from "recharts";
 import axios from "axios";
-import { GiLetterBomb } from "react-icons/gi";
+import { GiLetterBomb }      from "react-icons/gi";
 import { LuMessageSquareText } from "react-icons/lu";
+import { HiArrowRight }      from "react-icons/hi";
+import { MdVerified }        from "react-icons/md";
 
-const AdminHomePage = () => {
-  const dispatch = useDispatch();
+/* ─── colour tokens ─────────────────────────────────────────── */
+const STATUS_COLORS = {
+  Processing: "#facc15",
+  Shipped:    "#38bdf8",
+  Delivered:  "#4ade80",
+  Cancelled:  "#f87171",
+};
+const PIE_COLORS = ["#facc15", "#38bdf8", "#4ade80", "#f87171"];
 
-  const { orders } = useSelector((state) => state.adminOrders);
-  const { users } = useSelector((state) => state.admin);
-  const { user } = useSelector((state) => state.auth);
-  const { products } = useSelector((state) => state.adminProducts);
-
-  const [revenue, setRevenue] = useState(0);
-  const [orderCount, setOrderCount] = useState(0);
-  const [productCount, setProductCount] = useState(0);
-  const [userCount, setUserCount] = useState(0);
-  const [chartData, setChartData] = useState([]);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [subscribersCount, setSubscribersCount] = useState(0);
-  const [messagesCount, setMessagesCount] = useState(0);
-  const [latestMessages, setLatestMessages] = useState([]); // NEW
-
+/* ─── count-up hook ─────────────────────────────────────────── */
+function useCountUp(end, duration = 1200) {
+  const [count, setCount] = useState(0);
   useEffect(() => {
-    const fetchRevenue = async () => {
-      try {
-        const token = localStorage.getItem("userToken"); // Get token from localStorage
-        const { data } = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/orders/revenue/total`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setTotalRevenue(data.totalRevenue);
-      } catch (err) {
-        console.error("Error fetching revenue", err);
-      }
-    };
+    if (!end) return setCount(0);
+    let start = 0;
+    const step = end / (duration / 16);
+    const id = setInterval(() => {
+      start += step;
+      if (start >= end) { setCount(end); clearInterval(id); }
+      else setCount(Math.floor(start));
+    }, 16);
+    return () => clearInterval(id);
+  }, [end, duration]);
+  return count;
+}
 
-    if (user?.role === "merchantise" || user?.role === "admin") {
-      fetchRevenue();
-    }
+/* ─── status badge ──────────────────────────────────────────── */
+const StatusBadge = ({ status }) => {
+  const cfg = {
+    Delivered:        "bg-emerald-100 text-emerald-700 border-emerald-200",
+    Processing:       "bg-amber-100  text-amber-700  border-amber-200",
+    Cancelled:        "bg-red-100    text-red-700    border-red-200",
+    Shipped:          "bg-sky-100    text-sky-700    border-sky-200",
+    "In Transit":     "bg-sky-100    text-sky-700    border-sky-200",
+    "Out For Delivery":"bg-blue-100   text-blue-700   border-blue-200",
+  }[status] || "bg-gray-100 text-gray-600 border-gray-200";
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cfg}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{status}
+    </span>
+  );
+};
+
+/* ─── custom tooltip ─────────────────────────────────────────── */
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-gray-900 border border-white/10 rounded-xl px-4 py-2.5 shadow-xl text-xs">
+      <p className="text-gray-400 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="font-bold" style={{ color: p.color }}>
+          {p.name}: {p.value}
+        </p>
+      ))}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════ */
+const AdminHomePage = () => {
+  const dispatch   = useDispatch();
+  const { orders } = useSelector((s) => s.adminOrders);
+  const { users }  = useSelector((s) => s.admin);
+  const { user }   = useSelector((s) => s.auth);
+  const { products }= useSelector((s) => s.adminProducts);
+
+  const [totalRevenue,      setTotalRevenue]      = useState(0);
+  const [subscribersCount,  setSubscribersCount]  = useState(0);
+  const [messagesCount,     setMessagesCount]     = useState(0);
+  const [latestMessages,    setLatestMessages]    = useState([]);
+  const [chartData,         setChartData]         = useState([]);
+
+  /* ── fetch revenue ── */
+  useEffect(() => {
+    if (user?.role !== "admin" && user?.role !== "merchantise") return;
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/orders/revenue/total`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+    }).then(({ data }) => setTotalRevenue(data.totalRevenue)).catch(() => {});
   }, [user]);
 
-  // 🚀 Fetch subscribers and messages
+  /* ── fetch subscribers + messages ── */
   useEffect(() => {
-    const fetchCounts = async () => {
-      try {
-        const token = localStorage.getItem("userToken");
-
-        const [subsRes, msgsRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subscribers`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/contact`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-
-        setSubscribersCount(subsRes.data.length);
-        setMessagesCount(msgsRes.data.length);
-        setLatestMessages(msgsRes.data.slice(0, 5)); // NEW: store latest 5
-      } catch (err) {
-        console.error("Error fetching counts", err);
-      }
-    };
-
-    fetchCounts();
+    const token = localStorage.getItem("userToken");
+    Promise.all([
+      axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/subscribers`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/contact`,     { headers: { Authorization: `Bearer ${token}` } }),
+    ]).then(([s, m]) => {
+      setSubscribersCount(s.data.length);
+      setMessagesCount(m.data.length);
+      setLatestMessages(m.data.slice(0, 5));
+    }).catch(() => {});
   }, []);
 
+  /* ── fetch core data ── */
   useEffect(() => {
     dispatch(fetchAllOrders());
     dispatch(fetchUsers());
     dispatch(fetchAdminProducts());
   }, [dispatch]);
 
+  /* ── build chart data from orders ── */
   useEffect(() => {
-    const totalRevenue = orders.reduce(
-      (acc, order) => acc + order.totalPrice,
-      0
-    );
-    setRevenue(totalRevenue);
-    setOrderCount(orders.length);
-
-    const trendMap = {};
-    orders.forEach((order) => {
-      const date = new Date(order.createdAt).toLocaleDateString();
-      trendMap[date] = (trendMap[date] || 0) + 1;
+    const map = {};
+    orders.forEach((o) => {
+      const d = new Date(o.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+      if (!map[d]) map[d] = { date: d, orders: 0, revenue: 0 };
+      map[d].orders  += 1;
+      map[d].revenue += o.totalPrice || 0;
     });
-    const trendArray = Object.keys(trendMap).map((date) => ({
-      date,
-      orders: trendMap[date],
-    }));
-    setChartData(trendArray);
+    setChartData(Object.values(map).slice(-14)); // last 14 days
   }, [orders]);
 
-  useEffect(() => {
-    setUserCount(users.length);
-  }, [users]);
+  /* ── derived counts ── */
+  const orderCount   = orders.length;
+  const productCount = products.length;
+  const userCount    = users.length;
 
-  useEffect(() => {
-    setProductCount(products.length);
-  }, [products]);
+  const cOrders      = useCountUp(orderCount);
+  const cProducts    = useCountUp(productCount);
+  const cUsers       = useCountUp(userCount);
+  const cSubscribers = useCountUp(subscribersCount);
+  const cMessages    = useCountUp(messagesCount);
+  const cRevenue     = useCountUp(Math.round(totalRevenue));
 
-  const useCountUp = (end, duration = 5) => {
-    const [count, setCount] = useState(0);
-    useEffect(() => {
-      let start = 0;
-      const increment = end / (duration / 16);
-      const animate = () => {
-        start += increment;
-        if (start < end) {
-          setCount(Math.floor(start));
-          requestAnimationFrame(animate);
-        } else {
-          setCount(end);
-        }
-      };
-      animate();
-    }, [end, duration]);
-    return count;
-  };
-
-  const countOrders = useCountUp(orderCount);
-  const countProducts = useCountUp(productCount);
-  const countUsers = useCountUp(userCount);
-  const countSubscribers = useCountUp(subscribersCount);
-  const countMessages = useCountUp(messagesCount);
-
-  const pieData = [
-    {
-      name: "Processing",
-      value: orders.filter((order) => order.status === "Processing").length,
-    },
+  /* ── pie data ── */
+  const pieData = useMemo(() => [
+    { name: "Processing", value: orders.filter(o => o.status === "Processing").length },
     {
       name: "Shipped",
-      value: orders.filter((order) =>
-        ["Shipped", "Pickup Scheduled", "Picked Up", "In Transit", "Out For Delivery"].includes(order.status)
-      ).length,
+      value: orders.filter(o => ["Shipped","Pickup Scheduled","Picked Up","In Transit","Out For Delivery"].includes(o.status)).length,
     },
-    {
-      name: "Delivered",
-      value: orders.filter((order) => order.status === "Delivered").length,
-    },
-    {
-      name: "Cancelled",
-      value: orders.filter((order) => order.status === "Cancelled").length,
-    },
-  ];
+    { name: "Delivered", value: orders.filter(o => o.status === "Delivered").length },
+    { name: "Cancelled", value: orders.filter(o => o.status === "Cancelled").length },
+  ], [orders]);
 
-  const COLORS = ["#facc15", "#38bdf8", "#22c55e", "#ef4444"];
-
-  const percentChange = useMemo(() => {
-    if (!chartData || chartData.length < 2) return 0;
-
-    // Get last two weeks data
-    const lastWeek = chartData[chartData.length - 2]?.orders || 0;
-    const thisWeek = chartData[chartData.length - 1]?.orders || 0;
-
-    if (lastWeek === 0) return thisWeek > 0 ? 100 : 0;
-
-    return (((thisWeek - lastWeek) / lastWeek) * 100).toFixed(1);
-  }, [chartData]);
-
-  const deliveredPercent = useMemo(() => {
-    if (!pieData || pieData.length === 0) return 0;
-
-    const total = pieData.reduce((acc, item) => acc + item.value, 0);
-    const delivered = pieData.find((p) => p.name === "Delivered")?.value || 0;
-
-    if (total === 0) return 0;
-
-    return ((delivered / total) * 100).toFixed(0);
+  const deliveredPct = useMemo(() => {
+    const total = pieData.reduce((s, p) => s + p.value, 0);
+    if (!total) return 0;
+    return Math.round(((pieData.find(p => p.name === "Delivered")?.value || 0) / total) * 100);
   }, [pieData]);
 
+  const weekTrend = useMemo(() => {
+    if (chartData.length < 2) return 0;
+    const prev = chartData[chartData.length - 2]?.orders || 0;
+    const curr = chartData[chartData.length - 1]?.orders || 0;
+    if (!prev) return curr > 0 ? 100 : 0;
+    return +((( curr - prev) / prev) * 100).toFixed(1);
+  }, [chartData]);
+
+  /* ── greeting ── */
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+  const isAdmin       = user?.role === "admin";
+  const isMerch       = user?.role === "merchantise";
+  const isMarketing   = user?.role === "marketing";
+
+  /* ── stat card definition ── */
+  const statCards = [
+    {
+      show: isAdmin || isMerch,
+      icon: FaShoppingCart,
+      label: "Total Orders",
+      value: cOrders,
+      raw: orderCount,
+      prefix: "",
+      color: "from-emerald-500 to-teal-600",
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      trend: weekTrend,
+      link: "/admin/orders",
+      linkLabel: "View Orders",
+    },
+    {
+      show: isAdmin || isMerch,
+      icon: FaBoxOpen,
+      label: "Total Products",
+      value: cProducts,
+      raw: productCount,
+      prefix: "",
+      color: "from-violet-500 to-purple-600",
+      bg: "bg-violet-50",
+      text: "text-violet-700",
+      link: "/admin/products",
+      linkLabel: "Manage Products",
+    },
+    {
+      show: isAdmin,
+      icon: FaUsers,
+      label: "Total Users",
+      value: cUsers,
+      raw: userCount,
+      prefix: "",
+      color: "from-amber-400 to-orange-500",
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      link: "/admin/users",
+      linkLabel: "Manage Users",
+    },
+    {
+      show: isAdmin || isMerch,
+      icon: FaRupeeSign,
+      label: "Total Revenue",
+      value: cRevenue,
+      raw: totalRevenue,
+      prefix: "₹",
+      color: "from-sky-500 to-blue-600",
+      bg: "bg-sky-50",
+      text: "text-sky-700",
+      link: "/admin/revenue",
+      linkLabel: "Revenue Report",
+    },
+    {
+      show: isAdmin || isMarketing,
+      icon: GiLetterBomb,
+      label: "Subscribers",
+      value: cSubscribers,
+      raw: subscribersCount,
+      prefix: "",
+      color: "from-pink-500 to-rose-600",
+      bg: "bg-pink-50",
+      text: "text-pink-700",
+      link: "/admin/subscribed-users",
+      linkLabel: "View Subscribers",
+    },
+    {
+      show: isAdmin || isMarketing,
+      icon: LuMessageSquareText,
+      label: "Messages",
+      value: cMessages,
+      raw: messagesCount,
+      prefix: "",
+      color: "from-indigo-500 to-blue-700",
+      bg: "bg-indigo-50",
+      text: "text-indigo-700",
+      link: "/admin/contact-messages",
+      linkLabel: "View Messages",
+    },
+  ].filter(c => c.show);
+
+  /* ─────────────────── RENDER ─────────────────── */
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">
-        {user.role === "admin"
-          ? "Admin"
-          : user.role === "merchantise"
-            ? "Merchandise"
-            : user.role === "marketing"
-              ? "Marketing"
-              : "Customer"}{" "}
-        Dashboard
-      </h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Orders */}
-        {(user?.role === "admin" || user?.role === "merchantise") && (
-          <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-md hover:shadow-xl hover:scale-[1.03] transition-all border border-green-200 overflow-hidden">
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-200 rounded-full opacity-30 group-hover:scale-110 transition-transform"></div>
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="p-4 w-14 h-14 flex items-center justify-center rounded-xl bg-gradient-to-br from-green-400 to-green-600 text-white shadow-lg">
-                <FaShoppingCart className="text-2xl" />
+    <div className="min-h-screen p-4 md:p-6 space-y-6">
+
+      {/* ── Page header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{today}</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mt-0.5">
+            {greet}, <span className="text-blue-600">{user?.name?.split(" ")[0]}</span> 👋
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5 capitalize">{user?.role?.replace("_"," ")} Dashboard</p>
+        </div>
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 shadow-sm self-start sm:self-auto">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs font-semibold text-gray-600">All systems operational</span>
+        </div>
+      </div>
+
+      {/* ── Stat cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {statCards.map(({ icon: Icon, label, value, prefix, color, trend, link, linkLabel }, idx) => (
+          <Link
+            key={label}
+            to={link}
+            className={`group relative overflow-hidden rounded-2xl bg-linear-to-br ${color} p-5 shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between min-h-40`}
+          >
+            {/* ── Decorative background circles ── */}
+            <span className="pointer-events-none absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/10 group-hover:scale-110 transition-transform duration-500" />
+            <span className="pointer-events-none absolute -bottom-8 -left-4 w-24 h-24 rounded-full bg-white/8 group-hover:scale-110 transition-transform duration-700" />
+            <span className="pointer-events-none absolute top-1/2 right-4 w-10 h-10 rounded-full bg-white/5" />
+
+            {/* ── Top row: icon + trend ── */}
+            <div className="flex items-start justify-between relative z-10">
+              {/* Glassmorphism icon */}
+              <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm border border-white/25 flex items-center justify-center shadow-sm">
+                <Icon className="text-white text-lg" />
               </div>
-              <div>
-                <h2 className="text-md font-semibold text-gray-700">Total Orders</h2>
-                <p className="text-3xl font-bold text-green-700">{countOrders}</p>
+
+              {/* Trend badge */}
+              {trend != null && (
+                <span className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm ${
+                  trend >= 0
+                    ? "bg-white/20 text-white border border-white/20"
+                    : "bg-black/15 text-white/90 border border-white/10"
+                }`}>
+                  {trend >= 0
+                    ? <FaArrowUp className="text-[9px]" />
+                    : <FaArrowDown className="text-[9px]" />
+                  }
+                  {Math.abs(trend)}%
+                </span>
+              )}
+            </div>
+
+            {/* ── Bottom: label + number + link ── */}
+            <div className="relative z-10 mt-4">
+              <p className="text-white/70 text-[11px] font-semibold uppercase tracking-widest mb-1">{label}</p>
+              <p className="text-white text-3xl font-extrabold leading-none tracking-tight drop-shadow-sm">
+                {prefix}{value?.toLocaleString()}
+              </p>
+
+              {/* Divider */}
+              <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between">
+                <span className="text-white/70 text-xs font-medium">{linkLabel}</span>
+                <span className="w-6 h-6 rounded-full bg-white/20 border border-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                  <HiArrowRight className="text-white text-xs" />
+                </span>
               </div>
             </div>
-            <Link
-              to="/admin/orders"
-              className="text-sm text-green-700 hover:underline font-medium relative z-10"
-            >
-              {user?.role === "merchantise" ? "View Sales →" : "Manage Orders →"}
+          </Link>
+        ))}
+      </div>
+
+      {/* ── Charts row ── */}
+      {(isAdmin || isMerch) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Area chart — spans 2 cols */}
+          <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">Order Trends</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Last 14 days</p>
+              </div>
+              <span className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                weekTrend >= 0
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                  : "bg-red-50 text-red-600 border-red-100"
+              }`}>
+                {weekTrend >= 0 ? <FaArrowUp className="text-[10px]" /> : <FaArrowDown className="text-[10px]" />}
+                {Math.abs(weekTrend)}% this week
+              </span>
+            </div>
+
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="ordersGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#fff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                    fontSize: "12px",
+                  }}
+                  itemStyle={{ color: "#1e40af", fontWeight: 600 }}
+                  labelStyle={{ color: "#64748b", marginBottom: 4 }}
+                />
+                <Area
+                  type="monotone" dataKey="orders" name="Orders"
+                  stroke="#3b82f6" strokeWidth={2.5}
+                  fill="url(#ordersGrad)"
+                  dot={false} activeDot={{ r: 5, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Donut chart */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-gray-800">Order Status</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                <span className="text-emerald-600 font-bold">{deliveredPct}%</span> delivered
+              </p>
+            </div>
+
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={pieData} cx="50%" cy="50%"
+                  innerRadius={55} outerRadius={80}
+                  paddingAngle={3} dataKey="value"
+                >
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i]} stroke="#fff" strokeWidth={2} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    background: "#fff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                    fontSize: "12px",
+                  }}
+                  itemStyle={{ fontWeight: 600 }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Legend */}
+            <div className="space-y-2 mt-2">
+              {pieData.map((p, i) => (
+                <div key={p.name} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i] }} />
+                    <span className="text-gray-500">{p.name}</span>
+                  </div>
+                  <span className="font-bold text-gray-700">{p.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Recent Orders table ── */}
+      {(isAdmin || isMerch) && orders.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">Recent Orders</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Last 5 orders placed</p>
+            </div>
+            <Link to="/admin/orders" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition">
+              View all <HiArrowRight />
             </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                  <th className="px-5 py-3 text-left">Order ID</th>
+                  <th className="px-5 py-3 text-left">Customer</th>
+                  <th className="px-5 py-3 text-left">Amount</th>
+                  <th className="px-5 py-3 text-left">Date</th>
+                  <th className="px-5 py-3 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {orders.slice(0, 5).map((order) => (
+                  <tr key={order._id} className="hover:bg-gray-50 transition">
+                    <td className="px-5 py-3.5">
+                      <span className="font-mono text-xs text-gray-400">#{order._id.slice(-8).toUpperCase()}</span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                          {(order.user?.name || "?")[0].toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium text-gray-800 truncate max-w-30">
+                          {order.user?.name || "Unknown"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 font-bold text-gray-900">
+                      ₹{order.totalPrice?.toLocaleString("en-IN") || 0}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-gray-400">
+                      {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <StatusBadge status={order.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bottom row: Recent Users + Messages ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Recent user signups */}
+        {(isAdmin || isMerch) && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">New Signups</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Latest registered users</p>
+              </div>
+              <Link to="/admin/users" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition">
+                All users <HiArrowRight />
+              </Link>
+            </div>
+
+            <div className="divide-y divide-gray-50">
+              {users.slice(-5).reverse().map((u) => (
+                <div key={u._id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition">
+                  <div className="w-8 h-8 rounded-xl bg-linear-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    {(u.name || "?")[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{u.name}</p>
+                      {u.role === "admin" && <MdVerified className="text-blue-500 text-xs shrink-0" />}
+                    </div>
+                    <p className="text-[11px] text-gray-400 truncate">{u.email}</p>
+                  </div>
+                  <p className="text-[11px] text-gray-300 shrink-0">
+                    {new Date(u.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                  </p>
+                </div>
+              ))}
+              {users.length === 0 && (
+                <p className="px-5 py-6 text-center text-xs text-gray-400">No users yet.</p>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Products */}
-        {(user?.role === "admin" || user?.role === "merchantise") && (
-          <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 shadow-md hover:shadow-xl hover:scale-[1.03] transition-all border border-purple-200 overflow-hidden">
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-purple-200 rounded-full opacity-30 group-hover:scale-110 transition-transform"></div>
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="p-4 w-14 h-14 flex items-center justify-center rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-lg">
-                <FaBoxOpen className="text-2xl" />
-              </div>
+        {/* Latest messages */}
+        {(isAdmin || isMerch || isMarketing) && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div>
-                <h2 className="text-md font-semibold text-gray-700">Total Products</h2>
-                <p className="text-3xl font-bold text-purple-700">{countProducts}</p>
+                <h3 className="text-sm font-bold text-gray-800">Contact Messages</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Latest 5 enquiries</p>
               </div>
+              <Link to="/admin/contact-messages" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition">
+                View all <HiArrowRight />
+              </Link>
             </div>
-            <Link
-              to="/admin/products"
-              className="text-sm text-purple-700 hover:underline font-medium relative z-10"
-            >
-              Manage Products →
-            </Link>
-          </div>
-        )}
 
-        {/* Users (admin only) */}
-        {user?.role === "admin" && (
-          <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-yellow-50 to-yellow-100 shadow-md hover:shadow-xl hover:scale-[1.03] transition-all border border-yellow-200 overflow-hidden">
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-yellow-200 rounded-full opacity-30 group-hover:scale-110 transition-transform"></div>
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="p-4 w-14 h-14 flex items-center justify-center rounded-xl bg-gradient-to-br from-yellow-400 to-yellow-600 text-white shadow-lg">
-                <FaUsers className="text-2xl" />
-              </div>
-              <div>
-                <h2 className="text-md font-semibold text-gray-700">Total Users</h2>
-                <p className="text-3xl font-bold text-yellow-700">{countUsers}</p>
-              </div>
+            <div className="divide-y divide-gray-50">
+              {latestMessages.map((msg) => (
+                <div key={msg._id} className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition">
+                  <div className="w-8 h-8 rounded-xl bg-linear-to-br from-indigo-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mt-0.5">
+                    {(msg.name || "?")[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{msg.name}</p>
+                      <p className="text-[11px] text-gray-300 shrink-0">
+                        {new Date(msg.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{msg.subject || "No subject"}</p>
+                  </div>
+                </div>
+              ))}
+              {latestMessages.length === 0 && (
+                <p className="px-5 py-6 text-center text-xs text-gray-400">No messages yet.</p>
+              )}
             </div>
-            <Link
-              to="/admin/users"
-              className="text-sm text-yellow-700 hover:underline font-medium relative z-10"
-            >
-              Manage Users →
-            </Link>
-          </div>
-        )}
-
-        {/* Revenue */}
-        {(user?.role === "admin" || user?.role === "merchantise") && (
-          <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-md hover:shadow-xl hover:scale-[1.03] transition-all border border-blue-200 overflow-hidden">
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-blue-200 rounded-full opacity-30 group-hover:scale-110 transition-transform"></div>
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="p-4 w-14 h-14 flex items-center justify-center rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg">
-                <FaRupeeSign className="text-2xl" />
-              </div>
-              <div>
-                <h2 className="text-md font-semibold text-gray-700">Total Revenue</h2>
-                <p className="text-3xl font-bold text-blue-700">₹{totalRevenue}</p>
-              </div>
-            </div>
-            <Link
-              to="/admin/revenue"
-              className="text-sm text-blue-700 hover:underline font-medium relative z-10"
-            >
-              {user?.role === "merchantise" ? "View Sales →" : "Revenue Report →"}
-            </Link>
-          </div>
-        )}
-
-        {/* Subscribers (Dynamic) */}
-        {(user?.role === "admin" || user?.role === "marketing") && (
-          <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-pink-50 to-pink-100 shadow-md hover:shadow-xl hover:scale-[1.03] transition-all border border-pink-200 overflow-hidden">
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-pink-200 rounded-full opacity-30 group-hover:scale-110 transition-transform"></div>
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="p-4 w-14 h-14 flex items-center justify-center rounded-xl bg-gradient-to-br from-pink-400 to-pink-600 text-white shadow-lg">
-                <GiLetterBomb className="text-2xl" />
-              </div>
-              <div>
-                <h2 className="text-md font-semibold text-gray-700">Total Subscribers</h2>
-                <p className="text-3xl font-bold text-pink-700">{countSubscribers}</p>
-              </div>
-            </div>
-            <Link to="/admin/subscribed-users" className="text-sm text-pink-700 hover:underline font-medium relative z-10">
-              View Subscribers →
-            </Link>
-          </div>
-        )}
-
-        {/* Messages (Dynamic) */}
-        {(user?.role === "admin" || user?.role === "marketing") && (
-          <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-indigo-50 to-indigo-100 shadow-md hover:shadow-xl hover:scale-[1.03] transition-all border border-indigo-200 overflow-hidden">
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-indigo-200 rounded-full opacity-30 group-hover:scale-110 transition-transform"></div>
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="p-4 w-14 h-14 flex items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-lg">
-                <LuMessageSquareText className="text-2xl" />
-              </div>
-              <div>
-                <h2 className="text-md font-semibold text-gray-700">Total Messages</h2>
-                <p className="text-3xl font-bold text-indigo-700">{countMessages}</p>
-              </div>
-            </div>
-            <Link to="/admin/contact-messages" className="text-sm text-indigo-700 hover:underline font-medium relative z-10">
-              View Messages →
-            </Link>
           </div>
         )}
       </div>
-
-      {/* Order Trend and Status Charts */}
-      {(user?.role === "admin" || user?.role === "merchantise") && (
-        <div className="mt-12">
-          <h2 className="text-3xl font-extrabold text-gray-800 mb-8 tracking-tight">
-            Order Overview
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Line Chart */}
-            <div className="group relative bg-white/80 backdrop-blur-xl p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-t-2xl"></div>
-
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span> Order Trends
-                </h3>
-                <span
-                  className={`text-xs font-medium px-3 py-1 rounded-full shadow-sm ${percentChange >= 0
-                    ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-700"
-                    }`}
-                >
-                  {percentChange >= 0 ? "📈" : "📉"} {percentChange}% this week
-                </span>
-              </div>
-
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 12 }} />
-                  <YAxis allowDecimals={false} tick={{ fill: "#6b7280", fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(255,255,255,0.95)",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "10px",
-                      boxShadow: "0 6px 12px rgba(0,0,0,0.1)",
-                    }}
-                    itemStyle={{ color: "#111827", fontWeight: 500 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="orders"
-                    stroke="#3b82f6"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "#3b82f6" }}
-                    activeDot={{ r: 6, fill: "#2563eb" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Pie Chart */}
-            <div className="group relative bg-white/80 backdrop-blur-xl p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-t-2xl"></div>
-
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-purple-500 rounded-full"></span> Order Status Distribution
-                </h3>
-                <span className="text-xs font-medium px-3 py-1 rounded-full bg-purple-100 text-purple-700 shadow-sm">
-                  {deliveredPercent}% Delivered
-                </span>
-              </div>
-
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={110}
-                    labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name} (${(percent * 100).toFixed(0)}%)`
-                    }
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                        stroke="#fff"
-                        strokeWidth={2}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(255,255,255,0.95)",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "10px",
-                      boxShadow: "0 6px 12px rgba(0,0,0,0.1)",
-                    }}
-                    itemStyle={{ color: "#111827", fontWeight: 500 }}
-                  />
-                  <Legend
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    wrapperStyle={{ fontSize: "13px", marginTop: "10px" }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recent Orders */}
-      {(user?.role === "admin" || user?.role === "merchantise") && (
-        <div className="mt-12">
-          <h2 className="text-3xl font-extrabold text-gray-800 mb-6 tracking-tight">
-            Recent Orders
-          </h2>
-
-          <div className="relative bg-white/80 backdrop-blur-xl shadow-lg rounded-2xl border border-gray-200 overflow-hidden">
-            {/* Accent bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-blue-500"></div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-gray-100/80 text-xs uppercase tracking-wide text-gray-600">
-                  <tr>
-                    <th className="py-4 px-6">Order ID</th>
-                    <th className="py-4 px-6">User</th>
-                    <th className="py-4 px-6">Total Price</th>
-                    <th className="py-4 px-6">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.slice(0, 5).map((order, idx) => (
-                    <tr
-                      key={order._id}
-                      className={`transition-all duration-200 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        } hover:bg-green-50`}
-                    >
-                      <td className="py-4 px-6 font-semibold text-gray-900 whitespace-nowrap">
-                        #{order._id}
-                      </td>
-                      <td className="py-4 px-6">{order.user?.name || "Unknown"}</td>
-                      <td className="py-4 px-6 font-semibold text-blue-600">
-                        ₹{order.totalPrice?.toFixed(2) || 0}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full ${order.status === "Delivered"
-                            ? "bg-green-100 text-green-700"
-                            : order.status === "Processing"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : ["Shipped", "Pickup Scheduled", "Picked Up", "In Transit", "Out For Delivery"].includes(order.status)
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-red-100 text-red-700"
-                            }`}
-                        >
-                          {order.status === "Delivered"}
-                          {order.status === "Processing"}
-                          {order.status === "Shipped"}
-                          {order.status === "Cancelled"}
-                          {order.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {orders.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="py-6 px-6 text-center text-gray-500 italic"
-                      >
-                        No recent orders found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recent User Signups */}
-      {(user?.role === "admin" || user?.role === "merchantise") && (
-        <div className="mt-12">
-          <h2 className="text-3xl font-extrabold text-gray-800 mb-6 tracking-tight">
-            Recent User Signups
-          </h2>
-
-          <div className="relative bg-white/80 backdrop-blur-xl shadow-lg rounded-2xl border border-gray-200 overflow-hidden">
-            {/* Accent bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-pink-500"></div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-gray-100/80 text-xs uppercase tracking-wide text-gray-600">
-                  <tr>
-                    <th className="py-4 px-6">User Name</th>
-                    <th className="py-4 px-6">Email</th>
-                    <th className="py-4 px-6">Created At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users
-                    .slice(-5)
-                    .reverse()
-                    .map((user, idx) => (
-                      <tr
-                        key={user._id}
-                        className={`transition-all duration-200 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                          } hover:bg-yellow-50`}
-                      >
-                        <td className="py-4 px-6 font-semibold text-gray-900 whitespace-nowrap">
-                          {user.name}
-                        </td>
-                        <td className="py-4 px-6 text-gray-700">{user.email}</td>
-                        <td className="py-4 px-6 text-gray-500">
-                          {new Date(user.createdAt).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  {users.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={3}
-                        className="py-6 px-6 text-center text-gray-500 italic"
-                      >
-                        No users found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Latest 5 Messages */}
-      {(user?.role === "admin" || user?.role === "merchantise" || user?.role === "marketing") && (
-        <div className="mt-12">
-          <h2 className="text-3xl font-extrabold text-gray-800 mb-6 tracking-tight">
-            Latest Contact Messages
-          </h2>
-
-          <div className="relative bg-white/80 backdrop-blur-xl shadow-lg rounded-2xl border border-gray-200 overflow-hidden">
-            {/* Accent bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-400 to-sky-500"></div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-gray-100/80 text-xs uppercase tracking-wide text-gray-600">
-                  <tr>
-                    <th className="py-4 px-6">Name</th>
-                    <th className="py-4 px-6">Subject</th>
-                    <th className="py-4 px-6">Date & Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {latestMessages.map((msg, idx) => (
-                    <tr
-                      key={msg._id}
-                      className={`transition-all duration-200 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        } hover:bg-indigo-50`}
-                    >
-                      <td className="py-4 px-6 font-semibold text-gray-900 whitespace-nowrap">
-                        {msg.name}
-                      </td>
-                      <td className="py-4 px-6 text-gray-700">{msg.subject}</td>
-                      <td className="py-4 px-6 text-gray-500">
-                        {new Date(msg.createdAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                  {latestMessages.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={3}
-                        className="py-6 px-6 text-center text-gray-500 italic"
-                      >
-                        No messages found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end p-4">
-              <Link
-                to="/admin/contact-messages"
-                className="text-sm font-medium text-indigo-700 hover:underline"
-              >
-                View all messages →
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };

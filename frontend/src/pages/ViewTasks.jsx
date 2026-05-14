@@ -1,356 +1,343 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { FaCheckCircle, FaEdit, FaTrash } from "react-icons/fa";
+import { FaCheckCircle, FaEdit, FaTrash, FaSearch } from "react-icons/fa";
+import { MdOutlineAssignment, MdFilterList } from "react-icons/md";
+import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
+
+/* ── status config ── */
+const STATUS = {
+  completed:     { label: "Completed",     pill: "bg-emerald-100 text-emerald-700 border-emerald-200", bar: "bg-emerald-500", pct: "w-full",  dot: "bg-emerald-500" },
+  working:       { label: "In Progress",   pill: "bg-amber-100   text-amber-700   border-amber-200",   bar: "bg-amber-400",   pct: "w-2/3",   dot: "bg-amber-400"   },
+  "not-completed":{ label: "Not Started",  pill: "bg-red-100     text-red-600     border-red-200",     bar: "bg-red-400",     pct: "w-0",     dot: "bg-red-400"     },
+};
+const getStatus = (s) => STATUS[s] || STATUS["not-completed"];
 
 const ViewTasks = () => {
-  const [tasks, setTasks] = useState([]);
+  const [tasks,         setTasks]         = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const tasksPerPage = 2;
+  const [searchTerm,    setSearchTerm]    = useState("");
+  const [statusFilter,  setStatusFilter]  = useState("");
+  const [currentPage,   setCurrentPage]   = useState(1);
+  const [editingId,     setEditingId]     = useState(null);
+  const [editForm,      setEditForm]      = useState({ title: "", description: "" });
+  const [deleteModal,   setDeleteModal]   = useState({ open: false, id: null });
 
-  const [editingTaskId, setEditingTaskId] = useState(null);
-  const [editForm, setEditForm] = useState({ title: "", description: "" });
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    taskId: null,
-  });
-
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const TASKS_PER_PAGE = 5;
+  const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
   const isAdmin = userInfo?.role === "admin";
 
+  /* ── data ── */
   const fetchTasks = async () => {
     try {
-      const endpoint = isAdmin
+      const url = isAdmin
         ? `${import.meta.env.VITE_BACKEND_URL}/api/tasks`
-        : `${import.meta.env.VITE_BACKEND_URL}/api/tasks/user/${
-            userInfo.email
-          }`;
-      const res = await fetch(endpoint);
-      const data = await res.json();
+        : `${import.meta.env.VITE_BACKEND_URL}/api/tasks/user/${userInfo.email}`;
+      const data = await fetch(url).then((r) => r.json());
       setTasks(data);
-      setFilteredTasks(data);
-    } catch (err) {
-      toast.error("Failed to fetch tasks");
-    }
+    } catch { toast.error("Failed to fetch tasks"); }
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+  useEffect(() => { fetchTasks(); }, []);
 
   useEffect(() => {
-    let updated = [...tasks];
-
-    if (searchTerm && isAdmin) {
-      updated = updated.filter(
-        (task) =>
-          task.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          task.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    let list = [...tasks];
+    if (searchTerm && isAdmin)
+      list = list.filter((t) =>
+        t.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.title?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-
-    if (statusFilter && statusFilter !== "all") {
-      updated = updated.filter((task) => task.status === statusFilter);
-    }
-
-    setFilteredTasks(updated);
-    setCurrentPage(1); // reset to page 1
+    if (statusFilter && statusFilter !== "all")
+      list = list.filter((t) => t.status === statusFilter);
+    setFilteredTasks(list);
+    setCurrentPage(1);
   }, [searchTerm, statusFilter, tasks]);
 
   const handleDelete = async (id) => {
-    try {
-      await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tasks/${id}`, {
-        method: "DELETE",
-      });
-      toast.success("Task deleted");
-      fetchTasks();
-    } catch (err) {
-      toast.error("Failed to delete task");
-    }
+    await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tasks/${id}`, { method: "DELETE" });
+    toast.success("Task deleted");
+    fetchTasks();
   };
 
-  const handleStatusToggle = async (id, currentStatus) => {
-    const newStatus = currentStatus === "working" ? "completed" : "working";
-    try {
-      await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tasks/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      toast.success("Status updated");
-      fetchTasks();
-    } catch (err) {
-      toast.error("Failed to update status");
-    }
-  };
-
-  const startEdit = (task) => {
-    setEditingTaskId(task._id);
-    setEditForm({ title: task.title, description: task.description });
-  };
-
-  const cancelEdit = () => {
-    setEditingTaskId(null);
-    setEditForm({ title: "", description: "" });
+  const handleStatusToggle = async (id, current) => {
+    const next = current === "working" ? "completed" : "working";
+    await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tasks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
+    toast.success("Status updated");
+    fetchTasks();
   };
 
   const saveEdit = async (id) => {
-    try {
-      await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tasks/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
-      });
-      toast.success("Task updated");
-      cancelEdit();
-      fetchTasks();
-    } catch (err) {
-      toast.error("Failed to update task");
-    }
+    await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tasks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+    toast.success("Task updated");
+    setEditingId(null);
+    fetchTasks();
   };
 
-  // Pagination
-  const indexOfLast = currentPage * tasksPerPage;
-  const indexOfFirst = indexOfLast - tasksPerPage;
-  const currentTasks = filteredTasks.slice(indexOfFirst, indexOfLast);
-  const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
+  /* ── pagination ── */
+  const totalPages  = Math.ceil(filteredTasks.length / TASKS_PER_PAGE);
+  const currentList = filteredTasks.slice((currentPage - 1) * TASKS_PER_PAGE, currentPage * TASKS_PER_PAGE);
+
+  /* ── stats ── */
+  const totalCount     = tasks.length;
+  const workingCount   = tasks.filter((t) => t.status === "working").length;
+  const completedCount = tasks.filter((t) => t.status === "completed").length;
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <h2 className="text-2xl font-bold mb-6">My Tasks</h2>
+    <div className="min-h-screen p-4 md:p-6 space-y-5">
 
-      {/* Top Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        {isAdmin && (
-          <input
-            type="text"
-            placeholder="Search by name or email"
-            className="w-full sm:w-1/2 px-4 py-2 border border-gray-300 rounded-full shadow-sm outline-0 bg-white"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        )}
-        <select
-          className="w-full sm:w-1/4 px-4 py-2 border border-gray-300 rounded shadow-sm bg-white outline-0"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="working">Working</option>
-          <option value="completed">Completed</option>
-          <option value="not completed">Not Completed</option>
-        </select>
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+            <MdOutlineAssignment className="text-white text-xl" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-gray-900">{isAdmin ? "All Tasks" : "My Tasks"}</h1>
+            <p className="text-xs text-gray-400 mt-0.5">{totalCount} task{totalCount !== 1 ? "s" : ""} total</p>
+          </div>
+        </div>
+
+        {/* Summary chips */}
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { label: "Total",     val: totalCount,     dot: "bg-gray-400"    },
+            { label: "Working",   val: workingCount,   dot: "bg-amber-400"   },
+            { label: "Done",      val: completedCount, dot: "bg-emerald-500" },
+          ].map(({ label, val, dot }) => (
+            <div key={label} className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm text-xs font-semibold text-gray-700">
+              <span className={`w-2 h-2 rounded-full ${dot}`} />{label}: {val}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {currentTasks.length === 0 ? (
-        <p className="text-gray-600">No tasks found.</p>
+      {/* ── Filters ── */}
+      <div className="p-4 flex flex-col sm:flex-row gap-3">
+        {isAdmin && (
+          <div className="relative flex-1">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+            <input
+              type="text"
+              placeholder="Search by name, email or title…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            />
+          </div>
+        )}
+        <div className="relative">
+          <MdFilterList className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition appearance-none cursor-pointer"
+          >
+            <option value="">All Status</option>
+            <option value="working">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="not-completed">Not Started</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ── Task list ── */}
+      {currentList.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm text-center">
+          <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+            <MdOutlineAssignment className="text-3xl text-gray-300" />
+          </div>
+          <p className="text-sm font-semibold text-gray-500">No tasks found</p>
+          <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
+        </div>
       ) : (
-        <div className="space-y-6">
-          {currentTasks.map((task) => (
-            <div
-              key={task._id}
-              className="p-6 bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-md border border-gray-200 transition-all duration-300 hover:shadow-lg"
-            >
-              {editingTaskId === task._id ? (
-                <>
-                  <input
-                    type="text"
-                    value={editForm.title}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, title: e.target.value })
-                    }
-                    className="w-full mb-2 px-4 py-2 border rounded-md"
-                  />
-                  <textarea
-                    rows={3}
-                    value={editForm.description}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        description: e.target.value,
-                      })
-                    }
-                    className="w-full mb-4 px-4 py-2 border rounded-md"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => saveEdit(task._id)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="mb-3">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-1">
-                      {task.title}
-                    </h3>
-                    <p className="text-gray-600 mb-1">{task.description}</p>
-                    {isAdmin && (
-                      <p className="text-sm text-gray-500">
-                        <span className="font-semibold">Merchantiser:</span> {task.name}{" "}
-                        | <span className="font-semibold">Email:</span>{" "}
-                        {task.email}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400">
-                      Created: {new Date(task.createdAt).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      Updated: {new Date(task.updatedAt).toLocaleString()}
-                    </p>
-                  </div>
+        <div className="space-y-3">
+          {currentList.map((task) => {
+            const st = getStatus(task.status);
+            return (
+              <div
+                key={task._id}
+                className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden"
+              >
+                {/* Coloured left accent */}
+                <div className="flex">
+                  <div className={`w-1 shrink-0 ${st.bar}`} />
+                  <div className="flex-1 p-5">
 
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="flex flex-col gap-1">
-                      <span className="flex items-center gap-2">
-                        Status:
-                        <span
-                          className={`px-3 py-1 text-xs font-semibold rounded-full
-        ${
-          task.status === "completed"
-            ? "bg-gradient-to-r from-green-400 to-green-600 text-white"
-            : task.status === "not-completed"
-            ? "bg-gradient-to-r from-red-400 to-red-600 text-white"
-            : "bg-gradient-to-r from-yellow-300 to-yellow-500 text-gray-800"
-        }`}
-                        >
-                          {task.status === "completed"
-                            ? "Completed"
-                            : task.status === "not-completed"
-                            ? "Not Completed"
-                            : "Working"}
-                        </span>
-                      </span>
-
-                      {/* Progress bar */}
-                      {task.status !== "not-completed" ? (
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-300 ${
-                              task.status === "working"
-                                ? "w-2/3 bg-yellow-500"
-                                : "w-full bg-green-600"
-                            }`}
-                          ></div>
-                        </div>
-                      ) : (
-                        <div className="w-full h-2 bg-red-300 rounded-full flex items-center justify-center text-[10px] text-white font-bold tracking-wide bg-opacity-80">
-                          Not Started
-                        </div>
-                      )}
-                    </span>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          handleStatusToggle(task._id, task.status)
-                        }
-                        className="flex items-center gap-1 bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600"
-                      >
-                        <FaCheckCircle />
-                        Mark as{" "}
-                        {task.status === "working" ? "Completed" : "Working"}
-                      </button>
-
-                      <button
-                        onClick={() => startEdit(task)}
-                        className="flex items-center gap-1 bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
-                      >
-                        <FaEdit />
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          setConfirmModal({
-                            isOpen: true,
-                            taskId: task._id,
-                          })
-                        }
-                        className="flex items-center gap-1 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                      >
-                        <FaTrash />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  {confirmModal.isOpen && confirmModal.taskId === task._id && (
-                    <div
-                      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
-                      onClick={() =>
-                        setConfirmModal({ isOpen: false, taskId: null })
-                      }
-                    >
-                      <div
-                        className="bg-white rounded-xl p-6 shadow-xl max-w-sm w-full"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <h3 className="text-lg font-semibold mb-2 text-red-600">
-                          Confirm Delete
-                        </h3>
-                        <p className="text-gray-700 mb-4">
-                          Are you sure you want to delete this task?
-                        </p>
-                        <div className="flex justify-end gap-2">
+                    {editingId === task._id ? (
+                      /* ── Edit mode ── */
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={editForm.title}
+                          onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition font-semibold"
+                          placeholder="Task title"
+                        />
+                        <textarea
+                          rows={3}
+                          value={editForm.description}
+                          onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none transition"
+                          placeholder="Description"
+                        />
+                        <div className="flex gap-2">
                           <button
-                            className="px-4 py-1 rounded bg-gray-300 text-gray-800 hover:bg-gray-400"
-                            onClick={() =>
-                              setConfirmModal({
-                                isOpen: false,
-                                taskId: null,
-                              })
-                            }
+                            onClick={() => saveEdit(task._id)}
+                            className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition"
                           >
                             Cancel
                           </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── View mode ── */
+                      <div>
+                        {/* Top row */}
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <h3 className="text-base font-bold text-gray-900">{task.title}</h3>
+                              <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${st.pill}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-500 leading-relaxed">{task.description}</p>
+                          </div>
+                        </div>
+
+                        {/* Meta */}
+                        <div className="flex flex-wrap gap-4 text-xs text-gray-400 mb-3">
+                          {isAdmin && (
+                            <span className="flex items-center gap-1">
+                              <span className="font-semibold text-gray-600">{task.name}</span>
+                              <span>·</span>
+                              <span>{task.email}</span>
+                            </span>
+                          )}
+                          <span>Created {new Date(task.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1.5">
+                            <span>Progress</span>
+                            <span className="font-semibold">
+                              {task.status === "completed" ? "100%" : task.status === "working" ? "66%" : "0%"}
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${st.bar} ${st.pct}`} />
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
-                            className="px-4 py-1 rounded bg-red-600 text-white hover:bg-red-700"
-                            onClick={() => {
-                              handleDelete(confirmModal.taskId);
-                              setConfirmModal({
-                                isOpen: false,
-                                taskId: null,
-                              });
-                            }}
+                            onClick={() => handleStatusToggle(task._id, task.status)}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 transition"
                           >
-                            Delete
+                            <FaCheckCircle className="text-xs" />
+                            {task.status === "working" ? "Mark Complete" : "Mark Working"}
+                          </button>
+                          <button
+                            onClick={() => { setEditingId(task._id); setEditForm({ title: task.title, description: task.description }); }}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition"
+                          >
+                            <FaEdit className="text-xs" /> Edit
+                          </button>
+                          <button
+                            onClick={() => setDeleteModal({ open: true, id: task._id })}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition"
+                          >
+                            <FaTrash className="text-xs" /> Delete
                           </button>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-          {/* Pagination */}
-          <div className="flex justify-center gap-2 mt-6">
-            {Array.from({ length: totalPages }, (_, i) => (
+      {/* ── Pagination ── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            <HiChevronLeft />
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentPage(i + 1)}
+              className={`w-8 h-8 rounded-xl text-xs font-bold transition ${
+                currentPage === i + 1
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "border border-gray-200 text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            <HiChevronRight />
+          </button>
+        </div>
+      )}
+
+      {/* ── Delete confirm modal ── */}
+      {deleteModal.open && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setDeleteModal({ open: false, id: null })}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <FaTrash className="text-red-500 text-lg" />
+            </div>
+            <h3 className="text-base font-bold text-gray-800 text-center mb-1">Delete Task?</h3>
+            <p className="text-sm text-gray-500 text-center mb-5">This action cannot be undone.</p>
+            <div className="flex gap-3">
               <button
-                key={i}
-                onClick={() => setCurrentPage(i + 1)}
-                className={`px-3 py-1 rounded-full ${
-                  currentPage === i + 1
-                    ? "bg-indigo-600 text-white"
-                    : "bg-gray-200 text-gray-800"
-                } hover:bg-indigo-500 hover:text-white`}
+                onClick={() => setDeleteModal({ open: false, id: null })}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
               >
-                {i + 1}
+                Cancel
               </button>
-            ))}
+              <button
+                onClick={() => { handleDelete(deleteModal.id); setDeleteModal({ open: false, id: null }); }}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-sm font-bold text-white hover:bg-red-700 transition shadow-sm"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
