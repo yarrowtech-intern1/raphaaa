@@ -2259,75 +2259,27 @@ const ProductDetails = ({ productId }) => {
 
     try {
       const response = await fetch(
-        `https://api.postalpincode.in/pincode/${pincode}`
+        `${import.meta.env.VITE_BACKEND_URL}/api/products/delivery/check?pincode=${encodeURIComponent(
+          pincode
+        )}&cod=0`
       );
       const data = await response.json();
-
-      if (data[0].Status === "Error") {
+      if (!response.ok || !data?.success) {
         setDeliveryInfo({
           isDeliverable: false,
-          message: "Invalid pincode. Please check and try again.",
+          message: data?.message || "Unable to check delivery now.",
         });
-        setIsCheckingDelivery(false);
         return;
       }
-
-      const location = data[0].PostOffice[0];
-      const district = location.District;
-      const state = location.State;
-
-      const warehouseLocation = {
-        lat: 22.5726,
-        lon: 88.3639,
-      };
-
-      const locationCoordinates = await getLocationCoordinates(district, state);
-
-      if (!locationCoordinates) {
-        setDeliveryInfo({
-          isDeliverable: false,
-          message:
-            "Unable to verify delivery location. Please contact support.",
-        });
-        setIsCheckingDelivery(false);
-        return;
-      }
-
-      const distance = calculateDistance(
-        warehouseLocation.lat,
-        warehouseLocation.lon,
-        locationCoordinates.lat,
-        locationCoordinates.lon
-      );
-
-      const isDeliverable = distance <= 22717;
-
-      const currentDate = new Date();
-      const deliveryDate = new Date(currentDate);
-      deliveryDate.setDate(
-        currentDate.getDate() +
-        (isDeliverable ? Math.floor(Math.random() * 5) + 2 : 0)
-      );
-
       setDeliveryInfo({
-        isDeliverable,
-        message: isDeliverable
-          ? `Delivery available -  (${distance.toFixed(1)}km away)`
-          : `Not deliverable - beyond 80km radius (${distance.toFixed(
-            1
-          )}km away)`,
-        deliveryDate: isDeliverable
-          ? deliveryDate.toLocaleDateString("en-IN", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
-          : null,
-        deliveryDays: isDeliverable
-          ? Math.ceil((deliveryDate - currentDate) / (1000 * 60 * 60 * 24))
-          : null,
-        location: `${district}, ${state}`,
+        isDeliverable: Boolean(data.isDeliverable),
+        message: data.message || "Delivery check completed",
+        deliveryDate: data.deliveryDate || null,
+        deliveryDays: data.deliveryDays ?? null,
+        location: data.location || null,
+        courierName: data.courierName || null,
+        courierCount: data.courierCount || 0,
+        codAvailable: Boolean(data.codAvailable),
       });
     } catch (error) {
       console.error("Error checking delivery:", error);
@@ -2338,43 +2290,6 @@ const ProductDetails = ({ productId }) => {
     } finally {
       setIsCheckingDelivery(false);
     }
-  };
-
-  const getLocationCoordinates = async (district, state) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          district
-        )},${encodeURIComponent(state)},India&limit=1`
-      );
-      const data = await response.json();
-
-      if (data.length > 0) {
-        return {
-          lat: parseFloat(data[0].lat),
-          lon: parseFloat(data[0].lon),
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error("Error getting coordinates:", error);
-      return null;
-    }
-  };
-
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-    return distance;
   };
 
   const handleDeliveryCheck = () => {
@@ -2508,7 +2423,7 @@ const ProductDetails = ({ productId }) => {
       {selectedProduct && (
         <>
           {/* Breadcrumb */}
-          <div className="bg-white border-b border-gray-200">
+          <div className="bg-linear-to-r from-sky-200 to-sky-100 border-b border-gray-200">
             <div className="max-w-7xl mx-auto px-4 py-2.5 text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
               <span onClick={() => navigate("/")} className="hover:text-sky-600 cursor-pointer transition">Home</span>
               <span>/</span>
@@ -2941,6 +2856,17 @@ const ProductDetails = ({ productId }) => {
                       {deliveryInfo.isDeliverable && deliveryInfo.deliveryDate && (
                         <p className="mt-0.5 text-xs">
                           Estimated: <strong>{deliveryInfo.deliveryDate}</strong> ({deliveryInfo.deliveryDays} days)
+                        </p>
+                      )}
+                      {deliveryInfo.isDeliverable && deliveryInfo.courierName && (
+                        <p className="mt-0.5 text-xs">
+                          Courier: <strong>{deliveryInfo.courierName}</strong>
+                          {deliveryInfo.courierCount > 1 ? ` +${deliveryInfo.courierCount - 1} more` : ""}
+                        </p>
+                      )}
+                      {deliveryInfo.isDeliverable && (
+                        <p className="mt-0.5 text-xs">
+                          COD: <strong>{deliveryInfo.codAvailable ? "Available" : "Not available"}</strong>
                         </p>
                       )}
                       {deliveryInfo.location && (

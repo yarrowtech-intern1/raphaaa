@@ -2,18 +2,22 @@ const express = require("express");
 const router = express.Router();
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const { protect, admin } = require("../middleware/authMiddleware");
 
 // @desc    Get product sales performance (for admin/merchandise dashboard)
 // @route   GET /api/sales/analysis
 // @access  Private (admin & merchandise)
-router.get("/", async (req, res) => {
+router.get("/", protect, admin, async (req, res) => {
   try {
     const orders = await Order.find({ isPaid: true }).populate("orderItems.productId");
     const salesMap = new Map();
+    const isMerchandise = req.user?.role === "merchantise";
+
     for (const order of orders) {
       for (const item of order.orderItems || []) {
         const product = item.productId;
         if (!product) continue;
+        if (isMerchandise && String(product.user) !== String(req.user._id)) continue;
 
         const key = [
           product._id.toString(),

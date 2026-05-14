@@ -43,8 +43,16 @@ const SalesTrendsPage = () => {
   const fetchSales = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/sales-analysis`
+        `${import.meta.env.VITE_BACKEND_URL}/api/sales-analysis`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("userToken")}`,
+          },
+        }
       );
+      if (!res.ok) {
+        throw new Error("Failed to fetch sales data");
+      }
       const data = await res.json();
       setSalesData(data);
       setFilteredProducts(data);

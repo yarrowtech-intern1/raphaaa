@@ -224,8 +224,71 @@ const syncShiprocketStatusesForOpenOrders = async (limit = 50) => {
   }
 };
 
+const checkDeliveryServiceability = async ({
+  deliveryPostcode,
+  cod = 0,
+  weight = null,
+}) => {
+  const pickupPostcode = String(
+    process.env.SHIPROCKET_PICKUP_POSTCODE ||
+      process.env.SHIPROCKET_PICKUP_PINCODE ||
+      ""
+  ).trim();
+
+  if (!pickupPostcode) {
+    throw new Error(
+      "Missing SHIPROCKET_PICKUP_POSTCODE in environment for delivery check"
+    );
+  }
+
+  const deliveryPin = String(deliveryPostcode || "").trim();
+  if (!/^\d{6}$/.test(deliveryPin)) {
+    throw new Error("Valid 6-digit delivery pincode is required");
+  }
+
+  const parcelWeight = Number(weight || process.env.SHIPROCKET_PACKAGE_WEIGHT || 0.5);
+  const client = await shiprocketClient();
+  const { data } = await client.get("/courier/serviceability/", {
+    params: {
+      pickup_postcode: pickupPostcode,
+      delivery_postcode: deliveryPin,
+      cod: Number(cod) ? 1 : 0,
+      weight: Number.isFinite(parcelWeight) ? parcelWeight : 0.5,
+    },
+  });
+
+  const companies = data?.data?.available_courier_companies || [];
+  const firstCourier = companies[0] || null;
+  return {
+    serviceable: companies.length > 0,
+    pickupPostcode,
+    deliveryPostcode: deliveryPin,
+    courierCount: companies.length,
+    estimatedDays: firstCourier?.estimated_delivery_days ?? null,
+    estimatedDate: firstCourier?.etd ?? null,
+    courierName: firstCourier?.courier_name || null,
+    codAvailable:
+      firstCourier?.cod === 1 ||
+      firstCourier?.cod === true ||
+      firstCourier?.is_cod_available === 1 ||
+      firstCourier?.is_cod_available === true,
+    availableCouriers: companies.slice(0, 5).map((c) => ({
+      courierName: c?.courier_name || null,
+      estimatedDays: c?.estimated_delivery_days ?? null,
+      estimatedDate: c?.etd ?? null,
+      cod:
+        c?.cod === 1 ||
+        c?.cod === true ||
+        c?.is_cod_available === 1 ||
+        c?.is_cod_available === true,
+      rate: c?.rate ?? null,
+    })),
+  };
+};
+
 module.exports = {
   createShiprocketOrder,
   syncOrderTrackingStatus,
   syncShiprocketStatusesForOpenOrders,
+  checkDeliveryServiceability,
 };

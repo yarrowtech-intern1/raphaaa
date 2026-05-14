@@ -1,4 +1,5 @@
 const express = require("express");
+const axios = require("axios");
 const Product = require("../models/Product");
 const {
   protect,
@@ -8,8 +9,72 @@ const {
 const Review = require("../models/Review");
 const Order = require("../models/Order");
 const User = require("../models/User");
+const { checkDeliveryServiceability } = require("../utils/shiprocket");
 
 const router = express.Router();
+
+// @route GET /api/products/delivery/check?pincode=700001&cod=0&weight=0.5
+// @desc Check delivery serviceability and ETA by pincode via Shiprocket
+// @access Public
+router.get("/delivery/check", async (req, res) => {
+  const pincode = String(req.query.pincode || "").trim();
+  const cod = Number(req.query.cod || 0);
+  const weight = req.query.weight ? Number(req.query.weight) : null;
+
+  if (!/^\d{6}$/.test(pincode)) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide a valid 6-digit pincode",
+    });
+  }
+
+  try {
+    const sr = await checkDeliveryServiceability({
+      deliveryPostcode: pincode,
+      cod,
+      weight,
+    });
+
+    let location = null;
+    try {
+      const pinRes = await axios.get(
+        `https://api.postalpincode.in/pincode/${pincode}`,
+        { timeout: 10000 }
+      );
+      const postOffice = pinRes?.data?.[0]?.PostOffice?.[0];
+      if (postOffice) {
+        location = `${postOffice.District}, ${postOffice.State}`;
+      }
+    } catch (_) {
+      // Non-blocking fallback: location is optional
+    }
+
+    return res.json({
+      success: true,
+      isDeliverable: sr.serviceable,
+      message: sr.serviceable
+        ? "Delivery available"
+        : "Delivery not available for this pincode",
+      deliveryDate: sr.estimatedDate,
+      deliveryDays: sr.estimatedDays,
+      location,
+      courierName: sr.courierName,
+      courierCount: sr.courierCount,
+      codAvailable: sr.codAvailable,
+      availableCouriers: sr.availableCouriers,
+      pickupPostcode: sr.pickupPostcode,
+      deliveryPostcode: sr.deliveryPostcode,
+    });
+  } catch (error) {
+    console.error("Delivery check error:", error?.response?.data || error.message);
+    return res.status(500).json({
+      success: false,
+      isDeliverable: false,
+      message:
+        "Unable to check delivery now. Please try again in a moment.",
+    });
+  }
+});
 
 const normalizeVariants = (variants = []) => {
   if (!Array.isArray(variants)) return [];
@@ -311,9 +376,14 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/products/inventory - Admin & Merchandise only
-router.get("/inventory", async (req, res) => {
+router.get("/inventory", protect, admin, async (req, res) => {
   try {
-    const products = await Product.find().select(
+    const query =
+      req.user?.role === "merchantise"
+        ? { user: req.user._id }
+        : {};
+
+    const products = await Product.find(query).select(
       "name category price countInStock sku colorVariants variants"
     );
     res.json(products);

@@ -225,7 +225,7 @@ const AdminSidebar = () => {
         )}
 
         {/* ANALYTICS */}
-        {isAdmin && (
+        {(isAdmin || isMerchandise) && (
           <>
             <SectionLabel>Analytics</SectionLabel>
             <AccordionGroup icon={BsGraphUpArrow} label="Analysis">

@@ -34,8 +34,16 @@ const InventoryPage = () => {
     const fetchInventory = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/api/products/inventory`
+          `${import.meta.env.VITE_BACKEND_URL}/api/products/inventory`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("userToken")}`,
+            },
+          }
         );
+        if (!res.ok) {
+          throw new Error("Failed to fetch inventory");
+        }
         const data = await res.json();
         setProducts(data);
         setFiltered(data);

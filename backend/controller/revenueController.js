@@ -187,9 +187,54 @@ exports.getRevenueByPeriod = async (req, res) => {
       .sort({ paidAt: -1, createdAt: -1 })
       .lean();
 
-    const totalRevenue = paidOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0);
-    const totalOrders = paidOrders.length;
-    const totalProductsSold = paidOrders.reduce(
+    const isMerchandise = req.user?.role === "merchantise";
+    let scopedOrders = paidOrders;
+
+    if (isMerchandise) {
+      const allProductIds = [
+        ...new Set(
+          paidOrders
+            .flatMap((o) => o.orderItems || [])
+            .map((it) => (it.productId ? String(it.productId) : null))
+            .filter(Boolean)
+        ),
+      ];
+
+      const ownedProducts = await Product.find({
+        _id: { $in: allProductIds },
+        user: req.user._id,
+      })
+        .select("_id")
+        .lean();
+
+      const ownedIdSet = new Set(ownedProducts.map((p) => String(p._id)));
+
+      scopedOrders = paidOrders
+        .map((order) => {
+          const scopedItems = (order.orderItems || []).filter(
+            (item) => item.productId && ownedIdSet.has(String(item.productId))
+          );
+
+          if (!scopedItems.length) return null;
+
+          const scopedTotal = scopedItems.reduce(
+            (sum, item) =>
+              sum + (Number(item.quantity) || 0) * (Number(item.price) || 0),
+            0
+          );
+
+          return {
+            ...order,
+            orderItems: scopedItems,
+            totalPrice: scopedTotal,
+          };
+        })
+        .filter(Boolean);
+    }
+
+    const totalRevenue = scopedOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0);
+    const totalOrders = scopedOrders.length;
+    const totalProductsSold = scopedOrders.reduce(
       (acc, order) =>
         acc + (order.orderItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
       0
@@ -207,7 +252,7 @@ exports.getRevenueByPeriod = async (req, res) => {
       return date.toISOString().split("T")[0];
     };
 
-    for (const order of paidOrders) {
+    for (const order of scopedOrders) {
       const ts = order.paidAt || order.createdAt;
       const key = getBucketKey(ts);
       const itemQty = (order.orderItems || []).reduce(
@@ -230,7 +275,7 @@ exports.getRevenueByPeriod = async (req, res) => {
 
     const productMap = new Map();
 
-    for (const order of paidOrders) {
+    for (const order of scopedOrders) {
       for (const it of (order.orderItems || [])) {
         const keyBase = it.productId ? String(it.productId) : (it.name || "unknown");
         const key = [
@@ -299,7 +344,7 @@ exports.getRevenueByPeriod = async (req, res) => {
       orderIds: undefined,
     }));
 
-    const transactions = paidOrders.map((order) => {
+    const transactions = scopedOrders.map((order) => {
       const itemQuantity = (order.orderItems || []).reduce(
         (sum, item) => sum + (Number(item.quantity) || 0),
         0

@@ -623,7 +623,7 @@ router.get("/", protect, async (req, res) => {
 //   }
 // );
 
-router.get("/revenue/:period", protect, getRevenueByPeriod);
+router.get("/revenue/:period", protect, adminOrMerchantise, getRevenueByPeriod);
 
 // ✅ Verify if order exists for the logged-in user
 router.get('/verify/:orderId', protect, async (req, res) => {
