@@ -90,10 +90,10 @@ const CollectionPage = () => {
       <div className="min-h-screen">
 
         {/* ── Breadcrumb ── */}
-        <div className="border-b border-gray-100 bg-white">
-          <div className="max-w-400 mx-auto px-4 md:px-6 py-3 flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+        <div className="bg-linear-to-r from-sky-200 to-sky-100">
+          <div className="max-w-400 mx-auto px-4 md:px-6 py-3 flex items-center gap-1.5 text-xs text-slate-950-400 font-medium">
             <span className="hover:text-gray-700 cursor-pointer transition" onClick={() => navigate("/")}>Home</span>
-            <HiChevronRight className="text-gray-300" />
+            <HiChevronRight className="text-slate-950" />
             <span className="hover:text-gray-700 cursor-pointer transition" onClick={() => navigate("/collections/all")}>Collections</span>
             {collection && collection !== "all" && (
               <>
@@ -105,7 +105,7 @@ const CollectionPage = () => {
         </div>
 
         {/* ── Page body ── */}
-        <div className="max-w-400 mx-auto flex items-start">
+        <div className="max-w-400 mx-auto flex items-start lg:h-[calc(100vh-88px)] lg:overflow-hidden">
 
           {/* ── Mobile filter FAB ── */}
           <button
@@ -137,7 +137,7 @@ const CollectionPage = () => {
               fixed inset-y-0 left-0 z-50
               lg:translate-x-0 lg:z-auto
               w-64 xl:w-72 shrink-0
-              lg:sticky lg:top-0 lg:h-screen
+              lg:sticky lg:top-0 lg:h-full
               overflow-y-auto
               transition-transform duration-300 ease-in-out
               bg-white lg:bg-transparent
@@ -157,7 +157,7 @@ const CollectionPage = () => {
           </aside>
 
           {/* ── MAIN CONTENT ── */}
-          <main className="flex-1 min-w-0 px-4 md:px-5 py-5">
+          <main className="flex-1 min-w-0 px-4 md:px-5 py-5 lg:h-full lg:overflow-y-auto">
 
             {/* ── Toolbar row ── */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">

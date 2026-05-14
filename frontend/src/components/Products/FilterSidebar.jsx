@@ -37,6 +37,7 @@ const FilterSidebar = ({ onClose }) => {
   const [open, setOpen]             = useState({
     category: true, gender: true, color: true, size: true, material: true, price: true,
   });
+  const [priceDebounceTimer, setPriceDebounceTimer] = useState(null);
 
   const COLORS  = Object.keys(COLOR_MAP);
   const SIZES   = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
@@ -94,14 +95,26 @@ const FilterSidebar = ({ onClose }) => {
     const next = [clamp(Number(e.target.value), MIN_BOUND, priceRange[1]), priceRange[1]];
     setPriceRange(next);
     const nf = { ...filters, minPrice: next[0], maxPrice: next[1] };
-    setFilters(nf); push(nf);
+    setFilters(nf);
+    if (priceDebounceTimer) clearTimeout(priceDebounceTimer);
+    const t = setTimeout(() => push(nf), 220);
+    setPriceDebounceTimer(t);
   };
   const onMaxChange = (e) => {
     const next = [priceRange[0], clamp(Number(e.target.value), priceRange[0], MAX_BOUND)];
     setPriceRange(next);
     const nf = { ...filters, minPrice: next[0], maxPrice: next[1] };
-    setFilters(nf); push(nf);
+    setFilters(nf);
+    if (priceDebounceTimer) clearTimeout(priceDebounceTimer);
+    const t = setTimeout(() => push(nf), 220);
+    setPriceDebounceTimer(t);
   };
+
+  useEffect(() => {
+    return () => {
+      if (priceDebounceTimer) clearTimeout(priceDebounceTimer);
+    };
+  }, [priceDebounceTimer]);
 
   const hasFilters = [...searchParams.keys()].some((k) => k !== "sortBy");
   const clearAll = () => {
