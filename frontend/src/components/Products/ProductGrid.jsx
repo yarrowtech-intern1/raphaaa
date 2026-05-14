@@ -1,22 +1,31 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import demoImg from "../../assets/login.jpg";
-import { IoFlash } from "react-icons/io5";
 import { AiOutlineHeart, AiFillHeart } from "react-icons/ai";
+import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import axios from "axios";
-import { toast } from "sonner"; // since you're already using toast
+import { toast } from "sonner";
+
+/* ── Skeleton ── */
+const Skeleton = () => (
+  <div className="animate-pulse">
+    <div className="bg-gray-100 rounded-none w-full aspect-3/4 mb-3" />
+    <div className="h-2.5 bg-gray-100 rounded w-1/4 mb-2" />
+    <div className="h-3.5 bg-gray-100 rounded w-3/4 mb-1.5" />
+    <div className="h-3 bg-gray-100 rounded w-1/2" />
+  </div>
+);
 
 const ProductGrid = ({ products = [], loading, error }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [productsPerPage, setProductsPerPage] = useState(
-    window.innerWidth < 640 ? 10 : 9
-  );
-  const navigate = useNavigate();
+  const [page,          setPage]          = useState(1);
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const navigate   = useNavigate();
   const { search } = useLocation();
-  const sortBy = useMemo(() => new URLSearchParams(search).get("sortBy"), [search]);
+  const sortBy     = useMemo(() => new URLSearchParams(search).get("sortBy"), [search]);
 
-  // Fisher–Yates shuffle (non-mutating)
-  const shuffleArray = (arr) => {
+  const PER_PAGE = 12;
+
+  const shuffle = (arr) => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -25,319 +34,230 @@ const ProductGrid = ({ products = [], loading, error }) => {
     return a;
   };
 
+  const safe     = Array.isArray(products) ? products : [];
+  const doShuffle = !sortBy || sortBy === "default" || sortBy === "none";
+  const source    = useMemo(() => (doShuffle ? shuffle(safe) : safe), [safe, doShuffle]);
+  const totalPages = Math.ceil(source.length / PER_PAGE);
+  const list       = source.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  // Dynamic resizing
+  useEffect(() => { setPage(1); }, [search, safe.length]);
+
+  /* ── wishlist ── */
   useEffect(() => {
-    const handleResize = () => {
-      setProductsPerPage(window.innerWidth < 640 ? 10 : 9);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const token = localStorage.getItem("userToken");
+    if (!token) return;
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/wishlist`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then((r) => setWishlistItems(r.data)).catch(() => {});
   }, []);
 
-  // ✅ Guard in case products is not a valid array
-  const safeProducts = Array.isArray(products) ? products : [];
-  const shouldShuffle = !sortBy || sortBy === "default" || sortBy === "none";
+  const inWishlist = (id) => wishlistItems.some((i) => i._id === id);
 
-  // const shuffledProducts = useMemo(() => shuffleArray(safeProducts), [safeProducts]);
+  const toggleWish = async (e, product) => {
+    e.preventDefault(); e.stopPropagation();
+    const token = localStorage.getItem("userToken");
+    if (!token) { toast.warning("Please login"); navigate("/login"); return; }
+    if (inWishlist(product._id)) {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/wishlist/remove/${product._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setWishlistItems((p) => p.filter((x) => x._id !== product._id));
+      toast.success("Removed from wishlist");
+    } else {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/wishlist/add/${product._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setWishlistItems((p) => [...p, product]);
+      toast.success("Added to wishlist");
+    }
+  };
 
-  const sourceProducts = useMemo(
-    () => (shouldShuffle ? shuffleArray(safeProducts) : safeProducts),
-    [safeProducts, shouldShuffle]
+  const pUrl = (p) =>
+    `/product/${p.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
+      p.skuCode || p.sku ||
+      p.colorVariants?.[0]?.sizes?.[0]?.sku ||
+      p.variants?.[0]?.sku || p._id
+    )}`;
+
+  /* ── states ── */
+  if (loading) return (
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
+      {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} />)}
+    </div>
   );
 
-  const indexOfLast = currentPage * productsPerPage;
-  const indexOfFirst = indexOfLast - productsPerPage;
-  const currentProducts = sourceProducts.slice(indexOfFirst, indexOfLast);
-  const totalPages = Math.ceil(sourceProducts.length / productsPerPage);
-  const [wishlistItems, setWishlistItems] = useState([]);
+  if (error) return (
+    <div className="py-20 text-center text-sm text-red-500">Failed to load products.</div>
+  );
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, productsPerPage, safeProducts.length]);
-
-  useEffect(() => {
-    const fetchWishlist = async () => {
-      try {
-        const token = localStorage.getItem("userToken");
-        const { data } = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/wishlist`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setWishlistItems(data);
-      } catch (err) {
-        console.error("Error fetching wishlist:", err);
-      }
-    };
-
-    fetchWishlist();
-  }, []);
-
-  // 👇 Add this
-  const isInWishlist = (productId) => {
-    return wishlistItems.some((item) => item._id === productId); // ✅ Correct
-  };
-
-  const handleRemoveFromWishlist = async (productId) => {
-    try {
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        toast.warning("Please login to add items to wishlist");
-        navigate("/login");
-        return;
-      }
-      await axios.delete(
-        `${import.meta.env.VITE_BACKEND_URL}/api/wishlist/remove/${productId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      toast.success("Removed from wishlist");
-      setWishlistItems((prev) => prev.filter((item) => item._id !== productId));
-    } catch (err) {
-      console.error("Failed to remove from wishlist:", err);
-      toast.error("Failed to remove from wishlist");
-    }
-  };
-
-  const handleAddToWishlist = async (product) => {
-    try {
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        toast.warning("Please login to add items to wishlist");
-        navigate("/login");
-        return;
-      }
-      await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/wishlist/add/${product._id}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      toast.success(`${product.name} added to wishlist`);
-      setWishlistItems((prev) => [...prev, product]);
-    } catch (error) {
-      console.error("Failed to add to wishlist:", error);
-      toast.error("Failed to add to wishlist");
-    }
-  };
-
-  // Loading
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <svg
-          className="animate-spin h-10 w-10 text-sky-500"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          ></circle>
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          ></path>
-        </svg>
-      </div>
-    );
-  }
-
-  // Error
-  if (error) {
-    return <p className="text-center text-red-500">Error: {error}</p>;
-  }
-
-  // No products
-  if (!loading && safeProducts.length === 0) {
-    return (
-      <div className="flex flex-col justify-center items-center h-96 text-center">
-        <img
-          src="https://i.gifer.com/7VE.gif"
-          alt="No products found"
-          className="w-64 h-64 object-contain mb-4"
-        />
-        <p className="text-2xl font-semibold text-gray-700">
-          🤧 Oops! No products found
-        </p>
-        <p className="text-sm text-gray-500 mt-1">
-          Try adjusting your filters and search again.
-        </p>
-      </div>
-    );
-  }
+  if (!loading && safe.length === 0) return (
+    <div className="flex flex-col items-center justify-center py-28 text-center gap-4">
+      <p className="text-4xl">🛍️</p>
+      <p className="text-base font-semibold text-gray-600">No products found</p>
+      <p className="text-sm text-gray-400">Try adjusting your filters</p>
+    </div>
+  );
 
   return (
-    <>
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3 md:gap-4">
-        {currentProducts.map((product, index) => (
-          // <Link
-          //   key={index}
-          //   to={`/product/${product.name.toLowerCase().replace(/\s+/g, "-")}`}
-          //   className="block group will-change-transform"
-          // >
-          <Link
-            key={product._id || index}
-            to={`/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
-              product.skuCode || product.sku ||
-              product.colorVariants?.[0]?.sizes?.[0]?.sku ||
-              product.variants?.[0]?.sku ||
-              product._id
-            )}`}
-            className="block group will-change-transform"
-          >
-            <div
-              className="bg-white/80 backdrop-blur rounded-xl md:rounded-2xl
-                         shadow-[0_8px_24px_rgba(14,165,233,0.12)]
-                         hover:shadow-[0_14px_32px_rgba(14,165,233,0.18)]
-                         transition-all duration-300 border border-sky-100"
-            >
-              <div className="w-full h-[220px] md:h-[300px] relative overflow-hidden rounded-t-xl md:rounded-t-2xl">
-                <img
-                  src={
-                    product.colorVariants?.[0]?.images?.[0]?.url ||
-                    product.images?.[0]?.url ||
-                    demoImg
-                  }
-                  alt={
-                    product.colorVariants?.[0]?.images?.[0]?.altText ||
-                    product.images?.[0]?.altText ||
-                    product.name
-                  }
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+    <div>
+      {/* ── Grid ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8">
+        {list.map((product) => {
+          const img        = product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || demoImg;
+          const isNew      = Date.now() - new Date(product.createdAt).getTime() < 2 * 24 * 60 * 60 * 1000;
+          const hasDis     = product.discountPrice && product.discountPrice < product.price;
+          const wished     = inWishlist(product._id);
+          const outOfStock = product.countInStock === 0;
+          const lowStock   = !outOfStock && product.countInStock < 5;
 
-                {/* NEW Badge */}
-                {new Date() - new Date(product.createdAt) <
-                  2 * 24 * 60 * 60 * 1000 && (
-                    <div className="absolute bottom-3 left-3 bg-gradient-to-r from-orange-500 to-yellow-400 text-white text-[10px] font-bold px-2 py-[2px] rounded-full shadow-md tracking-wide uppercase animate-[pulse_1.8s_ease-in-out_infinite]">
-                      New
-                    </div>
-                  )}
+          return (
+            <div key={product._id} className="group relative">
 
-                {/* Raphaaa Assured */}
-                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur text-sky-700 text-[10px] font-bold px-2 py-[2px] rounded-full shadow-sm tracking-wide flex items-center gap-1 border border-sky-100">
-                  <img src="/favicon-16x16.png" alt="raphaaa-assured" />
-                  Assured
-                </div>
+              {/* ── Wishlist button (above link) ── */}
+              <button
+                onClick={(e) => toggleWish(e, product)}
+                className={`absolute top-3 right-3 z-20 w-8 h-8 flex items-center justify-center rounded-full
+                  transition-all duration-200 backdrop-blur-sm border
+                  ${wished
+                    ? "bg-white border-red-200 text-red-500 shadow-sm"
+                    : "bg-white/70 border-white/50 text-gray-400 hover:bg-white hover:text-red-400 hover:border-red-200 shadow-sm opacity-0 group-hover:opacity-100"
+                  }`}
+              >
+                {wished ? <AiFillHeart className="text-sm" /> : <AiOutlineHeart className="text-sm" />}
+              </button>
 
-                {/* Stock */}
-                <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur text-xs font-semibold px-2 py-1 rounded shadow-sm border border-gray-100">
-                  {product.countInStock === 0 ? (
-                    <span className="text-red-600">Out of Stock</span>
-                  ) : product.countInStock < 10 ? (
-                    <span className="text-red-600">
-                      Hurry! {product.countInStock} left
+              <Link to={pUrl(product)} className="block">
+
+                {/* ── Image ── */}
+                <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-md mb-3">
+                  <img
+                    src={img}
+                    alt={product.name}
+                    className={`w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04] ${outOfStock ? "opacity-60 grayscale-[30%]" : ""}`}
+                    loading="lazy"
+                  />
+
+                  {/* Badges top-left */}
+                  <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+                    {isNew && (
+                      <span className="bg-black text-white text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-sm">
+                        New
+                      </span>
+                    )}
+                    {hasDis && (
+                      <span className="bg-red-600 text-white text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                        {product.offerPercentage}% off
+                      </span>
+                    )}
+                    {outOfStock && (
+                      <span className="bg-gray-800 text-white text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                        Sold out
+                      </span>
+                    )}
+                    {lowStock && (
+                      <span className="bg-amber-500 text-white text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                        {product.countInStock} left
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Hover overlay — subtle bottom gradient + CTA */}
+                  <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
+                    <span className="text-white text-[11px] font-semibold tracking-widest uppercase border border-white/60 px-4 py-1.5 rounded-full backdrop-blur-sm translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                      Quick View
                     </span>
-                  ) : (
-                    <span className="text-green-600">In Stock</span>
-                  )}
+                  </div>
                 </div>
 
-                {/* Wishlist (corner) */}
-                {/* (logic kept commented as in your file) */}
-              </div>
-
-              <div className="p-3 md:p-4">
-                <h3 className="text-[15px] md:text-base font-semibold text-gray-900 mb-1 truncate">
-                  {product.name}
-                </h3>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  {product.discountPrice && product.discountPrice < product.price ? (
-                    <>
-                      <p className="text-sky-700 font-extrabold text-2xl md:text-3xl tracking-wide">
-                        ₹ {Math.floor(product.discountPrice)}
-                      </p>
-                      <p className="text-sm text-gray-500 line-through">
-                        ₹ {Math.floor(product.price)}
-                      </p>
-                      <p className="text-green-600 text-sm font-semibold bg-green-50 px-2 py-0.5 rounded-full">
-                        {product.offerPercentage}% OFF
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sky-700 font-extrabold text-2xl tracking-wide">
-                      ₹ {product.price}
+                {/* ── Info ── */}
+                <div className="space-y-0.5">
+                  {/* Brand */}
+                  {product.brand && (
+                    <p className="text-[10px] font-bold tracking-[0.15em] text-gray-400 uppercase">
+                      {product.brand}
                     </p>
                   )}
 
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      isInWishlist(product._id)
-                        ? handleRemoveFromWishlist(product._id)
-                        : handleAddToWishlist(product);
-                    }}
-                    title={
-                      isInWishlist(product._id)
-                        ? "Remove from Wishlist"
-                        : "Add to Wishlist"
-                    }
-                    className={`ml-auto w-10 h-10 flex items-center justify-center rounded-full shadow-md transition
-                      ${isInWishlist(product._id)
-                        ? "bg-red-50 text-red-600 hover:scale-110"
-                        : "bg-white text-gray-800 hover:bg-pink-50 hover:scale-110"}
-                    `}
-                  >
-                    <span className="relative inline-block">
-                      {isInWishlist(product._id) ? (
-                        <AiFillHeart className="text-2xl animate-pulse" />
-                      ) : (
-                        <AiOutlineHeart className="text-2xl" />
-                      )}
-                    </span>
-                  </button>
-                </div>
+                  {/* Name */}
+                  <h3 className="text-sm font-medium text-gray-900 line-clamp-1 leading-snug">
+                    {product.name}
+                  </h3>
 
-                {product.rating > 0 && product.numReviews > 0 && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs bg-green-600 text-white px-2 py-[2px] rounded-full">
-                      {product.rating.toFixed(1)} ★
+                  {/* Rating */}
+                  {product.rating > 0 && product.numReviews > 0 && (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <div className="flex items-center gap-0.5 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                        {product.rating.toFixed(1)} ★
+                      </div>
+                      <span className="text-[10px] text-gray-400">({product.numReviews})</span>
+                    </div>
+                  )}
+
+                  {/* Price */}
+                  <div className="flex items-baseline gap-2 pt-1">
+                    <span className="text-sm font-bold text-gray-900">
+                      ₹{Math.floor(hasDis ? product.discountPrice : product.price).toLocaleString("en-IN")}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      {product.numReviews} Reviews
-                    </span>
+                    {hasDis && (
+                      <>
+                        <span className="text-xs text-gray-400 line-through font-normal">
+                          ₹{Math.floor(product.price).toLocaleString("en-IN")}
+                        </span>
+                        <span className="text-xs text-emerald-600 font-semibold">
+                          {product.offerPercentage}% off
+                        </span>
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              </Link>
             </div>
-          </Link>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Pagination */}
+      {/* ── Pagination ── */}
       {totalPages > 1 && (
-        <div className="flex justify-center mt-6 space-x-2">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentPage(i + 1)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200
-                ${currentPage === i + 1
-                  ? "bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-md shadow-sky-200"
-                  : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"}
-              `}
-            >
-              {i + 1}
-            </button>
-          ))}
+        <div className="flex items-center justify-center gap-1.5 mt-12 pt-8 border-t border-gray-100">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-900 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <HiChevronLeft className="text-sm" />
+          </button>
+
+          {Array.from({ length: totalPages }, (_, i) => {
+            const p = i + 1;
+            const show = p === 1 || p === totalPages || Math.abs(p - page) <= 1;
+            const ellipsis = (p === page - 2 && p > 1) || (p === page + 2 && p < totalPages);
+            if (ellipsis) return <span key={i} className="text-gray-300 text-sm px-1">···</span>;
+            if (!show) return null;
+            return (
+              <button
+                key={i}
+                onClick={() => setPage(p)}
+                className={`w-9 h-9 rounded-full text-xs font-semibold transition-all
+                  ${page === p
+                    ? "bg-gray-900 text-white"
+                    : "border border-gray-200 text-gray-600 hover:border-gray-900 hover:text-gray-900"
+                  }`}
+              >
+                {p}
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-900 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <HiChevronRight className="text-sm" />
+          </button>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
