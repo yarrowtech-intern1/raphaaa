@@ -1,6 +1,7 @@
 const express = require("express");
 const User = require("../models/User");
 const { protect, admin, adminOrMerchantise } = require("../middleware/authMiddleware");
+const { getJson, setJson } = require("../utils/redisCache");
 
 const router = express.Router();
 
@@ -9,7 +10,12 @@ const router = express.Router();
 // @access Private/Admin
 router.get("/", protect, admin, async (req, res) => {
     try {
+        const cacheKey = `role:${req.user.role}:users`;
+        const cached = await getJson("dashboard", cacheKey);
+        if (cached) return res.json(cached);
+
         const users = await User.find({});
+        await setJson("dashboard", cacheKey, users, 60);
         res.json(users);
     } catch (error) {
         console.error(error);

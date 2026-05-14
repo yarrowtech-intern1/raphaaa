@@ -212,6 +212,7 @@ const {
   syncOrderTrackingStatus,
   syncShiprocketStatusesForOpenOrders,
 } = require("../utils/shiprocket");
+const { getJson, setJson } = require("../utils/redisCache");
 
 // Middleware to check if user is admin or merchantise
 const adminOrMerchantiseMiddleware = (req, res, next) => {
@@ -236,6 +237,10 @@ const adminOnly = (req, res, next) => {
 // @access  Private/Admin/Merchantise
 router.get('/', protect, adminOrMerchantiseMiddleware, async (req, res) => {
   try {
+    const cacheKey = `role:${req.user.role}:uid:${req.user._id}:orders`;
+    const cached = await getJson("dashboard", cacheKey);
+    if (cached) return res.json(cached);
+
     await syncShiprocketStatusesForOpenOrders(20);
     let orders;
     
@@ -266,6 +271,7 @@ router.get('/', protect, adminOrMerchantiseMiddleware, async (req, res) => {
     }
 
     // console.log(`${req.user.role} fetching orders, found:`, orders.length);
+    await setJson("dashboard", cacheKey, orders, 45);
     res.json(orders);
   } catch (error) {
     console.error('Fetch all orders error:', error);

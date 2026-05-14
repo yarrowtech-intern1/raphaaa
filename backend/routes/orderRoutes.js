@@ -63,6 +63,7 @@ const {
 const { sendMail } = require("../utils/sendMail");
 const Collab = require("../models/Collab");
 const { buildInvoicePDF } = require("../utils/invoice");
+const { getJson, setJson } = require("../utils/redisCache");
 
 const applyStockDeduction = (product, item) => {
   const qty = Number(item?.quantity || 0);
@@ -539,12 +540,49 @@ router.get("/:id/invoice", protect, async (req, res) => {
 // Example API Endpoint in Express (orderRoutes.js)
 router.get("/revenue/total", protect, adminOrMerchantise, async (req, res) => {
   try {
-    const orders = await Order.find({ isPaid: true });
-    const totalRevenue = orders.reduce(
-      (acc, order) => acc + order.totalPrice,
-      0
-    );
-    res.json({ totalRevenue });
+    const cacheKey = `role:${req.user.role}:uid:${req.user._id}:revenue_total`;
+    const cached = await getJson("dashboard", cacheKey);
+    if (cached) return res.json(cached);
+
+    const orders = await Order.find({ isPaid: true }).lean();
+    let totalRevenue = 0;
+
+    if (req.user?.role === "merchantise") {
+      const allProductIds = [
+        ...new Set(
+          orders
+            .flatMap((o) => o.orderItems || [])
+            .map((it) => (it.productId ? String(it.productId) : null))
+            .filter(Boolean)
+        ),
+      ];
+      const ownedProducts = await Product.find({
+        _id: { $in: allProductIds },
+        user: req.user._id,
+      })
+        .select("_id")
+        .lean();
+      const ownedSet = new Set(ownedProducts.map((p) => String(p._id)));
+
+      totalRevenue = orders.reduce((sum, order) => {
+        const ownItems = (order.orderItems || []).filter(
+          (it) => it.productId && ownedSet.has(String(it.productId))
+        );
+        const orderOwnRevenue = ownItems.reduce(
+          (s, it) => s + (Number(it.quantity) || 0) * (Number(it.price) || 0),
+          0
+        );
+        return sum + orderOwnRevenue;
+      }, 0);
+    } else {
+      totalRevenue = orders.reduce(
+        (acc, order) => acc + (Number(order.totalPrice) || 0),
+        0
+      );
+    }
+    const payload = { totalRevenue };
+    await setJson("dashboard", cacheKey, payload, 45);
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
   }
