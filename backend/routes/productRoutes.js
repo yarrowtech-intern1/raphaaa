@@ -206,9 +206,15 @@ router.get("/", async (req, res) => {
       brand,
       limit,
       userId, // 👈 new
+      includeUnpublished,
     } = req.query;
 
     let query = {};
+
+    // Storefront should show only published products by default
+    if (String(includeUnpublished) !== "true") {
+      query.isPublished = true;
+    }
     // git status
     // Filters
     if (collection && collection.toLowerCase() !== "all") {
@@ -391,7 +397,9 @@ router.get("/best-seller", async (req, res) => {
 // @access Public
 router.get("/new-arrivals", async (req, res) => {
   try {
-    const newArrivals = await Product.find().sort({ createdAt: -1 }).limit(8);
+    const newArrivals = await Product.find({ isPublished: true })
+      .sort({ createdAt: -1 })
+      .limit(8);
     res.json(newArrivals);
   } catch (error) {
     console.error(error);
@@ -416,6 +424,7 @@ router.get("/similar/:id", async (req, res) => {
       _id: { $ne: id }, // Exclude the current product ID
       gender: product.gender,
       category: product.category,
+      isPublished: true,
     }).limit(50);
 
     res.json(similarProducts);

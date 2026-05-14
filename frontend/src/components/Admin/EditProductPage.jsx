@@ -65,11 +65,11 @@ const dbColorVariantsToState = (dbCVs = []) =>
   }));
 
 const inputCls =
-  "w-full px-3 py-2 rounded-md border border-gray-200 bg-white text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition";
+  "w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400 transition";
 
 const Field = ({ label, children }) => (
   <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">{label}</label>
     {children}
   </div>
 );
@@ -346,266 +346,359 @@ const EditProductPage = () => {
     navigate("/admin/products");
   };
 
-  if (loading) return <p className="p-6">Loading…</p>;
-  if (error)   return <p className="p-6 text-red-600">Error: {error}</p>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">Loading product…</p>
+      </div>
+    </div>
+  );
+  if (error) return <p className="p-6 text-red-600">Error: {error}</p>;
 
   return (
-    <div className="max-w-5xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-gray-200 mb-10">
-      <h2 className="text-3xl font-bold mb-8 text-gray-800">Edit Product</h2>
+    <div className="min-h-screen p-4 md:p-6 space-y-4">
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/* ── Page header ── */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 shadow-sm">
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-xl font-extrabold text-gray-900">Edit Product</h1>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {selectedProduct?.name && <span className="text-violet-600 font-semibold">{selectedProduct.name}</span>}
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
 
         {/* ── Basic Info ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Product Name *">
-            <input type="text" name="name" value={productData.name}
-              onChange={handleChange} required className={inputCls} />
+        <SectionCard title="Basic Information" subtitle="Product name, SKU, brand and description">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Product Name *">
+              <input type="text" name="name" value={productData.name}
+                onChange={handleChange} required className={inputCls} />
+            </Field>
+            <Field label="SKU">
+              <input type="text" name="sku" value={productData.sku}
+                onChange={handleChange} className={inputCls} />
+            </Field>
+            <Field label="Brand">
+              <input type="text" name="brand" value={productData.brand}
+                onChange={handleChange} placeholder="Brand name" className={inputCls} />
+            </Field>
+            <Field label="Tags (comma-separated)">
+              <input type="text" name="tags" value={productData.tags}
+                onChange={handleChange} placeholder="casual, trendy, cotton" className={inputCls} />
+            </Field>
+          </div>
+          <Field label="Description *">
+            <textarea name="description" value={productData.description}
+              onChange={handleChange} rows={4} required
+              placeholder="Product description…" className={inputCls} />
           </Field>
-          <Field label="SKU">
-            <input type="text" name="sku" value={productData.sku}
-              onChange={handleChange} className={inputCls} />
-          </Field>
-          <Field label="Price *">
-            <input type="number" name="price" value={productData.price}
-              onChange={handleChange} required min="0" step="0.01" className={inputCls} />
-          </Field>
-          <Field label="Offer %">
-            <input type="number" name="offerPercentage" value={productData.offerPercentage}
-              onChange={handleChange} min="0" step="0.1" className={inputCls} />
-          </Field>
-          <Field label="Discount Price (auto)">
-            <input type="number" name="discountPrice" value={productData.discountPrice}
-              readOnly className={`${inputCls} bg-gray-100`} />
-          </Field>
-          <Field label="Total Stock (auto)">
-            <input type="number" value={productData.countInStock}
-              readOnly className={`${inputCls} bg-gray-100`} />
-          </Field>
-          <Field label="Category">
-            <select name="category" value={productData.category} onChange={handleChange} className={inputCls}>
-              <option value="">Select Category</option>
-              {metaOptions.category.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Field>
-          <Field label="Collection">
-            <select name="collections" value={productData.collections} onChange={handleChange} className={inputCls}>
-              <option value="">Select Collection</option>
-              {metaOptions.collection.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Field>
-          <Field label="Gender">
-            <select name="gender" value={productData.gender} onChange={handleChange} className={inputCls}>
-              <option value="">Select Gender</option>
-              {metaOptions.gender.map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </Field>
-          <Field label="Material">
-            <select name="material" value={productData.material} onChange={handleChange} className={inputCls}>
-              <option value="">Select Material</option>
-              {metaOptions.material.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </Field>
-          <Field label="Brand">
-            <input type="text" name="brand" value={productData.brand}
-              onChange={handleChange} className={inputCls} />
-          </Field>
-          <Field label="Weight (kg)">
-            <input type="number" name="weight" value={productData.weight}
-              onChange={handleChange} min="0" step="0.01" className={inputCls} />
-          </Field>
-          <Field label="Tags (comma-separated)">
-            <input type="text" name="tags" value={productData.tags}
-              onChange={handleChange} placeholder="casual, trendy, cotton" className={inputCls} />
-          </Field>
-          <div className="flex items-center gap-6 pt-2">
-            {[["isFeatured","Featured"],["isPublished","Published"]].map(([name, label]) => (
-              <label key={name} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="checkbox" name={name} checked={productData[name]} onChange={handleChange}
-                  className="w-4 h-4 accent-indigo-600" />
-                {label}
+        </SectionCard>
+
+        {/* ── Pricing ── */}
+        <SectionCard title="Pricing" subtitle="MRP, offer discount, selling price and total stock">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Field label="MRP Price (₹) *">
+              <input type="number" name="price" value={productData.price}
+                onChange={handleChange} required min="0" step="0.01" className={inputCls} />
+            </Field>
+            <Field label="Offer %">
+              <input type="number" name="offerPercentage" value={productData.offerPercentage}
+                onChange={handleChange} min="0" step="0.1" className={inputCls} />
+            </Field>
+            <Field label="Selling Price (auto)">
+              <input type="number" name="discountPrice" value={productData.discountPrice}
+                readOnly className={`${inputCls} bg-gray-100 cursor-not-allowed text-gray-500`} />
+            </Field>
+            <Field label="Total Stock (auto)">
+              <input type="number" value={productData.countInStock}
+                readOnly className={`${inputCls} bg-gray-100 cursor-not-allowed text-gray-500`} />
+            </Field>
+          </div>
+        </SectionCard>
+
+        {/* ── Classification ── */}
+        <SectionCard title="Classification" subtitle="Category, collection, gender and material">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <Field label="Category">
+              <select name="category" value={productData.category} onChange={handleChange} className={inputCls}>
+                <option value="">Select…</option>
+                {metaOptions.category.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Collection">
+              <select name="collections" value={productData.collections} onChange={handleChange} className={inputCls}>
+                <option value="">Select…</option>
+                {metaOptions.collection.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Gender">
+              <select name="gender" value={productData.gender} onChange={handleChange} className={inputCls}>
+                <option value="">Select…</option>
+                {metaOptions.gender.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
+            <Field label="Material / Fabric">
+              <select name="material" value={productData.material} onChange={handleChange} className={inputCls}>
+                <option value="">Select…</option>
+                {metaOptions.material.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </Field>
+          </div>
+        </SectionCard>
+
+        {/* ── Shipping ── */}
+        <SectionCard title="Shipping & Dimensions" subtitle="Weight and package dimensions (optional)">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Field label="Weight (kg)">
+              <input type="number" name="weight" value={productData.weight}
+                onChange={handleChange} min="0" step="0.01" placeholder="0.5" className={inputCls} />
+            </Field>
+            {["length","width","height"].map((d) => (
+              <Field key={d} label={`${d.charAt(0).toUpperCase() + d.slice(1)} (cm)`}>
+                <input type="number" name={`dimensions.${d}`}
+                  value={productData.dimensions?.[d] || ""} onChange={handleChange}
+                  min="0" step="0.1" placeholder="0" className={inputCls} />
+              </Field>
+            ))}
+          </div>
+        </SectionCard>
+
+        {/* ── Size Chart ── */}
+        <SectionCard title="Size Chart" subtitle="Upload a size guide image for customers">
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            <label className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl cursor-pointer transition
+              ${uploading ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              {uploading ? "Uploading…" : "Upload Size Chart"}
+              <input type="file" accept="image/*" onChange={handleSizeChartUpload} disabled={uploading} className="hidden" />
+            </label>
+            {productData.sizeChart?.imageUrl && (
+              <img src={productData.sizeChart.imageUrl} alt="Size chart"
+                className="w-32 rounded-xl border border-gray-200 shadow-sm" />
+            )}
+          </div>
+        </SectionCard>
+
+        {/* ── Visibility ── */}
+        <SectionCard title="Visibility" subtitle="Control whether this product appears on the store">
+          <div className="flex flex-wrap gap-6">
+            {[
+              { name: "isFeatured", label: "Featured Product", desc: "Show on homepage featured section" },
+              { name: "isPublished", label: "Published",        desc: "Visible to customers in the store" },
+            ].map(({ name, label, desc }) => (
+              <label key={name} className="flex items-start gap-3 cursor-pointer group">
+                <div className="relative mt-0.5">
+                  <input type="checkbox" name={name} checked={productData[name]}
+                    onChange={handleChange} className="sr-only peer" />
+                  <div className="w-10 h-5 rounded-full bg-gray-200 peer-checked:bg-violet-600 transition-colors" />
+                  <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{label}</p>
+                  <p className="text-xs text-gray-400">{desc}</p>
+                </div>
               </label>
             ))}
           </div>
-        </div>
-
-        {/* ── Description ── */}
-        <Field label="Description *">
-          <textarea name="description" value={productData.description}
-            onChange={handleChange} rows={4} required className={inputCls} />
-        </Field>
-
-        {/* ── Dimensions ── */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Dimensions (cm)</label>
-          <div className="grid grid-cols-3 gap-2">
-            {["length","width","height"].map((d) => (
-              <input key={d} type="number" name={`dimensions.${d}`}
-                value={productData.dimensions?.[d] || ""} onChange={handleChange}
-                min="0" step="0.1" placeholder={d.charAt(0).toUpperCase()+d.slice(1)}
-                className={inputCls} />
-            ))}
-          </div>
-        </div>
-
-        {/* ── Size Chart ── */}
-        <div className="border border-gray-200 rounded-lg p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Size Chart Image</label>
-          <input type="file" accept="image/*" onChange={handleSizeChartUpload}
-            disabled={uploading} className="text-sm" />
-          {uploading && <p className="text-xs text-blue-500 mt-1 animate-pulse">Uploading…</p>}
-          {productData.sizeChart?.imageUrl && (
-            <img src={productData.sizeChart.imageUrl} alt="Size chart"
-              className="mt-2 w-48 rounded border border-gray-200" />
-          )}
-        </div>
+        </SectionCard>
 
         {/* ── Color Variants ── */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-base font-bold text-gray-800">
-              Color Variants <span className="text-red-500">*</span>
-            </h4>
+        <SectionCard
+          title={<>Color Variants <span className="text-red-500">*</span></>}
+          subtitle="Manage colors, photos, sizes, SKU and stock"
+          action={
             <button type="button" onClick={addColorVariant}
-              className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+              className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl shadow-sm transition">
               + Add Color
             </button>
-          </div>
-
-          <div className="space-y-6">
+          }
+        >
+          <div className="space-y-4">
             {colorVariants.map((cv, cvIdx) => (
-              <div key={cv.id}
-                className="border-2 border-indigo-100 rounded-xl p-4 bg-gradient-to-br from-white to-indigo-50">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
+              <div key={cv.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                {/* Color card header */}
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                   <div className="flex items-center gap-3">
-                    {cv.color && (
-                      <span className="w-8 h-8 rounded-full border-2 border-white shadow-md"
-                        style={{ backgroundColor: cv.color }} />
-                    )}
-                    <span className="font-semibold text-gray-800">
-                      Color {cvIdx + 1}{cv.colorName ? `: ${cv.colorName}` : ""}
+                    {cv.color
+                      ? <span className="w-6 h-6 rounded-full border-2 border-white shadow-sm shrink-0" style={{ backgroundColor: cv.color }} />
+                      : <span className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 shrink-0" />
+                    }
+                    <span className="text-sm font-bold text-gray-700">
+                      Color {cvIdx + 1}{cv.colorName ? ` — ${cv.colorName}` : ""}
                     </span>
                   </div>
                   {colorVariants.length > 1 && (
                     <button type="button" onClick={() => removeColorVariant(cv.id)}
-                      className="text-xs text-red-500 hover:text-red-700 border border-red-200 px-2 py-1 rounded">
+                      className="text-[11px] font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 px-2.5 py-1 rounded-lg transition">
                       Remove
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Color (hex) *</label>
-                    <Select
-                      options={COLOR_OPTIONS}
-                      value={cv.color ? { value: cv.color, label: getColorName(cv.color) } : null}
-                      onChange={(sel) => {
-                        updateCV(cv.id, "color", sel?.value || "");
-                        updateCV(cv.id, "colorName", getColorName(sel?.value || ""));
-                      }}
-                      placeholder="Select color"
-                      formatOptionLabel={(opt) => (
-                        <div className="flex items-center gap-2">
-                          <span className="w-4 h-4 rounded-full border border-gray-300 shrink-0"
-                            style={{ backgroundColor: opt.value }} />
-                          <span>{opt.label}</span>
-                        </div>
-                      )}
-                    />
+                <div className="p-4 space-y-4">
+                  {/* Color picker + name */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Color *</label>
+                      <Select
+                        options={COLOR_OPTIONS}
+                        value={cv.color ? { value: cv.color, label: getColorName(cv.color) } : null}
+                        onChange={(sel) => {
+                          updateCV(cv.id, "color", sel?.value || "");
+                          updateCV(cv.id, "colorName", getColorName(sel?.value || ""));
+                        }}
+                        placeholder="Pick a colour…"
+                        formatOptionLabel={(opt) => (
+                          <div className="flex items-center gap-2">
+                            <span className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
+                              style={{ backgroundColor: opt.value }} />
+                            <span>{opt.label}</span>
+                          </div>
+                        )}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Display Name</label>
+                      <input type="text" value={cv.colorName}
+                        onChange={(e) => updateCV(cv.id, "colorName", e.target.value)}
+                        placeholder="e.g. Midnight Black" className={inputCls} />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Display Name</label>
-                    <input type="text" value={cv.colorName}
-                      onChange={(e) => updateCV(cv.id, "colorName", e.target.value)}
-                      placeholder="e.g. Midnight Black"
-                      className={inputCls} />
-                  </div>
-                </div>
 
-                {/* Images for this color */}
-                <div className="mb-4">
-                  <label className="block text-xs font-medium text-gray-600 mb-2">Photos</label>
-                  <label className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-lg cursor-pointer hover:bg-blue-100">
-                    📷 Upload Photos
-                    <input type="file" multiple accept="image/*" className="hidden"
-                      onChange={(e) => handleColorImageUpload(cv.id, e.target.files)} />
-                  </label>
-                  {uploadingColor === cv.id && (
-                    <span className="ml-2 text-xs text-blue-500 animate-pulse">Uploading…</span>
-                  )}
-                  {cv.images.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {cv.images.map((img, idx) => (
-                        <div key={idx} className="relative">
-                          <img src={img.url} alt={img.altText}
-                            className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-                          <button type="button"
-                            onClick={() => handleColorImageRemove(cv.id, idx)}
-                            disabled={deleting === `${cv.id}-${idx}`}
-                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
-                            {deleting === `${cv.id}-${idx}` ? "⟳" : "×"}
-                          </button>
-                          {idx === 0 && (
-                            <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center rounded-b-lg py-0.5">
-                              Main
-                            </span>
-                          )}
+                  {/* Photos */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Photos for this colour</label>
+                    <label className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-xl cursor-pointer hover:bg-blue-100 transition">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                      </svg>
+                      Upload Photos
+                      <input type="file" multiple accept="image/*" className="hidden"
+                        onChange={(e) => handleColorImageUpload(cv.id, e.target.files)} />
+                    </label>
+                    {uploadingColor === cv.id && (
+                      <span className="ml-3 text-xs text-blue-500 animate-pulse">Uploading…</span>
+                    )}
+                    {cv.images.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {cv.images.map((img, idx) => (
+                          <div key={idx} className="relative group">
+                            <img src={img.url} alt={img.altText}
+                              className="w-16 h-16 object-cover rounded-xl border border-gray-200 shadow-sm" />
+                            <button type="button"
+                              onClick={() => handleColorImageRemove(cv.id, idx)}
+                              disabled={deleting === `${cv.id}-${idx}`}
+                              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center shadow-sm transition disabled:opacity-60">
+                              {deleting === `${cv.id}-${idx}` ? (
+                                <span className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
+                              ) : "×"}
+                            </button>
+                            {idx === 0 && (
+                              <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center rounded-b-xl py-0.5 font-medium">
+                                Main
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sizes, SKU, Stock */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Sizes, SKU & Stock *</label>
+                      <button type="button" onClick={() => addSize(cv.id)}
+                        className="flex items-center gap-1 text-xs font-bold text-violet-600 border border-violet-200 hover:bg-violet-50 px-2.5 py-1 rounded-lg transition">
+                        + Size
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {cv.sizes.map((sz, idx) => (
+                        <div key={idx} className="grid grid-cols-3 gap-2 items-center">
+                          <Select
+                            options={SIZE_OPTIONS}
+                            value={sz.size ? { value: normalizeSize(sz.size), label: normalizeSize(sz.size) } : null}
+                            onChange={(sel) => updateSize(cv.id, idx, "size", sel?.value || "")}
+                            placeholder="Size"
+                          />
+                          <input type="text" value={sz.sku}
+                            onChange={(e) => updateSize(cv.id, idx, "sku", e.target.value)}
+                            placeholder="SKU" className={inputCls} />
+                          <div className="flex gap-1 items-center">
+                            <input type="number" min="0" value={sz.countInStock}
+                              onChange={(e) => updateSize(cv.id, idx, "countInStock", e.target.value)}
+                              placeholder="Stock" className={inputCls} />
+                            {cv.sizes.length > 1 && (
+                              <button type="button" onClick={() => removeSize(cv.id, idx)}
+                                className="w-7 h-7 shrink-0 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-bold">✕</button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
-
-                {/* Sizes */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-gray-600">Sizes, SKU & Stock *</label>
-                    <button type="button" onClick={() => addSize(cv.id)}
-                      className="text-xs text-indigo-600 border border-indigo-300 px-2 py-1 rounded hover:bg-indigo-50">
-                      + Add Size
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {cv.sizes.map((sz, idx) => (
-                      <div key={idx} className="grid grid-cols-3 gap-2 items-center">
-                        <Select
-                          options={SIZE_OPTIONS}
-                          value={sz.size ? { value: normalizeSize(sz.size), label: normalizeSize(sz.size) } : null}
-                          onChange={(sel) => updateSize(cv.id, idx, "size", sel?.value || "")}
-                          placeholder="Size"
-                        />
-                        <input type="text" value={sz.sku}
-                          onChange={(e) => updateSize(cv.id, idx, "sku", e.target.value)}
-                          placeholder="SKU" className={inputCls} />
-                        <div className="flex gap-1 items-center">
-                          <input type="number" min="0" value={sz.countInStock}
-                            onChange={(e) => updateSize(cv.id, idx, "countInStock", e.target.value)}
-                            placeholder="Stock" className={inputCls} />
-                          {cv.sizes.length > 1 && (
-                            <button type="button" onClick={() => removeSize(cv.id, idx)}
-                              className="text-red-500 hover:text-red-700 px-1">✕</button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </SectionCard>
 
         {/* ── Submit ── */}
-        <button
-          type="submit"
-          disabled={uploading || !!deleting}
-          className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-lg shadow-md hover:shadow-lg transition-all duration-200">
-          {uploading || deleting ? "Processing…" : "Update Product"}
-        </button>
+        <div className="flex items-center gap-3 pt-2 pb-6">
+          <button
+            type="submit"
+            disabled={uploading || !!deleting}
+            className={`flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-sm
+              ${uploading || !!deleting
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-violet-600 hover:bg-violet-700 text-white hover:shadow-md"
+              }`}
+          >
+            {uploading || deleting
+              ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Saving…</>
+              : "Save Changes"
+            }
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/admin/products")}
+            className="px-5 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-100 transition"
+          >
+            Cancel
+          </button>
+        </div>
       </form>
     </div>
   );
 };
+
+// ─── Section card ─────────────────────────────────────────────────────────────
+const SectionCard = ({ title, subtitle, children, action }) => (
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-100">
+      <div>
+        <h4 className="text-sm font-bold text-gray-800">{title}</h4>
+        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+    <div className="p-5 space-y-4">{children}</div>
+  </div>
+);
 
 export default EditProductPage;

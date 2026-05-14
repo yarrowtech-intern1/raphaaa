@@ -15,6 +15,7 @@ const AddMetaOption = () => {
   const [type,       setType]       = useState("category");
   const [value,      setValue]      = useState("");
   const [options,    setOptions]    = useState([]);
+  const [categoryCounts, setCategoryCounts] = useState({});
   const [editingId,  setEditingId]  = useState(null);
   const [editedVal,  setEditedVal]  = useState("");
   const [adding,     setAdding]     = useState(false);
@@ -24,7 +25,25 @@ const AddMetaOption = () => {
     setOptions(data);
   };
 
-  useEffect(() => { fetchOptions(); }, []);
+  const fetchCategoryCounts = async () => {
+    try {
+      const { data } = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/products`);
+      const counts = (Array.isArray(data) ? data : []).reduce((acc, product) => {
+        const key = String(product?.category || "").trim().toLowerCase();
+        if (!key) return acc;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      setCategoryCounts(counts);
+    } catch (error) {
+      setCategoryCounts({});
+    }
+  };
+
+  useEffect(() => {
+    fetchOptions();
+    fetchCategoryCounts();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,6 +54,7 @@ const AddMetaOption = () => {
       toast.success("Option added");
       setValue("");
       fetchOptions();
+      if (type === "category") fetchCategoryCounts();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add");
     } finally { setAdding(false); }
@@ -45,6 +65,7 @@ const AddMetaOption = () => {
       await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options/${id}`);
       toast.success("Deleted");
       fetchOptions();
+      fetchCategoryCounts();
     } catch { toast.error("Failed to delete"); }
   };
 
@@ -54,6 +75,7 @@ const AddMetaOption = () => {
       toast.success("Updated");
       setEditingId(null);
       fetchOptions();
+      fetchCategoryCounts();
     } catch { toast.error("Update failed"); }
   };
 
@@ -167,6 +189,11 @@ const AddMetaOption = () => {
                     ) : (
                       <>
                         <span className="flex-1 text-sm text-gray-700 font-medium truncate">{opt.value}</span>
+                        {tab.key === "category" && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                            {categoryCounts[String(opt.value || "").trim().toLowerCase()] || 0} products
+                          </span>
+                        )}
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
                           <button
                             onClick={() => { setEditingId(opt._id); setEditedVal(opt.value); }}

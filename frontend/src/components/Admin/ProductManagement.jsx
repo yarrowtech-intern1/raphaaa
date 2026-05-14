@@ -1,384 +1,336 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import {
-  deleteProduct,
-  fetchAdminProducts,
-} from "../../redux/slices/adminProductSlice";
+import { deleteProduct, fetchAdminProducts } from "../../redux/slices/adminProductSlice";
 import { FiEdit } from "react-icons/fi";
-import { FaTrash } from "react-icons/fa";
+import { FaTrash, FaSearch, FaBoxOpen, FaPlus } from "react-icons/fa";
+import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
+import { MdFilterList } from "react-icons/md";
 import { toast } from "sonner";
+
+/* ── stock badge ── */
+const StockBadge = ({ count }) => {
+  if (count === 0)  return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />Out of Stock</span>;
+  if (count < 10)   return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Low ({count})</span>;
+  return              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />In Stock ({count})</span>;
+};
 
 const ProductManagement = () => {
   const dispatch = useDispatch();
-  const { products, loading, error } = useSelector(
-    (state) => state.adminProducts
-  );
-  const user = JSON.parse(localStorage.getItem("userInfo"));
+  const { products, loading, error } = useSelector((s) => s.adminProducts);
+  const user = JSON.parse(localStorage.getItem("userInfo") || "{}");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const productsPerPage = 5;
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [skuSearchTerm, setSkuSearchTerm] = useState("");
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [productToDelete, setProductToDelete] = useState(null);
+  const [searchTerm,       setSearchTerm]       = useState("");
+  const [skuSearchTerm,    setSkuSearchTerm]     = useState("");
+  const [sortOption,       setSortOption]        = useState("");
+  const [currentPage,      setCurrentPage]       = useState(1);
+  const [showConfirmModal, setShowConfirmModal]  = useState(false);
+  const [productToDelete,  setProductToDelete]   = useState(null);
 
-  const openImageModal = (image) => {
-    setSelectedImage(image);
-    setIsImageModalOpen(true);
-  };
+  const PRODUCTS_PER_PAGE = 8;
 
-  const closeImageModal = () => {
-    setSelectedImage(null);
-    setIsImageModalOpen(false);
-  };
-
+  useEffect(() => { dispatch(fetchAdminProducts()); }, [dispatch]);
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === "Escape") {
-        setShowConfirmModal(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    const handler = (e) => { if (e.key === "Escape") setShowConfirmModal(false); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  useEffect(() => {
-    dispatch(fetchAdminProducts());
-  }, [dispatch]);
-
-  // const handleDelete = (id) => {
-  //   if (window.confirm("Are you sure want to delete your product?")) {
-  //     dispatch(deleteProduct(id));
-  //   }
-  // };
-
-  // const confirmDelete = () => {
-  //   if (productToDelete) {
-  //     dispatch(deleteProduct(productToDelete));
-  //     setProductToDelete(null);
-  //     setShowConfirmModal(false);
-  //   }
-  // };
-
   const confirmDelete = () => {
-    if (productToDelete) {
-      dispatch(deleteProduct(productToDelete));
-      toast.success("Product deleted successfully!");
-      setProductToDelete(null);
-      setShowConfirmModal(false);
-    }
+    if (!productToDelete) return;
+    dispatch(deleteProduct(productToDelete));
+    toast.success("Product deleted");
+    setProductToDelete(null);
+    setShowConfirmModal(false);
   };
 
-  // Filter by search
-  // const filteredProducts = products.filter((product) =>
-  //   product.name.toLowerCase().includes(searchTerm.toLowerCase())
-  // );
-  const filteredProducts = products.filter((product) => {
-    const matchesName = product.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const variantSkuText = Array.isArray(product.variants)
-      ? product.variants.map((v) => v?.sku || "").join(" ")
-      : "";
-    const matchesSKU =
-      product.sku?.toLowerCase().includes(skuSearchTerm.toLowerCase()) ||
-      variantSkuText.toLowerCase().includes(skuSearchTerm.toLowerCase());
-    return matchesName && (!skuSearchTerm || matchesSKU);
-  });
-
-  // Sort logic
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    switch (sortOption) {
-      case "name-asc":
-        return a.name.localeCompare(b.name);
-      case "name-desc":
-        return b.name.localeCompare(a.name);
-      case "price-asc":
-        return a.price - b.price;
-      case "price-desc":
-        return b.price - a.price;
-      default:
-        return 0;
-    }
-  });
-
-  // Pagination logic
-  const indexOfLastProduct = currentPage * productsPerPage;
-  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = sortedProducts.slice(
-    indexOfFirstProduct,
-    indexOfLastProduct
-  );
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
-
-  if (loading) {
+  /* ── filter + sort ── */
+  const filtered = products.filter((p) => {
+    const variantSku = (p.variants || []).map((v) => v?.sku || "").join(" ");
+    const colorSku   = (p.colorVariants || []).flatMap((cv) => (cv.sizes || []).map((s) => s?.sku || "")).join(" ");
     return (
-      <div className="flex justify-center items-center h-40">
-        <div className="w-12 h-12 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-      </div>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (!skuSearchTerm ||
+        p.sku?.toLowerCase().includes(skuSearchTerm.toLowerCase()) ||
+        variantSku.toLowerCase().includes(skuSearchTerm.toLowerCase()) ||
+        colorSku.toLowerCase().includes(skuSearchTerm.toLowerCase()))
     );
-  }
+  });
 
-  if (error) return <p>Error: {error}</p>;
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortOption === "name-asc")   return a.name.localeCompare(b.name);
+    if (sortOption === "name-desc")  return b.name.localeCompare(a.name);
+    if (sortOption === "price-asc")  return a.price - b.price;
+    if (sortOption === "price-desc") return b.price - a.price;
+    return 0;
+  });
+
+  const totalPages    = Math.ceil(sorted.length / PRODUCTS_PER_PAGE);
+  const currentList   = sorted.slice((currentPage - 1) * PRODUCTS_PER_PAGE, currentPage * PRODUCTS_PER_PAGE);
+
+  const getProductImage = (p) =>
+    p.colorVariants?.[0]?.images?.[0]?.url || p.images?.[0]?.url || null;
+
+  /* ── loading / error ── */
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">Loading products…</p>
+      </div>
+    </div>
+  );
+  if (error) return <p className="p-6 text-red-500">Error: {error}</p>;
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <h2 className="text-2xl font-bold mb-6">Product Management</h2>
+    <div className="min-h-screen p-4 space-y-5">
 
-      {/* Search + Sort */}
-      <div className="mb-4 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        {/* Search by Name */}
-        <input
-          type="text"
-          placeholder="Search by name..."
-          className="border px-4 py-2 rounded-md shadow-sm w-full md:max-w-xs bg-white outline-0"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-        />
-
-        {/* Search by SKU */}
-        <input
-          type="text"
-          placeholder="Search by SKU..."
-          className="border px-4 py-2 rounded-md shadow-sm w-full md:max-w-xs bg-white outline-0"
-          value={skuSearchTerm}
-          onChange={(e) => {
-            setSkuSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-        />
-
-        {/* Sort Select */}
-        <select
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value)}
-          className="border px-4 py-2 rounded-md shadow-sm w-full md:w-auto bg-white outline-0"
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 shadow-sm">
+            <FaBoxOpen className="text-white text-lg" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-gray-900">Products</h1>
+            <p className="text-xs text-gray-400 mt-0.5">{products.length} product{products.length !== 1 ? "s" : ""} in catalogue</p>
+          </div>
+        </div>
+        <Link
+          to="/admin/add-product"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl shadow-sm transition self-start sm:self-auto"
         >
-          <option value="">Sort by</option>
-          <option value="name-asc">Name (A - Z)</option>
-          <option value="name-desc">Name (Z - A)</option>
-          <option value="price-asc">Price (Low to High)</option>
-          <option value="price-desc">Price (High to Low)</option>
-        </select>
+          <FaPlus className="text-xs" /> Add Product
+        </Link>
+      </div>
 
-        {/* Product Count */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-800">
-          <span className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-xs font-bold rounded-full shadow-inner p-2">
-            {filteredProducts.length}
-          </span>
-          <span className="text-sm font-medium tracking-wide">
-            Total Products
-          </span>
+      {/* ── Filter bar ── */}
+      <div className="p-4 flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-40">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+          <input
+            type="text" placeholder="Search by name…"
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition"
+          />
+        </div>
+        <div className="relative flex-1 min-w-35">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+          <input
+            type="text" placeholder="Search by SKU…"
+            value={skuSearchTerm}
+            onChange={(e) => { setSkuSearchTerm(e.target.value); setCurrentPage(1); }}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition"
+          />
+        </div>
+        <div className="relative">
+          <MdFilterList className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
+          <select
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value)}
+            className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition appearance-none cursor-pointer"
+          >
+            <option value="">Sort by</option>
+            <option value="name-asc">Name A → Z</option>
+            <option value="name-desc">Name Z → A</option>
+            <option value="price-asc">Price Low → High</option>
+            <option value="price-desc">Price High → Low</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 text-xs font-bold text-violet-700 shrink-0">
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
         </div>
       </div>
 
-      <div className="bg-white p-6 shadow-md rounded-lg">
+      {/* ── Table card ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm text-gray-700">
-            <thead className="bg-gray-100 text-xs uppercase text-gray-600">
-              <tr>
-                {/* <th className="py-3 px-6">#</th> */}
-                <th className="py-3 px-6">Image</th>
-                <th className="py-3 px-6">Name</th>
-                <th className="py-3 px-6">Variants</th>
-                <th className="py-3 px-6">Price</th>
-                <th className="py-3 px-6">Stock</th>
-                {user.role === "admin" && (
-                  <th className="py-3 px-6">Added by</th>
-                )}
-                <th className="py-3 px-6">Actions</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-100 border-b border-gray-100 text-[11px] font-bold text-black uppercase tracking-widest">
+                <th className="px-4 py-3 text-left">Product</th>
+                <th className="px-4 py-3 text-left">SKU / Variants</th>
+                <th className="px-4 py-3 text-left">Price</th>
+                <th className="px-4 py-3 text-left">Stock</th>
+                {user.role === "admin" && <th className="px-4 py-3 text-left">Added by</th>}
+                <th className="px-4 py-3 text-left">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {currentProducts.length > 0 ? (
-                currentProducts.map((product, index) => (
-                  <tr
-                    key={product._id}
-                    className="hover:bg-gray-50 transition-all duration-200"
-                  >
-                    {/* <td className="py-3 px-6 font-medium text-gray-900">
-                      {(currentPage - 1) * productsPerPage + index + 1}
-                    </td>{" "} */}
-                    {/* Serial number */}
-                    <td className="py-3 px-6">
-                      {product.images?.length > 0 && product.images[0].url ? (
-                        <div className="group relative w-12 h-12">
-                          <img
-                            src={product.images[0].url}
-                            alt={product.images[0].altText || product.name}
-                            className="w-12 h-12 rounded object-cover border"
-                          />
-                          <div className="absolute z-10 hidden group-hover:block top-0 left-14 w-32 h-32 rounded shadow-lg border bg-white p-1">
-                            <img
-                              src={product.images[0].url}
-                              alt={product.images[0].altText || product.name}
-                              className="w-full h-full object-cover rounded"
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-12 h-12 flex items-center justify-center bg-gray-100 text-gray-400 rounded border border-gray-300 text-xs">
-                          N/A
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-6 font-medium text-gray-900">
-                      {product.name}
-                    </td>
-                    <td className="py-3 px-6">
-                      {Array.isArray(product.variants) && product.variants.length > 0 ? (
-                        <div className="text-xs text-gray-700 space-y-1">
-                          <div className="font-semibold">
-                            {product.variants.length} variant{product.variants.length > 1 ? "s" : ""}
-                          </div>
-                          <div className="text-gray-500">
-                            {product.variants
-                              .slice(0, 3)
-                              .map((v) => `${v.designName || "Default"} / ${v.color} / ${v.size}`)
-                              .join(", ")}
-                            {product.variants.length > 3 ? "..." : ""}
-                          </div>
-                          <div className="text-gray-500">
-                            SKU: {product.variants[0]?.sku || "-"}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-500 italic">No variants</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-6">₹{product.discountPrice}</td>
-                    <td className="py-3 px-6">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full flex items-center justify-center gap-1 ${product.countInStock === 0
-                          ? "bg-red-100 text-red-700"
-                          : product.countInStock < 10
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-green-100 text-green-700"
-                          }`}
-                      >
-                        {product.countInStock === 0
-                          ? "Out of Stock"
-                          : product.countInStock < 10
-                            ? "Out of Stock Soon"
-                            : "In Stock"}
-                        <span className="font-semibold">
-                          ({product.countInStock})
-                        </span>
-                      </span>
-                    </td>
-                    {user.role === "admin" && (
-                      <td className="py-3 px-6">
-                        <span className="text-[10px] sm:text-xs font-medium text-gray-600 flex flex-wrap flex-col justify-center items-center">
-                          <strong>
-                            {product.user.name}
-                          </strong>
-                          <span className={`text-xs font-semibold text-white rounded-full px-2 py-0.5
-          ${product.user?.role === "admin"
-                              ? "bg-gradient-to-r from-purple-500 via-pink-500 to-red-500"
-                              : product.user?.role === "merchantise"
-                                ? "bg-gradient-to-r from-lime-500 via-green-500 to-teal-500"
-                                : "bg-gray-400"
-                            }`}>
-                            {product.user?.role === "admin" ? "Admin" : product.user?.role === "merchantise" ? "Merchandise" : "Unknown"}
-                          </span>
-                        </span>
-                      </td>
-                    )}
-
-
-
-                    <td className="py-3 px-6 space-x-2">
-                      <Link
-                        to={`/admin/products/${product._id}/edit`}
-                        className="inline-block bg-yellow-500 text-white px-4 py-1.5 rounded hover:bg-yellow-600"
-                      >
-                        <FiEdit className="inline" /> Edit
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setProductToDelete(product._id);
-                          setShowConfirmModal(true);
-                        }}
-                        className="inline-block bg-red-500 text-white px-4 py-1.5 rounded hover:bg-red-600"
-                      >
-                        <FaTrash className="inline" /> Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
+            <tbody className="divide-y divide-gray-50">
+              {currentList.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={user.role === "admin" ? 7 : 6}
-                    className="py-6 px-6 text-center text-gray-500 italic"
-                  >
-                    No products found
+                  <td colSpan={user.role === "admin" ? 6 : 5} className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <FaBoxOpen className="text-3xl text-gray-200" />
+                      <p className="text-sm font-semibold text-gray-400">No products found</p>
+                      <p className="text-xs text-gray-300">Try adjusting your search or filters</p>
+                    </div>
                   </td>
                 </tr>
+              ) : (
+                currentList.map((product) => {
+                  const imgUrl      = getProductImage(product);
+                  const variantCount = (product.colorVariants?.length || 0) + (product.variants?.length || 0);
+
+                  return (
+                    <tr key={product._id} className="hover:bg-gray-50/70 transition group">
+                      {/* Product */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-11 h-11 shrink-0 rounded-xl overflow-hidden bg-gray-100 border border-gray-100 group-hover:border-violet-200 transition">
+                            {imgUrl
+                              ? <img src={imgUrl} alt={product.name} className="w-full h-full object-cover" />
+                              : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">N/A</div>
+                            }
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-800 truncate max-w-[180px]">{product.name}</p>
+                            {product.brand && <p className="text-[11px] text-gray-400">{product.brand}</p>}
+                            <div className="flex gap-1 mt-0.5 flex-wrap">
+                              {product.isFeatured && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Featured</span>}
+                              {product.isPublished
+                                ? <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Published</span>
+                                : <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Draft</span>
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* SKU / Variants */}
+                      <td className="px-4 py-3">
+                        <p className="font-mono text-xs text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-lg inline-block">
+                          {product.sku || "—"}
+                        </p>
+                        {variantCount > 0 && (
+                          <p className="text-[11px] text-gray-400 mt-1">{variantCount} variant{variantCount !== 1 ? "s" : ""}</p>
+                        )}
+                      </td>
+
+                      {/* Price */}
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-gray-800">₹{(product.discountPrice || product.price)?.toLocaleString("en-IN")}</p>
+                        {product.discountPrice && product.discountPrice < product.price && (
+                          <p className="text-[11px] text-gray-400 line-through">₹{product.price?.toLocaleString("en-IN")}</p>
+                        )}
+                      </td>
+
+                      {/* Stock */}
+                      <td className="px-4 py-3">
+                        <StockBadge count={product.countInStock} />
+                      </td>
+
+                      {/* Added by */}
+                      {user.role === "admin" && (
+                        <td className="px-4 py-3">
+                          <p className="text-xs font-semibold text-gray-700">{product.user?.name}</p>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                            product.user?.role === "admin"
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-teal-100 text-teal-700"
+                          }`}>
+                            {product.user?.role === "admin" ? "Admin" : "Merchandise"}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Actions */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/admin/products/${product._id}/edit`}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition"
+                          >
+                            <FiEdit className="text-xs" /> Edit
+                          </Link>
+                          <button
+                            onClick={() => { setProductToDelete(product._id); setShowConfirmModal(true); }}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition"
+                          >
+                            <FaTrash className="text-[10px]" /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
-          {showConfirmModal && (
-            <div
-              className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 animate-fade-in"
-              onClick={() => setShowConfirmModal(false)}
-            >
-              <div
-                className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full animate-fade-in-slow"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Confirm Deletion
-                </h3>
-                <p className="text-sm text-gray-600 mb-6">
-                  Are you sure you want to delete this product? This action
-                  cannot be undone.
-                </p>
-                <div className="flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowConfirmModal(false)}
-                    className="px-4 py-2 text-sm rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className="px-4 py-2 text-sm rounded-md bg-red-500 text-white hover:bg-red-600"
-                  >
-                    Yes, Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Pagination */}
+        {/* ── Pagination ── */}
         {totalPages > 1 && (
-          <div className="mt-6 flex justify-center space-x-2">
-            {Array.from({ length: totalPages }, (_, i) => (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <p className="text-xs text-gray-400">
+              Page {currentPage} of {totalPages} · {sorted.length} products
+            </p>
+            <div className="flex items-center gap-1.5">
               <button
-                key={i}
-                onClick={() => setCurrentPage(i + 1)}
-                className={`px-4 py-2 rounded-full ${currentPage === i + 1
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                {i + 1}
+                <HiChevronLeft className="text-sm" />
               </button>
-            ))}
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`w-8 h-8 rounded-xl text-xs font-bold transition ${
+                    currentPage === i + 1
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                <HiChevronRight className="text-sm" />
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* ── Delete modal ── */}
+      {showConfirmModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowConfirmModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <FaTrash className="text-red-500 text-lg" />
+            </div>
+            <h3 className="text-base font-bold text-gray-800 text-center mb-1">Delete Product?</h3>
+            <p className="text-sm text-gray-500 text-center mb-5">This action is permanent and cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white shadow-sm transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
