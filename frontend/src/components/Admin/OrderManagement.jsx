@@ -556,7 +556,11 @@ const OrderManagement = () => {
         <div>
           <h2 className="text-2xl font-bold">Order Management</h2>
           <p className="text-sm text-gray-600 mt-1">
-            {isAdmin ? "Admin Dashboard" : "Merchantise Dashboard"}
+            {isAdmin
+              ? "Admin Dashboard"
+              : user?.role === "delivery_boy"
+              ? "Delivery Dashboard"
+              : "Merchantise Dashboard"}
           </p>
         </div>
         <div className="text-sm text-gray-600">
@@ -630,41 +634,25 @@ const OrderManagement = () => {
                     ₹{order.totalPrice?.toFixed(2) || "0.00"}
                   </td>
                   <td className="py-4 px-6">
-                    {user.role === "delivery_boy" ? (
-                      <span
-                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          order.status === "Delivered"
-                            ? "bg-green-100 text-green-700"
-                            : ["Shipped", "In Transit", "Out For Delivery", "Picked Up", "Pickup Scheduled"].includes(order.status)
-                            ? "bg-yellow-100 text-yellow-700"
-                            : order.status === "Cancelled"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    ) : (
-                      <select
-                        value={order.status}
-                        onChange={(e) =>
-                          handleStatusChange(order._id, e.target.value)
-                        }
-                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block p-2 w-full"
-                      >
-                        <option value="Processing">Processing</option>
-                        <option value="Packed">Packed</option>
-                        <option value="Pickup Scheduled">Pickup Scheduled</option>
-                        <option value="Picked Up">Picked Up</option>
-                        <option value="Shipped">Shipped</option>
-                        <option value="In Transit">In Transit</option>
-                        <option value="Out For Delivery">Out For Delivery</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="RTO Initiated">RTO Initiated</option>
-                        <option value="RTO Delivered">RTO Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    )}
+                    <select
+                      value={order.status}
+                      onChange={(e) =>
+                        handleStatusChange(order._id, e.target.value)
+                      }
+                      className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block p-2 w-full"
+                    >
+                      <option value="Processing">Processing</option>
+                      <option value="Packed">Packed</option>
+                      <option value="Pickup Scheduled">Pickup Scheduled</option>
+                      <option value="Picked Up">Picked Up</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="In Transit">In Transit</option>
+                      <option value="Out For Delivery">Out For Delivery</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="RTO Initiated">RTO Initiated</option>
+                      <option value="RTO Delivered">RTO Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
                   </td>
 
                   <td className="py-4 px-6">
@@ -681,27 +669,14 @@ const OrderManagement = () => {
                       >
                         <FaEye className="inline mr-1" /> View
                       </button>
-                      {user.role === "delivery_boy" ? (
-                        ["Shipped", "In Transit", "Out For Delivery", "Picked Up", "Pickup Scheduled"].includes(order.status) && (
-                          <button
-                            onClick={() =>
-                              handleStatusChange(order._id, "Delivered")
-                            }
-                            className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition-colors text-xs"
-                          >
-                            <FaBoxOpen className="inline mr-1" /> Delivered
-                          </button>
-                        )
-                      ) : (
-                        <button
-                          onClick={() =>
-                            handleStatusChange(order._id, "Delivered")
-                          }
-                          className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition-colors text-xs"
-                        >
-                          <FaBoxOpen className="inline mr-1" /> Delivered
-                        </button>
-                      )}
+                      <button
+                        onClick={() =>
+                          handleStatusChange(order._id, "Delivered")
+                        }
+                        className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition-colors text-xs"
+                      >
+                        <FaBoxOpen className="inline mr-1" /> Delivered
+                      </button>
 
                       {/* Only show delete button for admin */}
                       {isAdmin && (
