@@ -34,7 +34,8 @@ const SalesTrendsPage = () => {
     category: "",
     gender: "",
     size: "",
-    season: "",
+    color: "",
+    sku: "",
   });
 
   const userInfo = JSON.parse(localStorage.getItem("userInfo"));
@@ -62,7 +63,8 @@ const SalesTrendsPage = () => {
         (!filters.category || p.category === filters.category) &&
         (!filters.gender || p.gender === filters.gender) &&
         (!filters.size || p.size === filters.size) &&
-        (!filters.season || p.season === filters.season)
+        (!filters.color || p.color === filters.color) &&
+        (!filters.sku || p.sku === filters.sku)
       );
     });
     setFilteredProducts(filtered);
@@ -93,21 +95,6 @@ const SalesTrendsPage = () => {
     ],
   };
 
-  const seasonalStats = filteredProducts.reduce((acc, p) => {
-    acc[p.season] = (acc[p.season] || 0) + p.totalSold;
-    return acc;
-  }, {});
-  const seasonalChart = {
-    labels: Object.keys(seasonalStats),
-    datasets: [
-      {
-        label: "Sold by Season",
-        data: Object.values(seasonalStats),
-        backgroundColor: ["#10b981", "#ef4444", "#6366f1", "#f59e0b"],
-      },
-    ],
-  };
-
   const handleFilterChange = (e) => {
     setFilters((f) => ({ ...f, [e.target.name]: e.target.value }));
   };
@@ -119,7 +106,7 @@ const SalesTrendsPage = () => {
       {/* Filters */}
 
       <div className="flex flex-wrap gap-4 mb-6">
-        {["category", "gender", "size"].map((f) => {
+        {["category", "gender", "size", "color", "sku"].map((f) => {
           const opts = [...new Set(salesData.map((p) => p[f]))].filter(Boolean);
           return (
             <CustomSelect
@@ -137,7 +124,7 @@ const SalesTrendsPage = () => {
         <button
           type="button"
           onClick={() =>
-            ["category", "gender", "size"].forEach((f) =>
+            ["category", "gender", "size", "color", "sku"].forEach((f) =>
               handleFilterChange({ target: { name: f, value: "" } })
             )
           }
@@ -261,6 +248,9 @@ const SalesTrendsPage = () => {
               <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur text-xs uppercase text-gray-600 border-b">
                 <tr>
                   <th className="py-3.5 px-6 font-semibold tracking-wide">Product</th>
+                  <th className="py-3.5 px-6 font-semibold tracking-wide">SKU</th>
+                  <th className="py-3.5 px-6 font-semibold tracking-wide">Color</th>
+                  <th className="py-3.5 px-6 font-semibold tracking-wide">Size</th>
                   <th className="py-3.5 px-6 font-semibold tracking-wide">Category</th>
                   <th className="py-3.5 px-6 font-semibold tracking-wide text-right">Sold</th>
                   <th className="py-3.5 px-6 font-semibold tracking-wide text-right">Revenue</th>
@@ -277,6 +267,9 @@ const SalesTrendsPage = () => {
                     <td className="py-3.5 px-6">
                       <span className="font-medium text-gray-900">{p.name}</span>
                     </td>
+                    <td className="py-3.5 px-6">{p.sku || "-"}</td>
+                    <td className="py-3.5 px-6">{p.color || "-"}</td>
+                    <td className="py-3.5 px-6">{p.size || "-"}</td>
 
                     <td className="py-3.5 px-6">
                       <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs capitalize text-gray-700">
@@ -302,14 +295,13 @@ const SalesTrendsPage = () => {
 
                 {/* Totals row */}
                 <tr className="bg-gray-50 font-semibold text-gray-900">
-                  <td className="py-3.5 px-6" colSpan={2}>Total</td>
+                  <td className="py-3.5 px-6" colSpan={5}>Total</td>
                   <td className="py-3.5 px-6 text-right tabular-nums">
                     {filteredProducts.reduce((sum, p) => sum + p.totalSold, 0)}
                   </td>
                   <td className="py-3.5 px-6 text-right tabular-nums">
                     ₹{filteredProducts.reduce((sum, p) => sum + p.totalRevenue, 0).toFixed(2)}
                   </td>
-                  <td className="py-3.5 px-6"></td>
                 </tr>
               </tbody>
             </table>

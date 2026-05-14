@@ -169,17 +169,65 @@ exports.getRevenueByPeriod = async (req, res) => {
         return res.status(400).json({ message: "Invalid period" });
     }
 
-    // Paid orders in window
     const paidOrders = await Order.find({
       isPaid: true,
-      paidAt: { $gte: startDate, $lte: now },
-    }).lean();
+      $or: [
+        { paidAt: { $gte: startDate, $lte: now } },
+        {
+          paidAt: { $exists: false },
+          createdAt: { $gte: startDate, $lte: now },
+        },
+        {
+          paidAt: null,
+          createdAt: { $gte: startDate, $lte: now },
+        },
+      ],
+    })
+      .populate("user", "name email")
+      .sort({ paidAt: -1, createdAt: -1 })
+      .lean();
 
-    // High-level totals
     const totalRevenue = paidOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0);
     const totalOrders = paidOrders.length;
+    const totalProductsSold = paidOrders.reduce(
+      (acc, order) =>
+        acc + (order.orderItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
+      0
+    );
 
-    // Flatten and aggregate per (productId|name) + sku + size + color
+    const breakdownMap = new Map();
+    const getBucketKey = (dt) => {
+      const date = new Date(dt);
+      if (period === "daily") {
+        return `${String(date.getHours()).padStart(2, "0")}:00`;
+      }
+      if (period === "yearly") {
+        return date.toLocaleString("en-IN", { month: "short", year: "numeric" });
+      }
+      return date.toISOString().split("T")[0];
+    };
+
+    for (const order of paidOrders) {
+      const ts = order.paidAt || order.createdAt;
+      const key = getBucketKey(ts);
+      const itemQty = (order.orderItems || []).reduce(
+        (sum, item) => sum + (Number(item.quantity) || 0),
+        0
+      );
+
+      const existing = breakdownMap.get(key) || {
+        label: key,
+        totalRevenue: 0,
+        totalOrders: 0,
+        totalProductsSold: 0,
+      };
+
+      existing.totalRevenue += Number(order.totalPrice) || 0;
+      existing.totalOrders += 1;
+      existing.totalProductsSold += itemQty;
+      breakdownMap.set(key, existing);
+    }
+
     const productMap = new Map();
 
     for (const order of paidOrders) {
@@ -228,7 +276,6 @@ exports.getRevenueByPeriod = async (req, res) => {
       }
     }
 
-    // Best-effort category enrichment for items with productId
     const needLookup = [...productMap.values()]
       .filter(p => p.productId)
       .map(p => p.productId);
@@ -247,10 +294,46 @@ exports.getRevenueByPeriod = async (req, res) => {
       }
     }
 
-    const productsSold = [...productMap.values()].map(p => ({
+    const productsSold = [...productMap.values()].map((p) => ({
       ...p,
-      orderIds: undefined, // not needed in payload; keep counts only
+      orderIds: undefined,
     }));
+
+    const transactions = paidOrders.map((order) => {
+      const itemQuantity = (order.orderItems || []).reduce(
+        (sum, item) => sum + (Number(item.quantity) || 0),
+        0
+      );
+
+      return {
+        orderDbId: order._id,
+        orderId: order.orderId || "-",
+        transactionId:
+          order?.paymentResult?.id || order?.razorpayPaymentId || "-",
+        username: order?.user?.name || "Unknown",
+        userEmail: order?.user?.email || "-",
+        paymentMethod: order.paymentMethod || "-",
+        paidAt: order.paidAt || order.createdAt,
+        totalPrice: Number(order.totalPrice) || 0,
+        itemQuantity,
+        items: (order.orderItems || []).map((item) => ({
+          name: item.name || "Unknown",
+          sku: item.sku || "-",
+          size: item.size || "-",
+          color: item.color || "-",
+          quantity: Number(item.quantity) || 0,
+          unitPrice: Number(item.price) || 0,
+        })),
+      };
+    });
+
+    const periodBreakdown = [...breakdownMap.values()].sort((a, b) => {
+      if (period === "daily") return a.label.localeCompare(b.label);
+      if (period === "yearly") {
+        return new Date(`01 ${a.label}`) - new Date(`01 ${b.label}`);
+      }
+      return a.label.localeCompare(b.label);
+    });
 
     res.json({
       meta: {
@@ -260,6 +343,9 @@ exports.getRevenueByPeriod = async (req, res) => {
       },
       totalRevenue,
       totalOrders,
+      totalProductsSold,
+      periodBreakdown,
+      transactions,
       productsSold,
     });
   } catch (err) {

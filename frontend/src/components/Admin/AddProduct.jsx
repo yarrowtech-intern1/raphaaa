@@ -5,837 +5,599 @@ import { createProduct } from "../../redux/slices/adminProductSlice";
 import { toast } from "sonner";
 import Select from "react-select";
 
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:9000";
+
+const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"].map((s) => ({
+  value: s,
+  label: s,
+}));
+
+const normalizeSize = (s) => {
+  const t = String(s).trim().toUpperCase().replace(/\s+/g, "");
+  if (t === "XLL" || t === "2XL") return "XXL";
+  if (t === "XXXL") return "3XL";
+  if (t === "XXXXL") return "4XL";
+  if (t === "XXXXXL") return "5XL";
+  return t;
+};
+
+const COLOR_NAME_MAP = {
+  "#000000": "Black", "#FFFFFF": "White", "#FF0000": "Red",
+  "#00FF00": "Lime", "#0000FF": "Blue", "#FFFF00": "Yellow",
+  "#00FFFF": "Cyan", "#FF00FF": "Magenta", "#C0C0C0": "Silver",
+  "#808080": "Gray", "#800000": "Maroon", "#808000": "Olive",
+  "#008000": "Green", "#800080": "Purple", "#008080": "Teal",
+  "#000080": "Navy", "#FFA500": "Orange", "#FFC0CB": "Pink",
+  "#A52A2A": "Brown", "#F5F5DC": "Beige", "#D2691E": "Chocolate",
+  "#DC143C": "Crimson", "#FFD700": "Gold", "#4B0082": "Indigo",
+  "#F0E68C": "Khaki", "#E6E6FA": "Lavender", "#90EE90": "LightGreen",
+  "#ADD8E6": "LightBlue", "#D3D3D3": "LightGray",
+};
+
+const getColorName = (hex) => COLOR_NAME_MAP[hex?.toUpperCase()] || hex?.toUpperCase() || "";
+
+const generateColorOptions = () => {
+  const steps = ["00", "33", "66", "99", "CC", "FF"];
+  const colors = [];
+  for (let r of steps) for (let g of steps) for (let b of steps) colors.push(`#${r}${g}${b}`);
+  // Also include common named colors not in web-safe palette
+  ["#FFA500", "#FFC0CB", "#A52A2A", "#F5F5DC", "#D2691E", "#DC143C", "#FFD700",
+   "#4B0082", "#F0E68C", "#E6E6FA", "#90EE90", "#ADD8E6", "#D3D3D3"].forEach((c) => {
+    if (!colors.includes(c)) colors.push(c);
+  });
+  return colors.map((hex) => ({ value: hex, label: getColorName(hex) }));
+};
+
+const COLOR_OPTIONS = generateColorOptions();
+
+const emptySize = () => ({ size: "", sku: "", countInStock: "" });
+const emptyColorVariant = (index) => ({
+  id: Date.now() + index,
+  color: "",
+  colorName: "",
+  images: [],
+  sizes: [emptySize()],
+});
+
 const AddProduct = () => {
-  const [colorSearchHex, setColorSearchHex] = useState("");
+  const dispatch = useDispatch();
+  const { loading } = useSelector((state) => state.adminProducts);
+
+  const [colorVariants, setColorVariants] = useState([emptyColorVariant(0)]);
   const [productData, setProductData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    discountPrice: "",
-    offerPercentage: "",
-    countInStock: "",
-    sku: "",
-    category: "",
-    brand: "",
-    sizes: [],
-    colors: [],
-    collections: "",
-    material: "",
-    gender: "",
-    images: [],
-    isFeatured: false,
-    isPublished: false,
-    tags: "",
-    metaTitle: "",
-    metaDescription: "",
-    metaKeywords: "",
-    dimensions: {
-      length: "",
-      width: "",
-      height: "",
-    },
+    name: "", description: "", price: "", discountPrice: "",
+    offerPercentage: "", sku: "", category: "", brand: "",
+    collections: "", material: "", gender: "",
+    sizeChart: { imageUrl: "", title: "Size Chart" },
+    isFeatured: false, isPublished: false, tags: "",
+    dimensions: { length: "", width: "", height: "" },
     weight: "",
   });
-  const { loading } = useSelector((state) => state.adminProducts);
-  // const [loading, setLoading] = useState(false);
-  const dispatch = useDispatch();
-  // const [metaOptions, setMetaOptions] = useState({ category: [], collection: [], gender: [] });
-  // top of AddProduct.jsx
-  const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:9000";
 
-  const [metaOptions, setMetaOptions] = useState({
-    category: [],
-    collection: [],
-    gender: [],
-    material: [],        // ← include material from your API
-  });
-  const [metaLoading, setMetaLoading] = useState(true);
-  const [metaError, setMetaError] = useState("");
+  const [metaOptions, setMetaOptions] = useState({ category: [], collection: [], gender: [], material: [] });
+  const [uploadingColor, setUploadingColor] = useState(null);
+  const [uploadingSizeChart, setUploadingSizeChart] = useState(false);
 
   useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        setMetaLoading(true);
-        setMetaError("");
-
-        const { data } = await axios.get(`${API_BASE}/api/meta-options`);
-
-        // Map API -> state buckets; dedupe values just in case
-        const buckets = data.reduce(
-          (acc, { type, value }) => {
-            if (["category", "collection", "gender", "material"].includes(type)) {
-              if (!acc[type].includes(value)) acc[type].push(value);
-            }
-            return acc;
-          },
-          { category: [], collection: [], gender: [], material: [] }
-        );
-
-        setMetaOptions(buckets);
-      } catch (err) {
-        console.error("Failed to load meta options:", err);
-        setMetaError("Failed to load categories/collections/gender.");
-      } finally {
-        setMetaLoading(false);
-      }
-    };
-
-    fetchOptions();
+    axios.get(`${API_BASE}/api/meta-options`).then(({ data }) => {
+      const buckets = data.reduce(
+        (acc, { type, value }) => {
+          if (["category", "collection", "gender", "material"].includes(type)) {
+            if (!acc[type].includes(value)) acc[type].push(value);
+          }
+          return acc;
+        },
+        { category: [], collection: [], gender: [], material: [] }
+      );
+      setMetaOptions(buckets);
+    }).catch(console.error);
   }, []);
 
-  // useEffect(() => {
-  //   const fetchOptions = async () => {
-  //     const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options`);
-  //     const categorized = { category: [], collection: [], gender: [] };
-  //     res.data.forEach((opt) => categorized[opt.type].push(opt.value));
-  //     setMetaOptions(categorized);
-  //   };
-  //   fetchOptions();
-  // }, []);
-
-
+  // ─── Product field handlers ───────────────────────────────────────────────
   const handleProductChange = (e) => {
     const { name, value, type, checked } = e.target;
-
     if (type === "checkbox") {
-      setProductData({ ...productData, [name]: checked });
+      setProductData((p) => ({ ...p, [name]: checked }));
     } else if (name.startsWith("dimensions.")) {
-      const dimensionKey = name.split(".")[1];
-      setProductData({
-        ...productData,
-        dimensions: {
-          ...productData.dimensions,
-          [dimensionKey]: value,
-        },
-      });
+      const key = name.split(".")[1];
+      setProductData((p) => ({ ...p, dimensions: { ...p.dimensions, [key]: value } }));
     } else {
-      const updatedData = { ...productData, [name]: value };
-      if (name === "offerPercentage") {
-        const price = parseFloat(updatedData.price);
-        const offer = parseFloat(value);
-        if (!isNaN(price) && !isNaN(offer)) {
-          const discount = price - (price * offer) / 100;
-          updatedData.discountPrice = Math.round(discount);
+      setProductData((p) => {
+        const updated = { ...p, [name]: value };
+        if (name === "offerPercentage") {
+          const price = parseFloat(updated.price);
+          const offer = parseFloat(value);
+          if (!isNaN(price) && !isNaN(offer))
+            updated.discountPrice = Math.round(price - (price * offer) / 100);
         }
-      }
-      setProductData(updatedData);
+        return updated;
+      });
     }
   };
 
-  const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    const newImages = [];
+  // ─── Size chart upload ────────────────────────────────────────────────────
+  const handleSizeChartUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      setUploadingSizeChart(true);
+      const { data } = await axios.post(`${API_BASE}/api/upload`, formData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+      });
+      setProductData((p) => ({ ...p, sizeChart: { ...p.sizeChart, imageUrl: data.imageUrl } }));
+      toast.success("Size chart uploaded");
+    } catch {
+      toast.error("Failed to upload size chart");
+    } finally {
+      setUploadingSizeChart(false);
+    }
+  };
 
-    for (let file of files) {
+  // ─── Color variant handlers ───────────────────────────────────────────────
+  const addColorVariant = () =>
+    setColorVariants((prev) => [...prev, emptyColorVariant(prev.length)]);
+
+  const removeColorVariant = (id) =>
+    setColorVariants((prev) => prev.filter((cv) => cv.id !== id));
+
+  const updateColorVariant = (id, field, value) =>
+    setColorVariants((prev) =>
+      prev.map((cv) => (cv.id === id ? { ...cv, [field]: value } : cv))
+    );
+
+  // Images for a color
+  const handleColorImageUpload = async (id, files) => {
+    setUploadingColor(id);
+    const uploaded = [];
+    for (const file of Array.from(files)) {
       const formData = new FormData();
       formData.append("image", file);
-
       try {
-        const { data } = await axios.post(
-          `${import.meta.env.VITE_BACKEND_URL}/api/upload`,
-          formData,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("userToken")}`,
-            },
-          }
-        );
-
-        newImages.push({ url: data.imageUrl, altText: file.name });
-      } catch (error) {
-        console.error("Image upload failed:", error);
-        toast.error(`Failed to upload image: ${file.name}`);
+        const { data } = await axios.post(`${API_BASE}/api/upload`, formData, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+        });
+        uploaded.push({ url: data.imageUrl, altText: file.name });
+      } catch {
+        toast.error(`Failed to upload ${file.name}`);
       }
     }
-
-    setProductData((prev) => ({
-      ...prev,
-      images: [...prev.images, ...newImages],
-    }));
+    setColorVariants((prev) =>
+      prev.map((cv) =>
+        cv.id === id ? { ...cv, images: [...cv.images, ...uploaded] } : cv
+      )
+    );
+    setUploadingColor(null);
   };
 
-  const handleImageRemove = (index) => {
-    const updated = [...productData.images];
-    updated.splice(index, 1);
-    setProductData({ ...productData, images: updated });
-  };
+  const removeColorImage = (colorId, imgIndex) =>
+    setColorVariants((prev) =>
+      prev.map((cv) =>
+        cv.id === colorId
+          ? { ...cv, images: cv.images.filter((_, i) => i !== imgIndex) }
+          : cv
+      )
+    );
 
-  const handleMultiSelect = (selectedOptions, name) => {
-    const values = selectedOptions.map((opt) => opt.value);
-    setProductData({ ...productData, [name]: values });
-  };
+  // Sizes inside a color variant
+  const addSize = (colorId) =>
+    setColorVariants((prev) =>
+      prev.map((cv) =>
+        cv.id === colorId ? { ...cv, sizes: [...cv.sizes, emptySize()] } : cv
+      )
+    );
 
-  const generateWebSafeColors = () => {
-    const steps = ["00", "33", "66", "99", "CC", "FF"];
-    const colors = [];
-    for (let r of steps) {
-      for (let g of steps) {
-        for (let b of steps) {
-          colors.push(`#${r}${g}${b}`);
-        }
-      }
-    }
-    return colors;
-  };
+  const removeSize = (colorId, sizeIndex) =>
+    setColorVariants((prev) =>
+      prev.map((cv) =>
+        cv.id === colorId
+          ? { ...cv, sizes: cv.sizes.filter((_, i) => i !== sizeIndex) }
+          : cv
+      )
+    );
 
-  const colorNameMap = {
-    "#000000": "Black", "#FFFFFF": "White", "#FF0000": "Red",
-    "#00FF00": "Lime", "#0000FF": "Blue", "#FFFF00": "Yellow",
-    "#00FFFF": "Cyan", "#FF00FF": "Magenta", "#C0C0C0": "Silver",
-    "#808080": "Gray", "#800000": "Maroon", "#808000": "Olive",
-    "#008000": "Green", "#800080": "Purple", "#008080": "Teal",
-    "#000080": "Navy",
-  };
+  const updateSize = (colorId, sizeIndex, field, value) =>
+    setColorVariants((prev) =>
+      prev.map((cv) =>
+        cv.id === colorId
+          ? {
+              ...cv,
+              sizes: cv.sizes.map((s, i) =>
+                i === sizeIndex ? { ...s, [field]: value } : s
+              ),
+            }
+          : cv
+      )
+    );
 
-  const getColorNameFromHex = (hex) => {
-    return colorNameMap[hex.toUpperCase()] || hex.toUpperCase();
-  };
-
-  const webSafeColorOptions = generateWebSafeColors().map((hex) => ({
-    value: hex,
-    label: (
-      <div
-        className="flex items-center gap-2"
-        title={`${getColorNameFromHex(hex)} (${hex})`}
-      >
-        <span
-          className="inline-block w-4 h-4 rounded-full border border-gray-300"
-          style={{ backgroundColor: hex }}
-        ></span>
-        {getColorNameFromHex(hex)}
-      </div>
-    ),
-  }));
-
-  const selectedColors = productData.colors.map((hex) => ({
-    value: hex,
-    label: (
-      <div
-        className="flex items-center gap-2"
-        title={`${getColorNameFromHex(hex)} (${hex})`}
-      >
-        <span
-          className="inline-block w-4 h-4 rounded-full border border-gray-300"
-          style={{ backgroundColor: hex }}
-        ></span>
-        {getColorNameFromHex(hex)}
-      </div>
-    ),
-  }));
-
-  // Normalize a few common typos/synonyms (e.g., xll -> XXL, 2xl -> XXL)
-  const normalizeSize = (s) => {
-    const t = String(s).trim().toUpperCase().replace(/\s+/g, "");
-    if (t === "XLL") return "XXL";
-    if (t === "2XL") return "XXL";
-    if (t === "3XL" || t === "XXXL") return "3XL";
-    if (t === "4XL" || t === "XXXXL") return "4XL";
-    if (t === "5XL" || t === "XXXXXL") return "5XL";
-    return t;
-  };
-
-  // Build grouped options for react-select
-  const toOpts = (arr) => arr.map((v) => ({ value: v, label: v }));
-
-  // Curated size groups you can tweak anytime
-  const SIZE_GROUPED_OPTIONS = [
-    {
-      label: "Alpha (Adults)",
-      options: toOpts(["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"]),
-    },
-    {
-      label: "Women – Numeric (US)",
-      options: toOpts(["0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24"]),
-    },
-    {
-      label: "Men – Waist (in)",
-      options: toOpts(["26", "28", "29", "30", "31", "32", "33", "34", "36", "38", "40", "42", "44", "46", "48"]),
-    },
-    {
-      label: "Men – Shirt Neck (in)",
-      options: toOpts(["14", "14.5", "15", "15.5", "16", "16.5", "17", "17.5", "18"]),
-    },
-    {
-      label: "Kids / Baby",
-      options: toOpts([
-        "NB", "0-3M", "3-6M", "6-9M", "9-12M", "12-18M", "18-24M",
-        "2T", "3T", "4T", "5T",
-        "4", "5", "6", "7", "8", "10", "12", "14", "16"
-      ]),
-    },
-  ];
-
-
-
-  const handleProductSubmit = async (e) => {
+  // ─── Submit ───────────────────────────────────────────────────────────────
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    try {
-      const transformedData = {
-        ...productData,
-        price: Number(productData.price),
-        offerPercentage: productData.offerPercentage
-          ? Number(productData.offerPercentage)
-          : 0,
-        discountPrice: productData.offerPercentage
-          ? Math.round(
-            Number(productData.price) -
-            (Number(productData.price) * Number(productData.offerPercentage)) /
-            100
-          )
-          : productData.discountPrice
-            ? Math.round(Number(productData.discountPrice))
-            : undefined,
-        countInStock: Number(productData.countInStock),
-        weight: productData.weight ? Number(productData.weight) : undefined,
-        tags: productData.tags
-          ? productData.tags.split(",").map((tag) => tag.trim()).filter((tag) => tag)
-          : [],
-        dimensions: {
-          length: productData.dimensions.length ? Number(productData.dimensions.length) : undefined,
-          width: productData.dimensions.width ? Number(productData.dimensions.width) : undefined,
-          height: productData.dimensions.height ? Number(productData.dimensions.height) : undefined,
-        },
-        images: productData.images.filter((img) => img.url.trim() !== ""),
-      };
+    const normalizedColorVariants = colorVariants
+      .map((cv) => ({
+        color: cv.color.trim(),
+        colorName: cv.colorName.trim() || getColorName(cv.color),
+        images: cv.images,
+        sizes: cv.sizes
+          .map((s) => ({
+            size: normalizeSize(s.size),
+            sku: s.sku.trim(),
+            countInStock: Number(s.countInStock || 0),
+          }))
+          .filter((s) => s.size && s.sku),
+      }))
+      .filter((cv) => cv.color && cv.sizes.length > 0);
 
-      if (!transformedData.dimensions.length && !transformedData.dimensions.width && !transformedData.dimensions.height) {
-        delete transformedData.dimensions;
-      }
-
-      dispatch(createProduct(transformedData));
-
-      toast.success("Product added successfully!");
-      setProductData({
-        name: "",
-        description: "",
-        price: "",
-        discountPrice: "",
-        offerPercentage: "",
-        countInStock: "",
-        sku: "",
-        category: "",
-        brand: "",
-        sizes: [],
-        colors: [],
-        collections: "",
-        material: "",
-        gender: "",
-        images: [],
-        isFeatured: false,
-        isPublished: false,
-        tags: "",
-        metaTitle: "",
-        metaDescription: "",
-        metaKeywords: "",
-        dimensions: {
-          length: "",
-          width: "",
-          height: "",
-        },
-        weight: "",
-      });
-
-    } catch (err) {
-      console.error("Error adding product:", err);
-      toast.error("Failed to add product");
+    if (!normalizedColorVariants.length) {
+      toast.error("Add at least one color with a valid size, SKU and stock.");
+      return;
     }
+
+    const allSizes   = [...new Set(normalizedColorVariants.flatMap((cv) => cv.sizes.map((s) => s.size)))];
+    const allColors  = [...new Set(normalizedColorVariants.map((cv) => cv.color))];
+    const totalStock = normalizedColorVariants.reduce(
+      (sum, cv) => sum + cv.sizes.reduce((s2, sz) => s2 + Math.max(0, Number(sz.countInStock || 0)), 0),
+      0
+    );
+    const firstSku = productData.sku?.trim() || normalizedColorVariants[0]?.sizes[0]?.sku;
+
+    const payload = {
+      ...productData,
+      price: Number(productData.price),
+      offerPercentage: productData.offerPercentage ? Number(productData.offerPercentage) : 0,
+      discountPrice: productData.offerPercentage
+        ? Math.round(Number(productData.price) - (Number(productData.price) * Number(productData.offerPercentage)) / 100)
+        : productData.discountPrice ? Math.round(Number(productData.discountPrice)) : undefined,
+      countInStock: totalStock,
+      sku: firstSku,
+      sizes: allSizes,
+      colors: allColors,
+      colorVariants: normalizedColorVariants,
+      variants: [],
+      images: normalizedColorVariants[0]?.images || [],
+      weight: productData.weight ? Number(productData.weight) : undefined,
+      tags: productData.tags
+        ? productData.tags.split(",").map((t) => t.trim()).filter(Boolean)
+        : [],
+      dimensions: {
+        length: productData.dimensions.length ? Number(productData.dimensions.length) : undefined,
+        width:  productData.dimensions.width  ? Number(productData.dimensions.width)  : undefined,
+        height: productData.dimensions.height ? Number(productData.dimensions.height) : undefined,
+      },
+      sizeChart: {
+        imageUrl: productData.sizeChart?.imageUrl || "",
+        title:    productData.sizeChart?.title    || "Size Chart",
+      },
+    };
+
+    if (!payload.dimensions.length && !payload.dimensions.width && !payload.dimensions.height)
+      delete payload.dimensions;
+
+    dispatch(createProduct(payload));
+    toast.success("Product added successfully!");
+
+    setProductData({
+      name: "", description: "", price: "", discountPrice: "",
+      offerPercentage: "", sku: "", category: "", brand: "",
+      collections: "", material: "", gender: "",
+      sizeChart: { imageUrl: "", title: "Size Chart" },
+      isFeatured: false, isPublished: false, tags: "",
+      dimensions: { length: "", width: "", height: "" },
+      weight: "",
+    });
+    setColorVariants([emptyColorVariant(0)]);
   };
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 bg-white shadow-md rounded-lg mb-6">
       <h3 className="text-lg font-bold mb-6">Add New Product</h3>
-      <p className="text-red-500 font-bold mb-3 animate-pulse">
-        {" "}
-        * Note that product image you can upload after you can upload the
-        product details. You can upload the product image by find using product
-        name.
-      </p>
-      <form onSubmit={handleProductSubmit}>
-        <div>
-          <label className="block text-gray-700 mb-1 font-medium">Upload Product Images</label>
-          <div className="relative inline-block">
-            <label
-              htmlFor="file-upload"
-              className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white font-semibold rounded-lg shadow-md hover:scale-105 transition-transform duration-200"
-            >
-              📁 Upload Images
-            </label>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* ── Basic Info ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Product Name *">
             <input
-              id="file-upload"
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              type="text" name="name" value={productData.name}
+              onChange={handleProductChange} required
+              placeholder="e.g. Classic Crew-Neck T-Shirt"
+              className={inputCls}
             />
-          </div>
+          </Field>
+          <Field label="SKU (optional — auto from first variant)">
+            <input
+              type="text" name="sku" value={productData.sku}
+              onChange={handleProductChange}
+              placeholder="e.g. TSHIRT-001"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Price *">
+            <input
+              type="number" name="price" value={productData.price}
+              onChange={handleProductChange} required min="0" step="0.01"
+              placeholder="₹ MRP price"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Offer %">
+            <input
+              type="number" name="offerPercentage" value={productData.offerPercentage}
+              onChange={handleProductChange} min="0" step="0.1"
+              placeholder="Discount percentage"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Discount Price (auto)">
+            <input
+              type="number" name="discountPrice" value={productData.discountPrice}
+              readOnly placeholder="Auto calculated"
+              className={`${inputCls} bg-gray-100`}
+            />
+          </Field>
+          <Field label="Category *">
+            <select name="category" value={productData.category}
+              onChange={handleProductChange} required className={inputCls}>
+              <option value="">Select Category</option>
+              {metaOptions.category.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
+          <Field label="Collection *">
+            <select name="collections" value={productData.collections}
+              onChange={handleProductChange} required className={inputCls}>
+              <option value="">Select Collection</option>
+              {metaOptions.collection.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
+          <Field label="Gender">
+            <select name="gender" value={productData.gender}
+              onChange={handleProductChange} className={inputCls}>
+              <option value="">Select Gender</option>
+              {metaOptions.gender.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </Field>
+          <Field label="Material">
+            <select name="material" value={productData.material}
+              onChange={handleProductChange} className={inputCls}>
+              <option value="">Select Material</option>
+              {metaOptions.material.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Field>
+          <Field label="Brand">
+            <input type="text" name="brand" value={productData.brand}
+              onChange={handleProductChange} placeholder="Brand name" className={inputCls} />
+          </Field>
+          <Field label="Weight (kg)">
+            <input type="number" name="weight" value={productData.weight}
+              onChange={handleProductChange} min="0" step="0.01" className={inputCls} />
+          </Field>
+          <Field label="Tags (comma-separated)">
+            <input type="text" name="tags" value={productData.tags}
+              onChange={handleProductChange} placeholder="casual, trendy, cotton" className={inputCls} />
+          </Field>
         </div>
 
-        {/* Uploaded Image Preview */}
-        {productData.images.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {productData.images.map((img, index) => (
-              <div key={index} className="relative rounded-lg p-2 shadow-lg bg-gradient-to-tr from-white via-slate-50 to-gray-100 transition hover:shadow-xl">
-                <img src={img.url} alt={img.altText || "preview"} className="w-full object-cover rounded" />
-                <input
-                  type="text"
-                  value={img.altText}
-                  onChange={(e) => {
-                    const updated = [...productData.images];
-                    updated[index].altText = e.target.value;
-                    setProductData({ ...productData, images: updated });
-                  }}
-                  placeholder="Alt text"
-                  className="mt-1 px-3 py-1 w-full rounded border border-gray-200 bg-white text-sm shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleImageRemove(index)}
-                  className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-sm text-white rounded-full px-1"
-                >
-                  ✕
-                </button>
-              </div>
+        {/* ── Description ── */}
+        <Field label="Description *">
+          <textarea name="description" value={productData.description}
+            onChange={handleProductChange} rows={4} required
+            placeholder="Product description"
+            className={inputCls} />
+        </Field>
+
+        {/* ── Dimensions ── */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Dimensions (cm)</label>
+          <div className="grid grid-cols-3 gap-2">
+            {["length", "width", "height"].map((d) => (
+              <input key={d} type="number" name={`dimensions.${d}`}
+                value={productData.dimensions[d]} onChange={handleProductChange}
+                min="0" step="0.1" placeholder={d.charAt(0).toUpperCase() + d.slice(1)}
+                className={inputCls} />
             ))}
           </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-          {/* Product Name */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Product Name {" "}
-              <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={productData.name}
-              onChange={handleProductChange}
-              required
-              placeholder="Enter product name"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
+        </div>
+
+        {/* ── Size Chart ── */}
+        <div className="border border-gray-200 rounded-lg p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Size Chart Image</label>
+          <input type="file" accept="image/*" onChange={handleSizeChartUpload}
+            className="text-sm" />
+          {uploadingSizeChart && <p className="text-xs text-blue-500 mt-1 animate-pulse">Uploading…</p>}
+          {productData.sizeChart?.imageUrl && (
+            <img src={productData.sizeChart.imageUrl} alt="Size chart"
+              className="mt-2 w-48 rounded border border-gray-200" />
+          )}
+        </div>
+
+        {/* ── Color Variants (the core section) ── */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-base font-bold text-gray-800">
+              Color Variants <span className="text-red-500">*</span>
+            </h4>
+            <button type="button" onClick={addColorVariant}
+              className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+              + Add Color
+            </button>
           </div>
 
-          {/* SKU */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              SKU {" "}
-              <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="text"
-              name="sku"
-              value={productData.sku}
-              onChange={handleProductChange}
-              required
-              placeholder="Unique product identifier"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-
-          {/* Price */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Price {" "}
-              <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="number"
-              name="price"
-              value={productData.price}
-              onChange={handleProductChange}
-              required
-              min="0"
-              step="0.01"
-              placeholder="Enter product price"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Offer Percentage
-            </label>
-            <input
-              type="number"
-              name="offerPercentage"
-              value={productData.offerPercentage}
-              onChange={handleProductChange}
-              min="0"
-              step="0.1"
-              placeholder="Enter discount %"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-          {/* Discount Price */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Discount Price
-            </label>
-            <input
-              type="number"
-              name="discountPrice"
-              value={productData.discountPrice}
-              onChange={handleProductChange}
-              min="0"
-              step="0.01"
-              placeholder="Auto Generated"
-              disabled
-              className="w-full px-4 py-2 rounded-md border bg-gray-200 text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-
-          {/* Count in Stock */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Count in Stock {" "}
-              <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="number"
-              name="countInStock"
-              value={productData.countInStock}
-              onChange={handleProductChange}
-              required
-              min="0"
-              placeholder="Enter product stock"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Category {" "}
-              <span className="text-red-600">*</span>
-            </label>
-            <select
-              name="category"
-              value={productData.category}
-              onChange={handleProductChange}
-              required
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            >
-              <option value="">Select Category</option>
-              {metaOptions.category.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Collections */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Collections {" "}
-              <span className="text-red-600">*</span>
-            </label>
-            <select
-              name="collections"
-              value={productData.collections}
-              onChange={handleProductChange}
-              required
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            >
-              <option value="">Select Collection</option>
-              {metaOptions.collection.map((col) => (
-                <option key={col} value={col}>{col}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Brand */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Brand
-            </label>
-            <input
-              type="text"
-              name="brand"
-              value={productData.brand}
-              onChange={handleProductChange}
-              placeholder="Enter product brand"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-
-          {/* Gender */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Gender
-            </label>
-            <select
-              name="gender"
-              value={productData.gender}
-              onChange={handleProductChange}
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            >
-              <option value="">Select Gender</option>
-              {metaOptions.gender.map((gen) => (
-                <option key={gen} value={gen}>{gen}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Sizes and Colors with react-select */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="block text-gray-700 mb-1 font-medium">
-                Sizes <span className="text-red-600">*</span>
-              </label>
-              <Select
-                isMulti
-                name="sizes"
-                options={SIZE_GROUPED_OPTIONS}
-                value={productData.sizes.map((s) => {
-                  const v = normalizeSize(s);
-                  return { value: v, label: v };
-                })}
-                onChange={(selected) =>
-                  setProductData((prev) => ({
-                    ...prev,
-                    sizes: (selected || []).map((opt) => normalizeSize(opt.value)),
-                  }))
-                }
-                className="basic-multi-select"
-                classNamePrefix="select"
+          <div className="space-y-6">
+            {colorVariants.map((cv, cvIdx) => (
+              <ColorVariantCard
+                key={cv.id}
+                cv={cv}
+                cvIdx={cvIdx}
+                totalColors={colorVariants.length}
+                uploadingColor={uploadingColor}
+                onColorChange={(color) => {
+                  updateColorVariant(cv.id, "color", color);
+                  updateColorVariant(cv.id, "colorName", getColorName(color));
+                }}
+                onColorNameChange={(name) => updateColorVariant(cv.id, "colorName", name)}
+                onImageUpload={(files) => handleColorImageUpload(cv.id, files)}
+                onImageRemove={(idx) => removeColorImage(cv.id, idx)}
+                onAddSize={() => addSize(cv.id)}
+                onRemoveSize={(idx) => removeSize(cv.id, idx)}
+                onSizeChange={(idx, field, val) => updateSize(cv.id, idx, field, val)}
+                onRemoveColor={() => removeColorVariant(cv.id)}
               />
-
-            </div>
-
-            <div>
-              <label className="block text-gray-700 mb-1 font-medium">Colors {" "} <span className="text-red-600">*</span></label>
-              <Select
-                isMulti
-                name="colors"
-                options={webSafeColorOptions}
-                value={selectedColors}
-                onChange={(selected) => handleMultiSelect(selected, "colors")}
-                className="basic-multi-select"
-                classNamePrefix="select"
-              />
-
-            </div>
-          </div>
-
-          {/* Material */}
-          <div className="md: mt-3">
-            <label className="block text-gray-700 mb-1 font-medium">Material</label>
-            <select
-              name="material"
-              value={productData.material}
-              onChange={handleProductChange}
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            >
-              <option value="">Select Material</option>
-              {metaOptions.material.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-
-
-          {/* Weight */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Weight (kg)
-            </label>
-            <input
-              type="number"
-              name="weight"
-              value={productData.weight}
-              onChange={handleProductChange}
-              min="0"
-              step="0.01"
-              placeholder="Enter product weight"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">
-              Tags (comma-separated)
-            </label>
-            <input
-              type="text"
-              name="tags"
-              value={productData.tags}
-              onChange={handleProductChange}
-              placeholder="e.g., trendy, casual, comfortable"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
+            ))}
           </div>
         </div>
 
-        {/* Description */}
-        <div className="mt-4">
-          <label className="block text-gray-700 mb-1 font-medium">
-            Description {" "}
-            <span className="text-red-600">*</span>
-          </label>
-          <textarea
-            name="description"
-            value={productData.description}
-            onChange={handleProductChange}
-            rows="4"
-            required
-            placeholder="Enter product description"
-            className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-          ></textarea>
-        </div>
-
-        {/* Images */}
-        {/* <div className="mt-4">
-          <label className="block text-gray-700 mb-1 font-medium">Product Images *</label>
-          {productData.images.map((image, index) => (
-            <div key={index} className="flex gap-2 mb-2">
-              <input
-                type="url"
-                placeholder="Image URL"
-                value={image.url}
-                onChange={(e) => handleImageChange(index, "url", e.target.value)}
-                required={index === 0}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
-              />
-              <input
-                type="text"
-                placeholder="Alt text"
-                value={image.altText}
-                onChange={(e) => handleImageChange(index, "altText", e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
-              />
-              {productData.images.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeImageField(index)}
-                  className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addImageField}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          >
-            Add Another Image
-          </button>
-        </div> */}
-
-        {/* Dimensions */}
-        <div className="mt-4">
-          <label className="block text-gray-700 mb-1 font-medium">Dimensions (cm)</label>
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              type="number"
-              name="dimensions.length"
-              placeholder="Length"
-              value={productData.dimensions.length}
-              onChange={handleProductChange}
-              min="0"
-              step="0.1"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-            <input
-              type="number"
-              name="dimensions.width"
-              placeholder="Width"
-              value={productData.dimensions.width}
-              onChange={handleProductChange}
-              min="0"
-              step="0.1"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-            <input
-              type="number"
-              name="dimensions.height"
-              placeholder="Height"
-              value={productData.dimensions.height}
-              onChange={handleProductChange}
-              min="0"
-              step="0.1"
-              className="w-full px-4 py-2 rounded-md border bg-white text-gray-800 border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition duration-200"
-            />
-          </div>
-        </div>
-
-        {/* SEO Fields */}
-        {/* <div className="mt-4 grid grid-cols-1 gap-4">
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">Meta Title</label>
-            <input
-              type="text"
-              name="metaTitle"
-              value={productData.metaTitle}
-              onChange={handleProductChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">Meta Description</label>
-            <textarea
-              name="metaDescription"
-              value={productData.metaDescription}
-              onChange={handleProductChange}
-              rows="2"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
-            ></textarea>
-          </div>
-          <div>
-            <label className="block text-gray-700 mb-1 font-medium">Meta Keywords</label>
-            <input
-              type="text"
-              name="metaKeywords"
-              value={productData.metaKeywords}
-              onChange={handleProductChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-        </div> */}
-
-        {/* Checkboxes */}
-        {/* <div className="mt-4 flex gap-6">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              name="isFeatured"
-              checked={productData.isFeatured}
-              onChange={handleProductChange}
-              className="mr-2"
-            />
-            <label className="text-gray-700 font-medium">Featured Product</label>
-          </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              name="isPublished"
-              checked={productData.isPublished}
-              onChange={handleProductChange}
-              className="mr-2"
-            />
-            <label className="text-gray-700 font-medium">Published</label>
-          </div>
-        </div> */}
-
-        <div className="mt-6">
-          <button
-            type="submit"
-            className="bg-gradient-to-r from-green-500 via-teal-500 to-blue-500 hover:brightness-110 text-white font-semibold py-2 px-6 rounded-lg shadow-lg transition-all duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={loading}
-          >
-
-            {loading ? "Adding..." : "Add Product"}
-          </button>
-        </div>
+        {/* ── Submit ── */}
+        <button
+          type="submit" disabled={loading}
+          className="bg-gradient-to-r from-green-500 via-teal-500 to-blue-500 hover:brightness-110 text-white font-semibold py-2.5 px-8 rounded-lg shadow-lg transition-all duration-300 disabled:opacity-50">
+          {loading ? "Adding…" : "Add Product"}
+        </button>
       </form>
     </div>
   );
 };
+
+// ─── Sub-component: one color variant card ────────────────────────────────────
+const ColorVariantCard = ({
+  cv, cvIdx, totalColors, uploadingColor,
+  onColorChange, onColorNameChange,
+  onImageUpload, onImageRemove,
+  onAddSize, onRemoveSize, onSizeChange,
+  onRemoveColor,
+}) => (
+  <div className="border-2 border-indigo-100 rounded-xl p-4 bg-gradient-to-br from-white to-indigo-50">
+    {/* Header */}
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-3">
+        {cv.color && (
+          <span className="w-8 h-8 rounded-full border-2 border-white shadow-md inline-block"
+            style={{ backgroundColor: cv.color }} />
+        )}
+        <h5 className="font-semibold text-gray-800">
+          Color {cvIdx + 1}{cv.colorName ? `: ${cv.colorName}` : ""}
+        </h5>
+      </div>
+      {totalColors > 1 && (
+        <button type="button" onClick={onRemoveColor}
+          className="text-xs text-red-500 hover:text-red-700 border border-red-200 px-2 py-1 rounded">
+          Remove Color
+        </button>
+      )}
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      {/* Color picker */}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Color (hex) *</label>
+        <Select
+          options={COLOR_OPTIONS}
+          value={cv.color ? { value: cv.color, label: getColorName(cv.color) } : null}
+          onChange={(sel) => onColorChange(sel?.value || "")}
+          placeholder="Select color"
+          formatOptionLabel={(opt) => (
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded-full border border-gray-300 inline-block flex-shrink-0"
+                style={{ backgroundColor: opt.value }} />
+              <span>{opt.label}</span>
+            </div>
+          )}
+        />
+      </div>
+      {/* Color display name */}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Color Display Name</label>
+        <input type="text" value={cv.colorName} onChange={(e) => onColorNameChange(e.target.value)}
+          placeholder="e.g. Midnight Black (auto-filled)"
+          className={inputCls} />
+      </div>
+    </div>
+
+    {/* Images for this color */}
+    <div className="mb-4">
+      <label className="block text-xs font-medium text-gray-600 mb-2">
+        Photos for this color
+      </label>
+      <label className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-lg cursor-pointer hover:bg-blue-100 transition">
+        📷 Upload Photos
+        <input type="file" multiple accept="image/*" className="hidden"
+          onChange={(e) => onImageUpload(e.target.files)} />
+      </label>
+      {uploadingColor === cv.id && (
+        <span className="ml-2 text-xs text-blue-500 animate-pulse">Uploading…</span>
+      )}
+      {cv.images.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {cv.images.map((img, idx) => (
+            <div key={idx} className="relative">
+              <img src={img.url} alt={img.altText} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+              <button type="button" onClick={() => onImageRemove(idx)}
+                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center leading-none">
+                ×
+              </button>
+              {idx === 0 && (
+                <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center rounded-b-lg py-0.5">
+                  Main
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* Sizes for this color */}
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-medium text-gray-600">Sizes, SKU & Stock *</label>
+        <button type="button" onClick={onAddSize}
+          className="text-xs text-indigo-600 border border-indigo-300 px-2 py-1 rounded hover:bg-indigo-50">
+          + Add Size
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {cv.sizes.map((sz, idx) => (
+          <div key={idx} className="grid grid-cols-3 gap-2 items-center">
+            <Select
+              options={SIZE_OPTIONS}
+              value={sz.size ? { value: normalizeSize(sz.size), label: normalizeSize(sz.size) } : null}
+              onChange={(sel) => onSizeChange(idx, "size", sel?.value || "")}
+              placeholder="Size"
+              classNamePrefix="sz-select"
+            />
+            <input type="text" value={sz.sku}
+              onChange={(e) => onSizeChange(idx, "sku", e.target.value)}
+              placeholder="SKU (e.g. BLK-S)"
+              className={inputCls} />
+            <div className="flex gap-1 items-center">
+              <input type="number" min="0" value={sz.countInStock}
+                onChange={(e) => onSizeChange(idx, "countInStock", e.target.value)}
+                placeholder="Stock"
+                className={inputCls} />
+              {cv.sizes.length > 1 && (
+                <button type="button" onClick={() => onRemoveSize(idx)}
+                  className="text-red-500 hover:text-red-700 px-1">✕</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+const inputCls =
+  "w-full px-3 py-2 rounded-md border border-gray-200 bg-white text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition";
+
+const Field = ({ label, children }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    {children}
+  </div>
+);
 
 export default AddProduct;

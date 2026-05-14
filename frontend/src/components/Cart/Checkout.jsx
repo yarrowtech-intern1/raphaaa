@@ -313,15 +313,6 @@ const Checkout = () => {
     fetchUserProfile();
   }, []);
 
-  useEffect(() => {
-    if (
-      !orderProcessing &&
-      (!cart || !cart.products || cart.products.length === 0)
-    ) {
-      navigate("/");
-    }
-  }, [cart, navigate, orderProcessing]);
-
   const validatePhone = (phone) => {
     if (!phone.startsWith("+91")) {
       phone = "+91" + phone.replace(/^\+91/, ""); // silently add +91
@@ -533,16 +524,25 @@ const Checkout = () => {
     setOrderProcessing(false);
 
     try {
-      await dispatch(
+      const code = errorData?.code || errorData?.error?.code || "PAYMENT_FAILED";
+      const description =
+        errorData?.description ||
+        errorData?.error?.description ||
+        errorData?.reason ||
+        "Unknown error";
+
+      const result = await dispatch(
         handlePaymentFailure({
           razorpayOrderId,
-          error_code: errorData.error.code,
-          error_description: errorData.error.description,
+          error_code: code,
+          error_description: description,
         })
       );
+      if (result.type === "checkout/handlePaymentFailure/rejected") {
+        throw new Error(result.payload || "Failed to update payment failure status");
+      }
       alert(
-        `Payment failed: ${errorData.error.description || "Unknown error"
-        }. Please try again.`
+        `Payment failed: ${description}. Please try again.`
       );
       dispatch(clearCheckout());
       setOrderInitiated(false);
@@ -619,7 +619,23 @@ const Checkout = () => {
     !orderProcessing &&
     (!cart || !cart.products || cart.products.length === 0)
   ) {
-    return <p>Your cart is empty!!</p>;
+    return (
+      <div className="max-w-3xl mx-auto px-6 py-16 text-center">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-3">
+          Your cart is empty
+        </h2>
+        <p className="text-gray-600 mb-6">
+          Add products to your cart to continue checkout.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="bg-blue-700 text-white px-6 py-3 rounded-xl hover:bg-blue-900 transition"
+        >
+          Continue Shopping
+        </button>
+      </div>
+    );
   }
 
   return (

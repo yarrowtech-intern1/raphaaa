@@ -3,7 +3,7 @@ import { FaFilter } from "react-icons/fa";
 import FilterSidebar from "../components/Products/FilterSidebar";
 import SortOptions from "../components/Products/SortOptions";
 import ProductGrid from "../components/Products/ProductGrid";
-import { useParams, useSearchParams, useNavigate, Navigate } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProductsByFilters } from "../redux/slices/productsSlice";
 import { ImCross } from "react-icons/im";
@@ -51,11 +51,6 @@ const CollectionPage = () => {
   const handleClearFilters = () => {
     navigate(`/collections/${collection}`);
   };
-
-  // 🚫 Block `/collections/all` when a collab is active
-  if (collabActive && collection === "all") {
-    return <Navigate to="/404" />;
-  }
 
   // -----------------------
   // ⭐ SEO HELMET DATA

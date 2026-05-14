@@ -51,18 +51,115 @@ const router = express.Router();
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
+const Payment = require("../models/payment");
 const { protect, adminOrMerchantise } = require("../middleware/authMiddleware");
 const {
   getWeeklyRevenue,
   getMonthlyRevenue,
   getYearlyRevenue,
   getTodayRevenue,
+  getRevenueByPeriod,
 } = require("../controller/revenueController");
-
-const { getRevenueByPeriod } = require("../controller/orderController");
 const { sendMail } = require("../utils/sendMail");
 const Collab = require("../models/Collab");
 const { buildInvoicePDF } = require("../utils/invoice");
+
+const applyStockDeduction = (product, item) => {
+  const qty = Number(item?.quantity || 0);
+  if (!product || qty <= 0) return { ok: true };
+
+  const itemSku   = String(item?.sku   || "").trim().toLowerCase();
+  const itemColor = String(item?.color || "").trim().toLowerCase();
+  const itemSize  = String(item?.size  || "").trim().toLowerCase();
+
+  // --- Try new colorVariants structure first ---
+  if (Array.isArray(product.colorVariants) && product.colorVariants.length > 0) {
+    let matchedSize = null;
+
+    // Match by SKU across all color variants
+    if (itemSku) {
+      for (const cv of product.colorVariants) {
+        const found = (cv.sizes || []).find(
+          (s) => String(s?.sku || "").trim().toLowerCase() === itemSku
+        );
+        if (found) { matchedSize = found; break; }
+      }
+    }
+    // Fallback: match by color + size
+    if (!matchedSize && itemColor && itemSize) {
+      const cv = product.colorVariants.find(
+        (c) =>
+          String(c?.color || "").toLowerCase() === itemColor ||
+          String(c?.colorName || "").toLowerCase() === itemColor
+      );
+      if (cv) {
+        matchedSize = (cv.sizes || []).find(
+          (s) => String(s?.size || "").toLowerCase() === itemSize
+        );
+      }
+    }
+
+    if (matchedSize) {
+      const available = Number(matchedSize.countInStock || 0);
+      if (available < qty) {
+        return { ok: false, message: `Insufficient stock for ${product.name} (${matchedSize.sku})` };
+      }
+      matchedSize.countInStock = available - qty;
+      product.countInStock = product.colorVariants.reduce(
+        (sum, cv) => sum + (cv.sizes || []).reduce((s2, sz) => s2 + Number(sz?.countInStock || 0), 0),
+        0
+      );
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      message: `Variant not found for ${product.name}. Please re-add this item to cart and try again.`,
+    };
+  }
+
+  // --- Legacy flat variants ---
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    let matched = null;
+    if (itemSku) {
+      matched = product.variants.find(
+        (v) => String(v?.sku || "").trim().toLowerCase() === itemSku
+      );
+    }
+    if (!matched && itemColor && itemSize) {
+      matched = product.variants.find(
+        (v) =>
+          String(v?.color || "").trim().toLowerCase() === itemColor &&
+          String(v?.size  || "").trim().toLowerCase() === itemSize
+      );
+    }
+
+    if (matched) {
+      const available = Number(matched.countInStock || 0);
+      if (available < qty) {
+        return { ok: false, message: `Insufficient stock for ${product.name} (${matched.sku || "variant"})` };
+      }
+      matched.countInStock = Math.max(0, available - qty);
+      product.countInStock = product.variants.reduce(
+        (sum, v) => sum + Number(v?.countInStock || 0), 0
+      );
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      message: `Variant not found for ${product.name}. Please re-add this item to cart and try again.`,
+    };
+  }
+
+  // --- Overall stock fallback ---
+  const overall = Number(product.countInStock || 0);
+  if (overall < qty) {
+    return { ok: false, message: `Insufficient stock for ${product.name}` };
+  }
+  product.countInStock = Math.max(0, overall - qty);
+  return { ok: true };
+};
 
 // @desc    Create Cash on Delivery Order
 // @route   POST /api/orders/cod
@@ -92,7 +189,7 @@ router.post("/cod", protect, async (req, res) => {
       }
     }
 
-    // 1) Build a map of productId -> sku (only for items missing sku)
+    // 1) Build a map of productId -> default sku and variants (for missing item sku)
     const idsNeedingSku = [
       ...new Set(
         (orderItems || [])
@@ -100,15 +197,29 @@ router.post("/cod", protect, async (req, res) => {
           .map((it) => String(it.productId))
       ),
     ];
-    let skuById = {};
+    let productById = {};
     if (idsNeedingSku.length) {
       const prods = await Product.find({ _id: { $in: idsNeedingSku } }).select(
-        "_id sku"
+        "_id sku variants"
       );
-      skuById = Object.fromEntries(
-        prods.map((p) => [String(p._id), p.sku || "-"])
+      productById = Object.fromEntries(
+        prods.map((p) => [String(p._id), p])
       );
     }
+
+    const resolveOrderItemSku = (item) => {
+      if (item?.sku) return item.sku;
+      const p = productById[String(item?.productId)];
+      if (!p) return "-";
+      const variant = (p.variants || []).find(
+        (v) =>
+          String(v?.color || "").trim().toLowerCase() ===
+            String(item?.color || "").trim().toLowerCase() &&
+          String(v?.size || "").trim().toLowerCase() ===
+            String(item?.size || "").trim().toLowerCase()
+      );
+      return variant?.sku || p.sku || "-";
+    };
 
     const order = new Order({
       user: req.user._id,
@@ -121,8 +232,7 @@ router.post("/cod", protect, async (req, res) => {
         size: item.size,
         color: item.color,
         // sku: item.sku,
-        // 2) prefer incoming item.sku, else look up by productId, else "-"
-        sku: item.sku || skuById[String(item.productId)] || "-",
+        sku: resolveOrderItemSku(item),
       })),
       shippingAddress: {
         address: `${shippingAddress.firstName} ${shippingAddress.lastName}, ${shippingAddress.address}`,
@@ -218,8 +328,10 @@ router.post("/cod", protect, async (req, res) => {
     for (const item of orderItems) {
       const product = await Product.findById(item.productId);
       if (product) {
-        product.countInStock -= item.quantity;
-        if (product.countInStock < 0) product.countInStock = 0;
+        const deduction = applyStockDeduction(product, item);
+        if (!deduction.ok) {
+          return res.status(400).json({ message: deduction.message });
+        }
         await product.save();
       }
     }
@@ -340,7 +452,7 @@ router.get("/:id", protect, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("user", "name email")
-      .populate("orderItems.productId", "name image");
+      .populate("orderItems.productId", "name image sku");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -355,11 +467,70 @@ router.get("/:id", protect, async (req, res) => {
         .json({ message: "Not authorized to view this order" });
     }
 
-    res.json(order);
+    const responseOrder = order.toObject();
+    if (!responseOrder.paymentResult?.id) {
+      const payment = await Payment.findOne({ orderId: order._id }).lean();
+      if (payment?.razorpayPaymentId) {
+        responseOrder.paymentResult = {
+          id: payment.razorpayPaymentId,
+          status: payment.status,
+          update_time: payment.capturedAt || payment.updatedAt,
+          email_address: responseOrder.user?.email,
+        };
+      }
+    }
+
+    res.json(responseOrder);
   } catch (error) {
     console.error("Fetch order details error:", error);
     res.status(500).json({
       message: "Failed to fetch order details",
+      error: error.message,
+    });
+  }
+});
+
+// @desc    Download invoice PDF
+// @route   GET /api/orders/:id/invoice
+// @access  Private
+router.get("/:id/invoice", protect, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("user", "name email")
+      .populate("orderItems.productId", "name image sku");
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const isOwner = order.user?._id?.toString() === req.user._id.toString();
+    const isAdmin = req.user?.isAdmin || req.user?.role === "admin";
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: "Not authorized to view this invoice" });
+    }
+
+    let orderForInvoice = order.toObject();
+    if (!orderForInvoice.paymentResult?.id) {
+      const payment = await Payment.findOne({ orderId: order._id }).lean();
+      if (payment?.razorpayPaymentId) {
+        orderForInvoice.paymentResult = {
+          id: payment.razorpayPaymentId,
+          status: payment.status,
+          update_time: payment.capturedAt || payment.updatedAt,
+          email_address: orderForInvoice.user?.email,
+        };
+      }
+    }
+
+    const pdfBuffer = await buildInvoicePDF(orderForInvoice);
+    const invoiceRef = order.orderId || order._id.toString();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=Invoice_${invoiceRef}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Invoice download error:", error);
+    res.status(500).json({
+      message: "Failed to generate invoice",
       error: error.message,
     });
   }

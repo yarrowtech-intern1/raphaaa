@@ -191,7 +191,10 @@ const ProductGrid = ({ products = [], loading, error }) => {
           <Link
             key={product._id || index}
             to={`/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
-              product.skuCode || product.sku || product._id
+              product.skuCode || product.sku ||
+              product.colorVariants?.[0]?.sizes?.[0]?.sku ||
+              product.variants?.[0]?.sku ||
+              product._id
             )}`}
             className="block group will-change-transform"
           >
@@ -203,8 +206,16 @@ const ProductGrid = ({ products = [], loading, error }) => {
             >
               <div className="w-full h-[220px] md:h-[300px] relative overflow-hidden rounded-t-xl md:rounded-t-2xl">
                 <img
-                  src={product.images?.[0]?.url || demoImg}
-                  alt={product.images?.[0]?.altText || product.name}
+                  src={
+                    product.colorVariants?.[0]?.images?.[0]?.url ||
+                    product.images?.[0]?.url ||
+                    demoImg
+                  }
+                  alt={
+                    product.colorVariants?.[0]?.images?.[0]?.altText ||
+                    product.images?.[0]?.altText ||
+                    product.name
+                  }
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
 

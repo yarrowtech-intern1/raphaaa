@@ -2,16 +2,24 @@ import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { clearCart } from "../redux/slices/cartSlice";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import axios from "axios";
 
 const OrderConfirmationPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { order: checkout } = useSelector((state) => state.checkout);
+  const { order: checkoutOrder } = useSelector((state) => state.checkout);
   const { state } = useLocation();
-  const order = state?.order;
-
+  const [fetchedOrder, setFetchedOrder] = React.useState(null);
+  const [loadingOrder, setLoadingOrder] = React.useState(false);
+  const stateOrder = state?.order || checkoutOrder;
+  const orderId = fetchedOrder?._id || fetchedOrder?.id || stateOrder?._id || stateOrder?.id || state?.orderId;
+  const order = fetchedOrder || stateOrder;
+  const orderItems = order?.orderItems || order?.checkoutItems || [];
+  const transactionId =
+    order?.paymentResult?.id ||
+    order?.razorpayPaymentId ||
+    state?.transactionId ||
+    "N/A";
   // useEffect(() => {
   //   if (checkout && checkout._id) {
   //     dispatch(clearCart());
@@ -22,13 +30,40 @@ const OrderConfirmationPage = () => {
   // }, [checkout, dispatch, navigate]);
 
   useEffect(() => {
-    if (order && order._id) {
+    if (orderId) {
       dispatch(clearCart());
       localStorage.removeItem("cart");
     } else {
       navigate("/my-orders");
     }
-  }, [order, dispatch, navigate]);
+  }, [orderId, dispatch, navigate]);
+
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (!orderId) return;
+      try {
+        setLoadingOrder(true);
+        const token = localStorage.getItem("userToken");
+        const { data } = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/orders/${orderId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setFetchedOrder(data);
+      } catch (error) {
+        console.error(
+          "Failed to fetch order details:",
+          error?.response?.data?.message || error.message
+        );
+      } finally {
+        setLoadingOrder(false);
+      }
+    };
+    fetchOrderDetails();
+  }, [orderId]);
 
   const calculateEstimatedDelivery = (createdAt) => {
     const orderDate = new Date(createdAt);
@@ -36,47 +71,30 @@ const OrderConfirmationPage = () => {
     return orderDate.toLocaleDateString();
   };
 
-  const handleDownloadInvoice = () => {
-    const doc = new jsPDF();
+  const handleDownloadInvoice = async () => {
+    if (!orderId) return;
+    try {
+      const token = localStorage.getItem("userToken");
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/orders/${orderId}/invoice`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
 
-    doc.setFontSize(18);
-    doc.text("Order Invoice", 14, 22);
-
-    doc.setFontSize(12);
-    doc.text(`Order ID: ${checkout._id}`, 14, 32);
-    doc.text(`Order Date: ${new Date(checkout.createdAt).toLocaleDateString()}`, 14, 40);
-    doc.text(`Estimated Delivery: ${calculateEstimatedDelivery(checkout.createdAt)}`, 14, 48);
-
-    doc.text("Shipping Address:", 14, 60);
-    doc.text(`${checkout.shippingAddress.address}`, 14, 66);
-    doc.text(`${checkout.shippingAddress.city}, ${checkout.shippingAddress.country}`, 14, 72);
-
-    const items = checkout.checkoutItems.map((item) => [
-      item.name,
-      item.color,
-      item.size,
-      item.quantity,
-      `Rs. ${item.price}`,
-      `Rs. ${item.quantity * item.price}`,
-    ]);
-
-    autoTable(doc, {
-      startY: 80,
-      head: [["Product", "Color", "Size", "Qty", "Price", "Total"]],
-      body: items,
-    });
-
-    const totalAmount = checkout.checkoutItems.reduce(
-      (acc, item) => acc + item.price * item.quantity,
-      0
-    );
-
-    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 100;
-    // doc.text(`Payment: Online`);
-    doc.text(`Payment Method: Razor Pay`, 14, finalY + 10);
-    doc.text(`Total Amount: Rs. ${totalAmount}`, 14, finalY + 20);
-
-    doc.save(`invoice_${checkout._id}.pdf`);
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `Invoice_${order.orderId || orderId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Failed to download invoice:", error?.response?.data?.message || error.message);
+      alert("Failed to download invoice. Please try again.");
+    }
   };
 
   return (
@@ -91,39 +109,49 @@ const OrderConfirmationPage = () => {
       />
       <p className="text-center text-gray-500">An email has been sent to your registered email id</p>
 
-      {checkout && (
+      {loadingOrder && (
+        <div className="text-center py-8 text-gray-600">Loading order details...</div>
+      )}
+
+      {!loadingOrder && order && (
         <div className="space-y-10">
           {/* Order Details */}
           <div className="flex flex-col md:flex-row justify-between gap-6 md:items-center border-b pb-6">
             <div>
               <h2 className="text-lg font-semibold text-gray-800">
-                Order ID: <span className="text-gray-600">{checkout._id}</span>
+                Order ID: <span className="text-gray-600">{orderId}</span>
               </h2>
 
               <p className="text-sm text-gray-500">
-                Order Date: {new Date(checkout.createdAt).toLocaleDateString()}
+                Order Date: {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "-"}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Reference Order No: {order.orderId || "-"}
               </p>
 
-              {/* <button
+              <button
                 onClick={handleDownloadInvoice}
                 className="mt-2 inline-block bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-md"
               >
                 Download Invoice
-              </button> */}
+              </button>
             </div>
             <div>
               <p className="text-sm text-emerald-700 font-medium">
                 Estimated Delivery:{" "}
-                {calculateEstimatedDelivery(checkout.createdAt)}
+                {order.createdAt ? calculateEstimatedDelivery(order.createdAt) : "-"}
               </p>
             </div>
           </div>
 
           {/* Items */}
           <div className="space-y-4">
-            {checkout.checkoutItems.map((item) => (
+            {orderItems.length === 0 && (
+              <p className="text-gray-500">No product details available for this order.</p>
+            )}
+            {orderItems.map((item) => (
               <div
-                key={item.ProductId}
+                key={item.productId || item._id || item.name}
                 className="flex items-center justify-between bg-gray-50 p-4 rounded-lg shadow-sm"
               >
                 <div className="flex items-center gap-4">
@@ -137,7 +165,10 @@ const OrderConfirmationPage = () => {
                       {item.name}
                     </h4>
                     <p className="text-sm text-gray-500">
-                      Color: {item.color} | Size: {item.size}
+                      Color: {item.color || "-"} | Size: {item.size || "-"}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      SKU / Design: {item.sku || item.productId?.sku || "-"}
                     </p>
                   </div>
                 </div>
@@ -157,22 +188,28 @@ const OrderConfirmationPage = () => {
               <h4 className="text-lg font-semibold text-gray-800 mb-2">
                 Payment Method
               </h4>
-              {/* <p className="text-gray-600">Razor Pay</p> */}
-              <p className="text-gray-600">{checkout.paymentMethod}</p>
+              <p className="text-gray-600">{order.paymentMethod || state?.paymentMethod || "-"}</p>
+              <p className="text-gray-600 mt-1">Transaction ID: {transactionId}</p>
             </div>
             <div>
               <h4 className="text-lg font-semibold text-gray-800 mb-2">
                 Shipping Address
               </h4>
               <p className="text-gray-600">
-                {checkout.shippingAddress.address}
+                {order.shippingAddress?.address || "-"}
               </p>
               <p className="text-gray-600">
-                {checkout.shippingAddress.city},{" "}
-                {checkout.shippingAddress.country}, {checkout.shippingAddress.postalCode}
+                {order.shippingAddress?.city || "-"},{" "}
+                {order.shippingAddress?.country || "-"}, {order.shippingAddress?.postalCode || "-"}
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {!loadingOrder && !order && (
+        <div className="text-center py-8 text-gray-600">
+          Order details are unavailable right now. Please open this order from My Orders.
         </div>
       )}
     </div>

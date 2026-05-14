@@ -259,6 +259,7 @@ const InventoryPage = () => {
           <thead className="bg-gradient-to-r from-sky-50 to-blue-50">
             <tr>
               <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Product</th>
+              <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Variants</th>
               <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Category</th>
               <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Price</th>
               <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Stock</th>
@@ -276,6 +277,40 @@ const InventoryPage = () => {
               >
                 {/* Product */}
                 <td className="px-6 py-4 font-medium text-gray-800">{prod.name}</td>
+
+                {/* Variants */}
+                <td className="px-6 py-4 text-xs text-gray-600">
+                  {Array.isArray(prod.colorVariants) && prod.colorVariants.length > 0 ? (
+                    <>
+                      <div className="font-semibold text-gray-800">
+                        {prod.colorVariants.length} color{prod.colorVariants.length > 1 ? "s" : ""}
+                        {" · "}
+                        {prod.colorVariants.reduce((s, cv) => s + (cv.sizes?.length || 0), 0)} sizes
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {prod.colorVariants.slice(0, 3).map((cv, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded">
+                            <span className="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: cv.color }} />
+                            {cv.colorName || cv.color}
+                          </span>
+                        ))}
+                        {prod.colorVariants.length > 3 && <span className="text-gray-400">+{prod.colorVariants.length - 3}</span>}
+                      </div>
+                    </>
+                  ) : Array.isArray(prod.variants) && prod.variants.length > 0 ? (
+                    <>
+                      <div className="font-semibold text-gray-800">
+                        {prod.variants.length} variant{prod.variants.length > 1 ? "s" : ""}
+                      </div>
+                      <div>
+                        {prod.variants.slice(0, 2).map((v) => `${v.color}/${v.size}`).join(", ")}
+                        {prod.variants.length > 2 ? "…" : ""}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="italic text-gray-400">No variants</span>
+                  )}
+                </td>
 
                 {/* Category */}
                 <td className="px-6 py-4 capitalize text-gray-600">{prod.category}</td>

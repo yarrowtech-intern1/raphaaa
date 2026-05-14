@@ -331,6 +331,101 @@ const mongoose = require("mongoose");
 const { sendMail } = require("../utils/sendMail");        // +++
 const { buildInvoicePDF } = require("../utils/invoice");  // +++
 
+const applyVariantStockDeduction = (product, item) => {
+  const qty = Number(item?.quantity || 0);
+  if (!product || qty <= 0) return { ok: true };
+
+  const itemSku   = String(item?.sku   || "").trim().toLowerCase();
+  const itemColor = String(item?.color || "").trim().toLowerCase();
+  const itemSize  = String(item?.size  || "").trim().toLowerCase();
+
+  // --- Try new colorVariants structure first ---
+  if (Array.isArray(product.colorVariants) && product.colorVariants.length > 0) {
+    let matchedSize = null;
+
+    if (itemSku) {
+      for (const cv of product.colorVariants) {
+        const found = (cv.sizes || []).find(
+          (s) => String(s?.sku || "").trim().toLowerCase() === itemSku
+        );
+        if (found) { matchedSize = found; break; }
+      }
+    }
+    if (!matchedSize && itemColor && itemSize) {
+      const cv = product.colorVariants.find(
+        (c) =>
+          String(c?.color || "").toLowerCase() === itemColor ||
+          String(c?.colorName || "").toLowerCase() === itemColor
+      );
+      if (cv) {
+        matchedSize = (cv.sizes || []).find(
+          (s) => String(s?.size || "").toLowerCase() === itemSize
+        );
+      }
+    }
+
+    if (matchedSize) {
+      const available = Number(matchedSize.countInStock || 0);
+      if (available < qty) {
+        return { ok: false, message: `Insufficient stock for ${product.name} (${matchedSize.sku})` };
+      }
+      matchedSize.countInStock = available - qty;
+      product.countInStock = product.colorVariants.reduce(
+        (sum, cv) => sum + (cv.sizes || []).reduce((s2, sz) => s2 + Number(sz?.countInStock || 0), 0),
+        0
+      );
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      message: `Variant not found for ${product.name}. Please re-add this item to cart and try again.`,
+    };
+  }
+
+  // --- Legacy flat variants ---
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    let matched = null;
+    if (itemSku) {
+      matched = product.variants.find(
+        (v) => String(v?.sku || "").trim().toLowerCase() === itemSku
+      );
+    }
+    if (!matched && itemColor && itemSize) {
+      matched = product.variants.find(
+        (v) =>
+          String(v?.color || "").trim().toLowerCase() === itemColor &&
+          String(v?.size  || "").trim().toLowerCase() === itemSize
+      );
+    }
+
+    if (matched) {
+      const available = Number(matched.countInStock || 0);
+      if (available < qty) {
+        return { ok: false, message: `Insufficient stock for ${product.name} (${matched.sku || "variant"})` };
+      }
+      matched.countInStock = available - qty;
+      product.countInStock = product.variants.reduce(
+        (sum, v) => sum + Number(v?.countInStock || 0), 0
+      );
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      message: `Variant not found for ${product.name}. Please re-add this item to cart and try again.`,
+    };
+  }
+
+  // --- Overall stock fallback ---
+  const overall = Number(product.countInStock || 0);
+  if (overall < qty) {
+    return { ok: false, message: `Insufficient stock for ${product.name}` };
+  }
+  product.countInStock = overall - qty;
+  return { ok: true };
+};
+
 // Environment variables validation
 const requiredEnvVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET'];
 requiredEnvVars.forEach((varName) => {
@@ -398,6 +493,37 @@ router.post("/create-order", protect, async (req, res) => {
         }
       }
 
+      // Backfill SKU if frontend didn't send it
+      const idsNeedingSku = [
+        ...new Set(
+          (orderItems || [])
+            .filter((it) => !it.sku && it.productId)
+            .map((it) => String(it.productId))
+        ),
+      ];
+      let productById = {};
+      if (idsNeedingSku.length) {
+        const prods = await Product.find({ _id: { $in: idsNeedingSku } })
+          .select("_id sku variants")
+          .session(session);
+        productById = Object.fromEntries(
+          prods.map((p) => [String(p._id), p])
+        );
+      }
+      const resolveOrderItemSku = (item) => {
+        if (item?.sku) return item.sku;
+        const p = productById[String(item?.productId)];
+        if (!p) return "-";
+        const variant = (p.variants || []).find(
+          (v) =>
+            String(v?.color || "").trim().toLowerCase() ===
+              String(item?.color || "").trim().toLowerCase() &&
+            String(v?.size || "").trim().toLowerCase() ===
+              String(item?.size || "").trim().toLowerCase()
+        );
+        return variant?.sku || p.sku || "-";
+      };
+
       // Create MongoDB Order
       const order = new Order({
         user: req.user._id,
@@ -409,7 +535,7 @@ router.post("/create-order", protect, async (req, res) => {
           quantity: item.quantity,
           size: item.size || null,
           color: item.color || null,
-          sku: item.sku || null,
+          sku: resolveOrderItemSku(item),
         })),
         shippingAddress: {
           address: `${shippingAddress.firstName} ${shippingAddress.lastName}, ${shippingAddress.address}`,
@@ -618,10 +744,10 @@ router.post("/verify-payment", protect, async (req, res) => {
         if (!product) {
           throw new Error(`Product not found: ${item.productId}`);
         }
-        if (product.countInStock < item.quantity) {
-          throw new Error(`Insufficient stock for ${product.name}`);
+        const deduction = applyVariantStockDeduction(product, item);
+        if (!deduction.ok) {
+          throw new Error(deduction.message || `Insufficient stock for ${product.name}`);
         }
-        product.countInStock = Math.max(0, product.countInStock - item.quantity);
         await product.save({ session });
         console.log(`Updated stock for product ${product.name}: ${product.countInStock}`);
       }
@@ -646,8 +772,39 @@ router.post("/verify-payment", protect, async (req, res) => {
        // load user fields to address the email properly
        const populatedOrder = await Order.findById(order._id)
          .populate("user", "name email")
+         .populate("orderItems.productId", "sku")
          .lean();
        if (populatedOrder?.user?.email) {
+         populatedOrder.paymentResult = {
+           ...(populatedOrder.paymentResult || {}),
+           id:
+             populatedOrder?.paymentResult?.id ||
+             payment?.razorpayPaymentId ||
+             razorpayPaymentId,
+           status:
+             populatedOrder?.paymentResult?.status ||
+             payment?.status ||
+             "captured",
+           update_time:
+             populatedOrder?.paymentResult?.update_time ||
+             payment?.capturedAt ||
+             new Date(),
+           email_address:
+             populatedOrder?.paymentResult?.email_address ||
+             populatedOrder?.user?.email,
+         };
+
+         if (!populatedOrder.paymentResult?.id) {
+           const paid = await Payment.findOne({ orderId: populatedOrder._id }).lean();
+           if (paid?.razorpayPaymentId) {
+             populatedOrder.paymentResult = {
+               id: paid.razorpayPaymentId,
+               status: paid.status,
+               update_time: paid.capturedAt || paid.updatedAt,
+               email_address: populatedOrder.user?.email,
+             };
+           }
+         }
          // Build PDF buffer (same builder used elsewhere)
          const invoiceBuffer = await buildInvoicePDF(populatedOrder);
          const orderDate = new Date(populatedOrder.createdAt)
@@ -803,7 +960,7 @@ router.post("/payment-failed", protect, async (req, res) => {
         }
 
         order.paymentStatus = "failed";
-        order.status = "Payment Failed";
+        order.status = "Cancelled";
         await order.save({ session });
         
         console.log("Order status updated to failed:", order._id);

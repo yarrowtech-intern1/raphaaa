@@ -82,9 +82,12 @@ const ProductManagement = () => {
     const matchesName = product.name
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesSKU = product.sku
-      ?.toLowerCase()
-      .includes(skuSearchTerm.toLowerCase());
+    const variantSkuText = Array.isArray(product.variants)
+      ? product.variants.map((v) => v?.sku || "").join(" ")
+      : "";
+    const matchesSKU =
+      product.sku?.toLowerCase().includes(skuSearchTerm.toLowerCase()) ||
+      variantSkuText.toLowerCase().includes(skuSearchTerm.toLowerCase());
     return matchesName && (!skuSearchTerm || matchesSKU);
   });
 
@@ -185,6 +188,7 @@ const ProductManagement = () => {
                 {/* <th className="py-3 px-6">#</th> */}
                 <th className="py-3 px-6">Image</th>
                 <th className="py-3 px-6">Name</th>
+                <th className="py-3 px-6">Variants</th>
                 <th className="py-3 px-6">Price</th>
                 <th className="py-3 px-6">Stock</th>
                 {user.role === "admin" && (
@@ -228,6 +232,27 @@ const ProductManagement = () => {
                     </td>
                     <td className="py-3 px-6 font-medium text-gray-900">
                       {product.name}
+                    </td>
+                    <td className="py-3 px-6">
+                      {Array.isArray(product.variants) && product.variants.length > 0 ? (
+                        <div className="text-xs text-gray-700 space-y-1">
+                          <div className="font-semibold">
+                            {product.variants.length} variant{product.variants.length > 1 ? "s" : ""}
+                          </div>
+                          <div className="text-gray-500">
+                            {product.variants
+                              .slice(0, 3)
+                              .map((v) => `${v.designName || "Default"} / ${v.color} / ${v.size}`)
+                              .join(", ")}
+                            {product.variants.length > 3 ? "..." : ""}
+                          </div>
+                          <div className="text-gray-500">
+                            SKU: {product.variants[0]?.sku || "-"}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-500 italic">No variants</span>
+                      )}
                     </td>
                     <td className="py-3 px-6">₹{product.discountPrice}</td>
                     <td className="py-3 px-6">
@@ -292,7 +317,7 @@ const ProductManagement = () => {
               ) : (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={user.role === "admin" ? 7 : 6}
                     className="py-6 px-6 text-center text-gray-500 italic"
                   >
                     No products found

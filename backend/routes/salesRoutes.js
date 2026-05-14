@@ -9,34 +9,37 @@ const Product = require("../models/Product");
 router.get("/", async (req, res) => {
   try {
     const orders = await Order.find({ isPaid: true }).populate("orderItems.productId");
-
-    // Flatten all orderItems into a single array
-    const allItems = orders.flatMap(order => order.orderItems);
-
-    // Group by productId and calculate total quantity sold
     const salesMap = new Map();
+    for (const order of orders) {
+      for (const item of order.orderItems || []) {
+        const product = item.productId;
+        if (!product) continue;
 
-    for (const item of allItems) {
-      const product = item.productId;
-      if (!product) continue;
+        const key = [
+          product._id.toString(),
+          item.sku || "-",
+          item.size || "-",
+          item.color || "-",
+        ].join("||");
 
-      const key = product._id.toString();
+        if (!salesMap.has(key)) {
+          salesMap.set(key, {
+            productId: product._id,
+            name: product.name,
+            category: product.category,
+            gender: product.gender || "Unisex",
+            sku: item.sku || "-",
+            size: item.size || "-",
+            color: item.color || "-",
+            totalSold: 0,
+            totalRevenue: 0,
+          });
+        }
 
-      if (!salesMap.has(key)) {
-        salesMap.set(key, {
-          productId: product._id,
-          name: product.name,
-          category: product.category,
-          gender: product.gender || "Unisex",
-          size: item.size || "N/A",
-          totalSold: 0,
-          totalRevenue: 0,
-        });
+        const entry = salesMap.get(key);
+        entry.totalSold += Number(item.quantity) || 0;
+        entry.totalRevenue += (Number(item.quantity) || 0) * (Number(item.price) || 0);
       }
-
-      const entry = salesMap.get(key);
-      entry.totalSold += item.quantity;
-      entry.totalRevenue += item.quantity * item.price;
     }
 
     const result = [...salesMap.values()].sort((a, b) => b.totalSold - a.totalSold);

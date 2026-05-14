@@ -1,5 +1,21 @@
 const mongoose = require("mongoose");
 
+const colorVariantSizeSchema = new mongoose.Schema({
+    size: { type: String, required: true, trim: true },
+    sku:  { type: String, required: true, trim: true },
+    countInStock: { type: Number, required: true, default: 0, min: 0 },
+}, { _id: false });
+
+const colorVariantSchema = new mongoose.Schema({
+    color:     { type: String, required: true, trim: true },
+    colorName: { type: String, trim: true, default: "" },
+    images: [{
+        url:     { type: String, required: true },
+        altText: { type: String },
+    }],
+    sizes: [colorVariantSizeSchema],
+}, { _id: false });
+
 const productSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -46,6 +62,39 @@ const productSchema = new mongoose.Schema({
         type: [String],
         required: true,
     },
+    // New structured variant system: one entry per color, each with its own images & sizes
+    colorVariants: [colorVariantSchema],
+    // Legacy flat variants (kept for backwards compatibility with old products)
+    variants: [
+        {
+            designName: {
+                type: String,
+                trim: true,
+                default: "Default",
+            },
+            color: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+            size: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+            sku: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+            countInStock: {
+                type: Number,
+                required: true,
+                default: 0,
+                min: 0,
+            },
+        },
+    ],
     collections: {
         type: String,
         required: true,
@@ -68,6 +117,16 @@ const productSchema = new mongoose.Schema({
             },
         },
     ],
+    sizeChart: {
+        imageUrl: {
+            type: String,
+            default: "",
+        },
+        title: {
+            type: String,
+            default: "Size Chart",
+        },
+    },
     isFeatured: {
         type: Boolean,
         default: false,

@@ -11,6 +11,63 @@ const User = require("../models/User");
 
 const router = express.Router();
 
+const normalizeVariants = (variants = []) => {
+  if (!Array.isArray(variants)) return [];
+  return variants
+    .map((v) => ({
+      designName: String(v?.designName || "Default").trim() || "Default",
+      color: String(v?.color || "").trim(),
+      size: String(v?.size || "").trim().toUpperCase(),
+      sku: String(v?.sku || "").trim(),
+      countInStock: Number(v?.countInStock || 0),
+    }))
+    .filter((v) => v.color && v.size && v.sku);
+};
+
+const deriveFromVariants = (variants = []) => {
+  const sizes = [...new Set(variants.map((v) => v.size))];
+  const colors = [...new Set(variants.map((v) => v.color))];
+  const countInStock = variants.reduce(
+    (sum, v) => sum + Math.max(0, Number(v.countInStock || 0)),
+    0
+  );
+  return { sizes, colors, countInStock };
+};
+
+// Normalize the new colorVariants structure
+const normalizeColorVariants = (colorVariants = []) => {
+  if (!Array.isArray(colorVariants)) return [];
+  return colorVariants
+    .map((cv) => ({
+      color: String(cv?.color || "").trim(),
+      colorName: String(cv?.colorName || cv?.color || "").trim(),
+      images: Array.isArray(cv?.images)
+        ? cv.images.filter((img) => img?.url?.trim()).map((img) => ({ url: img.url.trim(), altText: img.altText || "" }))
+        : [],
+      sizes: Array.isArray(cv?.sizes)
+        ? cv.sizes
+            .map((s) => ({
+              size: String(s?.size || "").trim().toUpperCase(),
+              sku: String(s?.sku || "").trim(),
+              countInStock: Number(s?.countInStock || 0),
+            }))
+            .filter((s) => s.size && s.sku)
+        : [],
+    }))
+    .filter((cv) => cv.color && cv.sizes.length > 0);
+};
+
+const deriveFromColorVariants = (colorVariants = []) => {
+  const sizes = [...new Set(colorVariants.flatMap((cv) => cv.sizes.map((s) => s.size)))];
+  const colors = [...new Set(colorVariants.map((cv) => cv.color))];
+  const countInStock = colorVariants.reduce(
+    (sum, cv) => sum + cv.sizes.reduce((s2, sz) => s2 + Math.max(0, Number(sz.countInStock || 0)), 0),
+    0
+  );
+  const firstSku = colorVariants[0]?.sizes[0]?.sku || "";
+  return { sizes, colors, countInStock, firstSku };
+};
+
 // @route POST /api/products
 // @desc Create a new Product
 // @access Private/Admin
@@ -37,30 +94,56 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
       weight,
       sku,
       offerPercentage,
+      variants,
+      colorVariants,
+      sizeChart,
     } = req.body;
+
+    // Prefer new colorVariants structure, fall back to legacy variants
+    const normalizedColorVariants = normalizeColorVariants(colorVariants);
+    const normalizedVariants = normalizeVariants(variants);
+
+    let finalSizes, finalColors, finalStock, finalSku;
+
+    if (normalizedColorVariants.length > 0) {
+      const derived = deriveFromColorVariants(normalizedColorVariants);
+      finalSizes = derived.sizes;
+      finalColors = derived.colors;
+      finalStock = derived.countInStock;
+      finalSku = sku || derived.firstSku;
+    } else {
+      const variantDerived = deriveFromVariants(normalizedVariants);
+      finalSizes = normalizedVariants.length ? variantDerived.sizes : sizes;
+      finalColors = normalizedVariants.length ? variantDerived.colors : colors;
+      finalStock = normalizedVariants.length ? variantDerived.countInStock : Number(countInStock || 0);
+      finalSku = sku || normalizedVariants[0]?.sku;
+    }
 
     const product = new Product({
       name,
       description,
       price,
       discountPrice,
-      countInStock,
+      countInStock: finalStock,
       category,
       brand,
-      sizes,
-      colors,
+      sizes: finalSizes,
+      colors: finalColors,
+      colorVariants: normalizedColorVariants,
+      variants: normalizedColorVariants.length > 0 ? [] : normalizedVariants,
       collections,
       material,
       gender,
-      images,
+      images: normalizedColorVariants.length > 0 ? (images || []) : (images || []),
       isFeatured,
       isPublished,
       tags,
       dimensions,
       weight,
-      sku,
+      sku: finalSku,
       offerPercentage,
-      user: req.user._id, // Reference to the admin user who created it
+      sizeChart,
+      user: req.user._id,
     });
 
     const createdProduct = await product.save();
@@ -225,7 +308,7 @@ router.get("/", async (req, res) => {
 router.get("/inventory", async (req, res) => {
   try {
     const products = await Product.find().select(
-      "name category price countInStock"
+      "name category price countInStock sku colorVariants variants"
     );
     res.json(products);
   } catch (err) {
@@ -285,7 +368,12 @@ router.get("/best-seller", async (req, res) => {
           discountPrice: "$product.discountPrice",
           category: "$product.category",
           gender: "$product.gender",
-          image: { $arrayElemAt: ["$product.images.url", 0] },
+          image: {
+            $ifNull: [
+              { $arrayElemAt: ["$product.colorVariants.images.url", 0] },
+              { $arrayElemAt: ["$product.images.url", 0] },
+            ],
+          },
           totalSold: 1,
         },
       },
@@ -363,37 +451,63 @@ router.put("/:id", protect, admin, async (req, res) => {
       weight,
       sku,
       offerPercentage,
+      variants,
+      colorVariants,
+      sizeChart,
     } = req.body;
 
-    // Find product by ID
     const product = await Product.findById(req.params.id);
 
     if (product) {
-      // Update product fields
-      product.name = name || product.name;
-      product.description = description || product.description;
-      product.price = price || product.price;
-      product.discountPrice = discountPrice || product.discountPrice;
-      product.countInStock = countInStock || product.countInStock;
-      product.category = category || product.category;
-      product.brand = brand || product.brand;
-      product.sizes = sizes || product.sizes;
-      product.colors = colors || product.colors;
-      product.collections = collections || product.collections;
-      product.material = material || product.material;
-      product.gender = gender || product.gender;
-      product.images = images || product.images;
-      product.isFeatured =
-        isFeatured !== undefined ? isFeatured : product.isFeatured;
-      product.isPublished =
-        isPublished !== undefined ? isPublished : product.isPublished;
-      product.tags = tags || product.tags;
-      product.dimensions = dimensions || product.dimensions;
-      product.weight = weight || product.weight;
-      product.sku = sku || product.sku;
-      product.offerPercentage = offerPercentage || 0;
+      const normalizedColorVariants = normalizeColorVariants(colorVariants);
+      const normalizedVariants = normalizeVariants(variants);
 
-      // Save the updated product to the database
+      let finalSizes, finalColors, finalStock, finalSku;
+
+      if (normalizedColorVariants.length > 0) {
+        const derived = deriveFromColorVariants(normalizedColorVariants);
+        finalSizes = derived.sizes;
+        finalColors = derived.colors;
+        finalStock = derived.countInStock;
+        finalSku = sku || derived.firstSku || product.sku;
+        product.colorVariants = normalizedColorVariants;
+        product.variants = [];
+      } else if (normalizedVariants.length > 0) {
+        const derived = deriveFromVariants(normalizedVariants);
+        finalSizes = derived.sizes;
+        finalColors = derived.colors;
+        finalStock = derived.countInStock;
+        finalSku = sku || normalizedVariants[0]?.sku || product.sku;
+        product.variants = normalizedVariants;
+      } else {
+        finalSizes = sizes ?? product.sizes;
+        finalColors = colors ?? product.colors;
+        finalStock = countInStock ?? product.countInStock;
+        finalSku = sku ?? product.sku;
+      }
+
+      product.name = name ?? product.name;
+      product.description = description ?? product.description;
+      product.price = price ?? product.price;
+      product.discountPrice = discountPrice ?? product.discountPrice;
+      product.countInStock = finalStock;
+      product.category = category ?? product.category;
+      product.brand = brand ?? product.brand;
+      product.sizes = finalSizes;
+      product.colors = finalColors;
+      product.collections = collections ?? product.collections;
+      product.material = material ?? product.material;
+      product.gender = gender ?? product.gender;
+      product.images = images ?? product.images;
+      product.isFeatured = isFeatured !== undefined ? isFeatured : product.isFeatured;
+      product.isPublished = isPublished !== undefined ? isPublished : product.isPublished;
+      product.tags = tags ?? product.tags;
+      product.dimensions = dimensions ?? product.dimensions;
+      product.weight = weight ?? product.weight;
+      product.sku = finalSku;
+      product.offerPercentage = offerPercentage ?? 0;
+      product.sizeChart = sizeChart ?? product.sizeChart;
+
       const updatedProduct = await product.save();
       res.json(updatedProduct);
     } else {

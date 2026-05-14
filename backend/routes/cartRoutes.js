@@ -266,14 +266,57 @@ const getCart = async (userId, guestId) => {
     return null;
 }
 
+// Helper: get image URL for selected color from colorVariants or fallback to product.images
+const getProductImageForColor = (product, color) => {
+    if (Array.isArray(product.colorVariants) && product.colorVariants.length > 0 && color) {
+        const cv = product.colorVariants.find(
+            (c) =>
+                String(c?.color || "").toLowerCase() === String(color || "").toLowerCase() ||
+                String(c?.colorName || "").toLowerCase() === String(color || "").toLowerCase()
+        );
+        if (cv?.images?.[0]?.url) return cv.images[0].url;
+    }
+    return product?.images?.[0]?.url || "";
+};
+
+// Helper: resolve SKU from colorVariants or legacy variants
+const resolveSkuFromProduct = (product, color, size, skuFromRequest) => {
+    if (skuFromRequest) return skuFromRequest;
+    const colorLow = String(color || "").trim().toLowerCase();
+    const sizeLow  = String(size  || "").trim().toLowerCase();
+
+    if (Array.isArray(product.colorVariants) && product.colorVariants.length > 0) {
+        const cv = product.colorVariants.find(
+            (c) => String(c?.color || "").toLowerCase() === colorLow ||
+                   String(c?.colorName || "").toLowerCase() === colorLow
+        );
+        if (cv) {
+            const sz = cv.sizes.find((s) => String(s?.size || "").toLowerCase() === sizeLow);
+            if (sz?.sku) return sz.sku;
+        }
+    }
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+        const v = product.variants.find(
+            (v) =>
+                String(v?.color || "").toLowerCase() === colorLow &&
+                String(v?.size  || "").toLowerCase() === sizeLow
+        );
+        if (v?.sku) return v.sku;
+    }
+    return product.sku || "-";
+};
+
 // @route POST /api/cart
 // @desc Add a product to the cart for a guest or logged in user
 // @access Public
 router.post("/", async(req, res) => {
-    const { productId, quantity, size, color, guestId, userId } = req.body;
+    const { productId, quantity, size, color, sku, guestId, userId } = req.body;
     try {
         const product = await Product.findById(productId);
         if (!product) return res.status(404).json({ message: "Product not found" });
+
+        const resolvedSku = resolveSkuFromProduct(product, color, size, sku);
+        const productImage = getProductImageForColor(product, color);
 
         // Determine if the user is logged in or guest
         let cart = await getCart(userId, guestId);
@@ -281,7 +324,7 @@ router.post("/", async(req, res) => {
         // If the cart exists, update it
         if(cart) {
             const productIndex = cart.products.findIndex(
-                (p) => 
+                (p) =>
                     p.productId.toString() === productId &&
                     p.size === size &&
                     p.color === color
@@ -290,23 +333,28 @@ router.post("/", async(req, res) => {
             if(productIndex > -1) {
                 // If the product already exists, update the quantity
                 cart.products[productIndex].quantity += quantity;
+                if (!cart.products[productIndex].sku) {
+                    cart.products[productIndex].sku = resolvedSku;
+                }
+                // Update image in case it changed
+                cart.products[productIndex].image = productImage;
             } else {
                 // add new product
                 cart.products.push({
                     productId,
                     name: product.name,
-                    image: product.images[0].url,
-                    // price: product.price,
+                    image: productImage,
                     price: product.discountPrice || product.price,
                     size,
                     color,
+                    sku: resolvedSku,
                     quantity,
                 });
             }
 
             // Recalculate the total price
             cart.totalPrice = cart.products.reduce(
-                (acc, item) => acc + item.price * quantity,
+                (acc, item) => acc + item.price * item.quantity,
                 0
             );
             await cart.save();
@@ -320,15 +368,15 @@ router.post("/", async(req, res) => {
                     {
                         productId,
                         name: product.name,
-                        image: product.images[0].url,
-                        // price: product.price,
+                        image: productImage,
                         price: product.discountPrice || product.price,
                         size,
                         color,
+                        sku: resolvedSku,
                         quantity,
                     },
                 ],
-                totalPrice: product.price * quantity,
+                totalPrice: (product.discountPrice || product.price) * quantity,
             });
             return res.status(201).json(newCart);
         }
