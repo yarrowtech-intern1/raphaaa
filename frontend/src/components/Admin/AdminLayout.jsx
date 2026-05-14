@@ -6,14 +6,17 @@ import AdminHeader from "./AdminHeader"; // ⬅️ new header import
 
 const AdminLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const SIDEBAR_WIDTH = 256; // w-64
+  const HEADER_HEIGHT = 64; // 64px
+
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row relative">
+    <div className="h-screen overflow-hidden relative">
       {/* mobile toggle button */}
-      <div className="flex md:hidden p-4 bg-gray-900 text-white z-20">
+      <div className="fixed top-0 left-0 right-0 flex md:hidden p-4 bg-gray-900 text-white z-50">
         <button onClick={toggleSidebar}>
           <FaBars size={24} />
         </button>
@@ -30,21 +33,34 @@ const AdminLayout = () => {
 
       {/* sidebar */}
       <div
-        className={`bg-gray-900 w-64 min-h-screen text-white absolute md:relative transform ${
+        className={`bg-gray-900 w-64 h-screen text-white fixed top-0 left-0 transform ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } transition-transform duration-300 md:translate-x-0 md:static md:block z-20`}
+        } transition-transform duration-300 md:translate-x-0 md:block z-40`}
       >
         {/* sidebar component */}
         <AdminSidebar />
       </div>
 
-      {/* main content */}
-      <div className="flex-grow flex flex-col">
-        {/* header */}
-        <AdminHeader />
+      {/* main shell */}
+      <div className="h-screen md:pl-64">
+        {/* fixed header */}
+        <div
+          className="fixed top-0 right-0 left-0 md:left-64 z-30"
+          style={{ height: `${HEADER_HEIGHT}px` }}
+        >
+          <AdminHeader />
+        </div>
 
-        {/* page content */}
-        <div className="flex-grow p-6 overflow-auto">
+        {/* scrollable content only */}
+        <div
+          className="h-full overflow-y-auto"
+          style={{
+            paddingTop: `${HEADER_HEIGHT + 24}px`,
+            paddingLeft: "24px",
+            paddingRight: "24px",
+            paddingBottom: "24px",
+          }}
+        >
           <Outlet />
         </div>
       </div>

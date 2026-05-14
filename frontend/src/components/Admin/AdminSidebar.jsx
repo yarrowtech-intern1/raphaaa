@@ -95,7 +95,7 @@ const AdminSidebar = () => {
     }`;
 
   return (
-    <aside className="md:w-auto w-full sm:w-72 bg-gradient-to-b from-gray-900 via-gray-850 to-gray-900 text-gray-100 shadow-2xl flex flex-col">
+    <aside className="h-full md:w-auto w-full sm:w-72 bg-gradient-to-b from-gray-900 via-gray-850 to-gray-900 text-gray-100 shadow-2xl flex flex-col overflow-hidden">
       {/* Brand */}
       <div className="px-6 py-4 font-extrabold text-xl tracking-wide rounded-b-xl shadow-md">
         <Link to="/" title={undefined}>Raphaaa</Link>
@@ -178,7 +178,7 @@ const AdminSidebar = () => {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-4 custom-scrollbar">
+      <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-4 custom-scrollbar">
         {/* Dashboard */}
         {(user?.role === "admin" ||
           user?.role === "merchantise" ||
@@ -527,7 +527,7 @@ const AdminSidebar = () => {
       </nav>
 
       {/* Logout */}
-      <div className="p-4 border-t border-white/10">
+      <div className="shrink-0 p-4 border-t border-white/10 bg-gray-900/95 backdrop-blur-sm">
         <button
           onClick={handleLogout}
           className="w-full bg-gradient-to-r from-red-500 to-pink-600 hover:opacity-90 transition-all text-white font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 shadow-md"
