@@ -227,7 +227,7 @@ const AdminSidebar = () => {
             <span>All Tasks</span>
           </NavLink>
         )}
-        {(user?.role === "admin" || user?.role === "merchantise") && (
+        {user?.role === "admin" && (
           <div className="text-gray-300">
             <details className="group">
               <summary className="flex items-center justify-between px-4 py-2.5 rounded-lg hover:bg-white/10 cursor-pointer">
@@ -445,7 +445,7 @@ const AdminSidebar = () => {
         )}
 
         {/* Contact */}
-        {(user?.role === "admin" || user?.role === "merchantise" || user?.role === "marketing") && (
+        {user?.role === "admin" && (
           <NavLink to="/admin/contact-messages" className={navLinkClass}>
             <LuMessageSquareText />
             <span>Contact</span>
@@ -453,7 +453,7 @@ const AdminSidebar = () => {
         )}
 
         {/* Subscribers */}
-        {(user?.role === "admin" || user?.role === "merchantise" || user?.role === "marketing") && (
+        {(user?.role === "admin" || user?.role === "marketing") && (
           <NavLink to="/admin/subscribed-users" className={navLinkClass}>
             <GiLetterBomb />
             <span>Subscribers</span>
@@ -473,9 +473,7 @@ const AdminSidebar = () => {
         </NavLink>
 
         {/* Raphaaa Hierarchy */}
-        {(user?.role === "admin" ||
-          user?.role === "merchantise" ||
-          user?.role === "marketing") && (
+        {(user?.role === "admin" || user?.role === "marketing") && (
           <NavLink to="hierarchy" className={navLinkClass}>
             <TbHierarchy3 />
             <span>Raphaaa Hierarchy</span>
@@ -483,7 +481,7 @@ const AdminSidebar = () => {
         )}
 
         {/* Website Settings */}
-        {(user?.role === "admin" || user?.role === "merchantise") && (
+        {user?.role === "admin" && (
           <div className="text-gray-300">
             <details className="group">
               <summary className="flex items-center justify-between px-4 py-2.5 rounded-lg hover:bg-white/10 cursor-pointer">

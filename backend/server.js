@@ -52,14 +52,14 @@ cron.schedule("0 19 * * *", async () => {
   try {
     const result = await Task.updateMany(
       {
-        status: { $nin: ["completed", "not-completed"] }, // Not already completed or marked
+        status: "working", // still not updated by merchandiser
         createdAt: { $gte: startOfDay, $lte: endOfDay },
       },
-      { $set: { status: "not-completed" } }
+      { $set: { status: "not completed" } }
     );
 
     console.log(
-      `[TASK STATUS AUTO-UPDATE] ${result.modifiedCount} tasks marked as "not-completed"`
+      `[TASK STATUS AUTO-UPDATE] ${result.modifiedCount} tasks marked as "not completed"`
     );
   } catch (err) {
     console.error("Auto-update failed:", err.message);
