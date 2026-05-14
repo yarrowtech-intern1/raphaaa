@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../../redux/slices/authSlice";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "sonner";
 
 const AutoLogout = () => {
   const dispatch = useDispatch();
@@ -9,25 +11,53 @@ const AutoLogout = () => {
   const [showDialog, setShowDialog] = useState(false);
   const navigate = useNavigate();
 
+  const forceLogout = (showToast = false) => {
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("userToken");
+    dispatch(logout());
+    setShowDialog(true);
+    if (showToast) toast.error("Session expired. Please login again.");
+  };
+
+  const getTokenExpiryMs = (jwtToken) => {
+    try {
+      if (!jwtToken) return null;
+      const payload = JSON.parse(atob(jwtToken.split(".")[1]));
+      if (!payload?.exp) return null;
+      return payload.exp * 1000;
+    } catch (error) {
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (!user || !token) return;
-
-    // const AUTO_LOGOUT_TIME = 5000; // 5 seconds for testing
-    const AUTO_LOGOUT_TIME = 40 * 60 * 60 * 1000; // 40 hours
-
-    const timer = setTimeout(() => {
-      localStorage.removeItem("userInfo");
-      localStorage.removeItem("userToken");
-      dispatch(logout());
-      setShowDialog(true); // Show custom alert
-    }, AUTO_LOGOUT_TIME);
-
+    const expiryMs = getTokenExpiryMs(token);
+    if (!expiryMs) return;
+    const remaining = expiryMs - Date.now();
+    if (remaining <= 0) {
+      forceLogout(true);
+      return;
+    }
+    const timer = setTimeout(() => forceLogout(true), remaining);
     return () => clearTimeout(timer);
-  }, [user, token, dispatch]);
+  }, [user, token]);
+
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error?.response?.status === 401 && localStorage.getItem("userToken")) {
+          forceLogout(true);
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
 
   const handleLoginAgain = () => {
     setShowDialog(false);
-    // window.location.href = "/login";
     navigate("/login");
   };
 

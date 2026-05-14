@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+dotenv.config();
 const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const axios = require("axios");
@@ -81,8 +82,6 @@ app.use(express.json());
 // }));
 app.options("", cors(corsConfig));
 app.use(cors(corsConfig));
-
-dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 

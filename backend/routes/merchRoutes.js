@@ -3,6 +3,7 @@ const express = require("express");
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || "40h";
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
+      expiresIn: getJwtExpiresIn(),
     });
 
     res.json({

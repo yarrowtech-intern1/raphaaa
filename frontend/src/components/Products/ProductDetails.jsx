@@ -1725,6 +1725,8 @@ const ProductDetails = ({ productId }) => {
 
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState([]);
 
   const cart = useSelector((state) => state.cart);
 
@@ -1927,6 +1929,7 @@ const ProductDetails = ({ productId }) => {
         const { data } = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}/api/products`
         );
+        setCatalogProducts(Array.isArray(data) ? data : []);
 
         const toSlug = (name = "") =>
           name.toLowerCase().trim().replace(/\s+/g, "-");
@@ -1967,6 +1970,23 @@ const ProductDetails = ({ productId }) => {
 
     fetchByParams();
   }, [slug, sku, dispatch]);
+
+  const resolvedSimilarProducts = useMemo(() => {
+    if (Array.isArray(similarProducts) && similarProducts.length > 0) {
+      return similarProducts;
+    }
+
+    if (!selectedProduct || !Array.isArray(catalogProducts)) return [];
+
+    return catalogProducts
+      .filter(
+        (p) =>
+          p?._id !== selectedProduct?._id &&
+          String(p?.category || "").toLowerCase() ===
+            String(selectedProduct?.category || "").toLowerCase()
+      )
+      .slice(0, 12);
+  }, [similarProducts, selectedProduct, catalogProducts]);
 
   const handleBuyNow = async () => {
     if (isOutOfStock) {
@@ -2208,6 +2228,10 @@ const ProductDetails = ({ productId }) => {
     if (productFetchId) {
       fetchReviews();
     }
+  }, [productFetchId]);
+
+  useEffect(() => {
+    setShowFullDescription(false);
   }, [productFetchId]);
 
   const handleQuantityChange = (action) => {
@@ -2480,7 +2504,7 @@ const ProductDetails = ({ productId }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen pb-12">
       {selectedProduct && (
         <>
           {/* Breadcrumb */}
@@ -2948,8 +2972,23 @@ const ProductDetails = ({ productId }) => {
                 <div>
                   <h4 className="font-semibold text-gray-700 text-sm mb-2">Description</h4>
                   <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
-                    {selectedProduct.description}
+                    {(() => {
+                      const description = String(selectedProduct.description || "");
+                      const previewLength = 260;
+                      const isLong = description.length > previewLength;
+                      if (!isLong || showFullDescription) return description;
+                      return `${description.slice(0, previewLength)}...`;
+                    })()}
                   </p>
+                  {String(selectedProduct.description || "").length > 260 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowFullDescription((prev) => !prev)}
+                      className="mt-2 text-sm font-semibold text-sky-700 hover:text-sky-900"
+                    >
+                      {showFullDescription ? "See less" : "See more"}
+                    </button>
+                  )}
                 </div>
               )}
               <div>
@@ -3126,13 +3165,13 @@ const ProductDetails = ({ productId }) => {
           </div>
 
           {/* Similar Products */}
-          {similarProducts.length > 0 && !featuredCollab?.isPublished && (
+          {resolvedSimilarProducts.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
                 Similar Products
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
-                {similarProducts.slice(0, displayCount).map((product) => (
+                {resolvedSimilarProducts.slice(0, displayCount).map((product) => (
                   <div
                     key={product._id}
                     onClick={() =>
@@ -3190,7 +3229,7 @@ const ProductDetails = ({ productId }) => {
                   </div>
                 ))}
               </div>
-              {similarProducts.length > displayCount && (
+              {resolvedSimilarProducts.length > displayCount && (
                 <div className="flex justify-center mt-4">
                   <button
                     onClick={() => setDisplayCount((prev) => prev + 4)}
