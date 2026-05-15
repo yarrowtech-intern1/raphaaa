@@ -67,6 +67,15 @@ router.get("/delivery/check", async (req, res) => {
     });
   } catch (error) {
     console.error("Delivery check error:", error?.response?.data || error.message);
+    const msg = String(error?.message || "");
+    if (msg.includes("Missing SHIPROCKET_PICKUP_POSTCODE")) {
+      return res.status(400).json({
+        success: false,
+        isDeliverable: false,
+        message:
+          "Delivery check is not configured. Set SHIPROCKET_PICKUP_POSTCODE in backend .env and restart server.",
+      });
+    }
     return res.status(500).json({
       success: false,
       isDeliverable: false,

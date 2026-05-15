@@ -92,7 +92,11 @@ const ProductGrid = ({ products = [], loading, error }) => {
 
   if (!loading && safe.length === 0) return (
     <div className="flex flex-col items-center justify-center py-28 text-center gap-4">
-      <p className="text-4xl">🛍️</p>
+      <img
+        src="https://i.gifer.com/7VE.gif"
+        alt="No products"
+        className="w-60 h-60 object-contain"
+      />
       <p className="text-base font-semibold text-gray-600">No products found</p>
       <p className="text-sm text-gray-400">Try adjusting your filters</p>
     </div>

@@ -2300,6 +2300,25 @@ const ProductDetails = ({ productId }) => {
     }
   };
 
+  // Real-time Shiprocket delivery check when user enters valid 6-digit pincode
+  useEffect(() => {
+    const pin = String(pincode || "").trim();
+
+    if (!pin) {
+      setDeliveryInfo(null);
+      return;
+    }
+
+    if (!/^\d{0,6}$/.test(pin)) return;
+    if (pin.length !== 6) return;
+
+    const timer = setTimeout(() => {
+      checkDeliveryAvailability(pin);
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [pincode]);
+
   const handleAddToCart = () => {
     if (isOutOfStock) {
       toast.error("This product is out of stock.", { duration: 1500 });
@@ -2821,7 +2840,7 @@ const ProductDetails = ({ productId }) => {
                       type="text"
                       placeholder="Enter 6-digit pincode"
                       value={pincode}
-                      onChange={(e) => setPincode(e.target.value)}
+                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                       maxLength={6}
                       className="flex-1 px-3 py-2.5 text-sm border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-gray-900 transition"
                     />
@@ -2830,7 +2849,7 @@ const ProductDetails = ({ productId }) => {
                       disabled={isCheckingDelivery}
                       className="px-5 py-2.5 text-xs font-bold tracking-wide uppercase border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition disabled:opacity-50"
                     >
-                      {isCheckingDelivery ? "…" : "Check"}
+                      {isCheckingDelivery ? "Checking…" : "Check"}
                     </button>
                   </div>
                   {deliveryInfo && (
