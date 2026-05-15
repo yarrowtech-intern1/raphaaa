@@ -301,9 +301,9 @@ router.put('/:id', protect, adminOrMerchantiseMiddleware, async (req, res) => {
     if (status) {
       order.status = status;
       newStatus = status;
-      shouldSendStatusEmail = ['Shipped', 'Delivered', 'Cancelled'].includes(status);
+      shouldSendStatusEmail = ['Shipped', 'Delivered', 'Cancelled', 'Transfer'].includes(status);
 
-      if (status === "Shipped") {
+      if (status === "Shipped" || status === "Transfer") {
         try {
           const shipment = await createShiprocketOrder(order);
           order.shiprocket = {
@@ -343,7 +343,7 @@ router.put('/:id', protect, adminOrMerchantiseMiddleware, async (req, res) => {
     }
 
     const updatedOrder = await order.save();
-    if (updatedOrder.status === "Shipped" && updatedOrder?.shiprocket?.awbCode) {
+    if ((updatedOrder.status === "Shipped" || updatedOrder.status === "Transfer") && updatedOrder?.shiprocket?.awbCode) {
       await syncOrderTrackingStatus(updatedOrder);
     }
     
@@ -358,6 +358,7 @@ router.put('/:id', protect, adminOrMerchantiseMiddleware, async (req, res) => {
 
       const statusMessages = {
         Shipped: `Your order has been shipped and is on its way to you.${updatedOrder?.shiprocket?.awbCode ? ` AWB: ${updatedOrder.shiprocket.awbCode}` : ""}`,
+        Transfer: `Your order has been transferred to shipping partner.${updatedOrder?.shiprocket?.awbCode ? ` AWB: ${updatedOrder.shiprocket.awbCode}` : ""}`,
         Delivered: "Your order has been delivered. We hope you enjoy it!",
         Cancelled: "Your order has been cancelled. If this was unexpected, please contact support.",
       };

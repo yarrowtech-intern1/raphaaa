@@ -2419,28 +2419,26 @@ const ProductDetails = ({ productId }) => {
   };
 
   return (
-    <div className="min-h-screen pb-12">
+    <div className="min-h-screen bg-white pb-20">
       {selectedProduct && (
         <>
           {/* Breadcrumb */}
-          <div className="bg-linear-to-r from-sky-200 to-sky-100 border-b border-gray-200">
-            <div className="max-w-7xl mx-auto px-4 py-2.5 text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
-              <span onClick={() => navigate("/")} className="hover:text-sky-600 cursor-pointer transition">Home</span>
-              <span>/</span>
+          <div className="border-b border-gray-100 bg-white">
+            <div className="max-w-7xl mx-auto px-4 py-3 text-xs text-gray-400 font-medium flex items-center gap-1.5 flex-wrap">
+              <span onClick={() => navigate("/")} className="hover:text-gray-800 cursor-pointer transition">Home</span>
+              <span className="text-gray-300">/</span>
               {selectedProduct.category && (
                 <>
-                  <span onClick={() => navigate(`/collections/${selectedProduct.category.toLowerCase()}`)} className="hover:text-sky-600 cursor-pointer capitalize transition">{selectedProduct.category}</span>
-                  <span>/</span>
+                  <span onClick={() => navigate(`/collections/${selectedProduct.category.toLowerCase()}`)} className="hover:text-gray-800 cursor-pointer capitalize transition">{selectedProduct.category}</span>
+                  <span className="text-gray-300">/</span>
                 </>
               )}
-              <span className="text-gray-800 font-medium truncate max-w-[200px]">{selectedProduct.name}</span>
+              <span className="text-gray-700 font-semibold truncate max-w-[200px]">{selectedProduct.name}</span>
             </div>
           </div>
 
-          <div className="max-w-7xl mx-auto px-3 md:px-4 pt-4 space-y-3">
-          {/* Product Card */}
-          {/* Product Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 pt-6">
+          <div className="bg-white overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-12">
               {/* LEFT: Image Gallery */}
               <div className="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-gray-100 p-4 lg:p-6">
@@ -2454,10 +2452,10 @@ const ProductDetails = ({ productId }) => {
                           src={img.url}
                           alt={img.altText || `View ${i + 1}`}
                           onClick={() => setMainImage(img.url)}
-                          className={`w-[60px] h-[60px] object-cover rounded border-2 cursor-pointer transition-all ${
+                          className={`w-[60px] h-[60px] object-cover rounded-sm cursor-pointer transition-all ${
                             effectiveMainImage === img.url
-                              ? "border-sky-500 shadow-sm"
-                              : "border-gray-200 hover:border-gray-400"
+                              ? "ring-2 ring-gray-900 ring-offset-1"
+                              : "opacity-60 hover:opacity-100"
                           }`}
                         />
                       ))}
@@ -2466,17 +2464,17 @@ const ProductDetails = ({ productId }) => {
                     {/* Main image */}
                     <div className="flex-1 relative">
                       {selectedProduct.offerPercentage > 0 && (
-                        <div className="absolute top-2 left-2 z-10 bg-pink-600 text-white text-xs font-bold px-2 py-1 rounded-sm">
-                          {selectedProduct.offerPercentage}% OFF
+                        <div className="absolute top-3 left-3 z-10 bg-red-600 text-white text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                          {selectedProduct.offerPercentage}% off
                         </div>
                       )}
                       {new Date() - new Date(selectedProduct.createdAt) < 2 * 24 * 60 * 60 * 1000 && (
-                        <div className="absolute top-2 right-14 z-10 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-sm animate-pulse">
-                          NEW
+                        <div className="absolute top-3 right-14 z-10 bg-black text-white text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-sm">
+                          New
                         </div>
                       )}
                       <div
-                        className="relative w-full aspect-square bg-white rounded-lg border border-gray-200 overflow-hidden cursor-zoom-in"
+                        className="relative w-full aspect-square bg-gray-50 rounded-md border border-gray-100 overflow-hidden cursor-zoom-in"
                         onMouseEnter={handleZoomEnter}
                         onMouseLeave={handleZoomLeave}
                         onMouseMove={handleZoomMove}
@@ -2507,8 +2505,8 @@ const ProductDetails = ({ productId }) => {
                               ? handleRemoveFromWishlist(selectedProduct._id)
                               : handleAddToWishlist(selectedProduct);
                           }}
-                          className={`w-9 h-9 flex items-center justify-center rounded-full shadow bg-white transition hover:scale-110 ${
-                            isInWishlist(selectedProduct._id) ? "text-red-500" : "text-gray-400 hover:text-red-400"
+                          className={`w-9 h-9 flex items-center justify-center rounded-full border bg-white transition-all hover:scale-110 shadow-sm ${
+                            isInWishlist(selectedProduct._id) ? "text-red-500 border-red-200" : "text-gray-400 hover:text-red-400 border-gray-200"
                           }`}
                         >
                           {isInWishlist(selectedProduct._id) ? (
@@ -2519,7 +2517,7 @@ const ProductDetails = ({ productId }) => {
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); setShareOpen(true); }}
-                          className="w-9 h-9 flex items-center justify-center rounded-full shadow bg-white text-gray-400 hover:text-sky-500 hover:scale-110 transition"
+                          className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:scale-110 transition shadow-sm"
                         >
                           <FiShare2 className="text-base" />
                         </button>
@@ -2535,8 +2533,8 @@ const ProductDetails = ({ productId }) => {
                         src={img.url}
                         alt={img.altText || `View ${i + 1}`}
                         onClick={() => setMainImage(img.url)}
-                        className={`w-16 h-16 object-cover rounded border-2 cursor-pointer flex-shrink-0 transition ${
-                          effectiveMainImage === img.url ? "border-sky-500" : "border-gray-200"
+                        className={`w-16 h-16 object-cover rounded-sm cursor-pointer flex-shrink-0 transition-all ${
+                          effectiveMainImage === img.url ? "ring-2 ring-gray-900 ring-offset-1" : "opacity-55 hover:opacity-100"
                         }`}
                       />
                     ))}
@@ -2548,30 +2546,30 @@ const ProductDetails = ({ productId }) => {
               </div>
 
               {/* RIGHT: Product Info + Buy Box */}
-              <div className="lg:col-span-7 p-4 lg:p-6 space-y-4">
+              <div className="lg:col-span-7 p-4 lg:p-8 space-y-5">
                 {/* Brand + Title */}
                 <div>
                   {selectedProduct.brand && (
-                    <p className="text-sky-700 font-bold text-xs uppercase tracking-widest mb-1">
+                    <p className="text-[11px] font-bold tracking-[0.15em] text-gray-400 uppercase mb-1.5">
                       {selectedProduct.brand}
                     </p>
                   )}
-                  <h1 className="text-lg md:text-xl font-medium text-gray-900 leading-snug">
+                  <h1 className="text-xl md:text-2xl font-semibold text-gray-900 leading-snug">
                     {selectedProduct.name}
                   </h1>
                 </div>
 
                 {/* Rating row */}
                 {selectedProduct.rating > 0 && selectedProduct.numReviews > 0 && (
-                  <div className="flex items-center gap-3 flex-wrap border-b border-gray-100 pb-3">
-                    <div className="flex items-center gap-1 bg-green-600 text-white text-xs font-bold px-2.5 py-1 rounded">
+                  <div className="flex items-center gap-3 flex-wrap border-b border-gray-100 pb-4">
+                    <div className="flex items-center gap-1 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded">
                       {selectedProduct.rating.toFixed(1)} ★
                     </div>
-                    <span className="text-gray-500 text-sm">
-                      {selectedProduct.numReviews} Ratings &amp; Reviews
+                    <span className="text-gray-400 text-xs">
+                      {selectedProduct.numReviews} ratings
                     </span>
-                    <span className="ml-auto flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-xs font-medium">
-                      <BsPatchCheckFill /> Raphaaa Assured
+                    <span className="ml-auto flex items-center gap-1 text-gray-500 text-[11px] font-medium">
+                      <BsPatchCheckFill className="text-emerald-500" /> Raphaaa Assured
                     </span>
                   </div>
                 )}
@@ -2612,33 +2610,25 @@ const ProductDetails = ({ productId }) => {
                 </div>
 
                 {/* Offers strip */}
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-                    <p className="font-semibold text-gray-800 text-sm">Available Offers</p>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    <div className="flex items-start gap-2 text-xs text-gray-700">
-                      <span className="text-green-600 mt-0.5 shrink-0">🏷️</span>
-                      <p><span className="font-semibold text-gray-900">Free Delivery</span> on orders above ₹999</p>
-                    </div>
-                    <div className="flex items-start gap-2 text-xs text-gray-700">
-                      <span className="text-green-600 mt-0.5 shrink-0">🏷️</span>
-                      <p><span className="font-semibold text-gray-900">Special Price</span> Get extra {selectedProduct.offerPercentage || 0}% off</p>
-                    </div>
-                    <div className="flex items-start gap-2 text-xs text-gray-700">
-                      <span className="text-green-600 mt-0.5 shrink-0">🏷️</span>
-                      <p><span className="font-semibold text-gray-900">Easy Returns</span> 7 days hassle-free returns</p>
-                    </div>
-                  </div>
+                <div className="flex flex-wrap gap-3 py-3 border-y border-gray-100">
+                  {[
+                    { icon: "🚚", label: "Free delivery above ₹999" },
+                    { icon: "↩", label: "7-day returns" },
+                    { icon: "✔", label: "Authentic product" },
+                  ].map(({ icon, label }) => (
+                    <span key={label} className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
+                      <span className="text-gray-700">{icon}</span> {label}
+                    </span>
+                  ))}
                 </div>
 
                 {/* Color Selection */}
                 {effectiveColors.length > 0 && (
                   <div>
-                    <p className="text-sm font-semibold text-gray-800 mb-2">
+                    <p className="text-[11px] font-bold tracking-[0.12em] text-gray-500 uppercase mb-3">
                       Color:{" "}
                       {selectedColor && (
-                        <span className="font-normal text-gray-600 capitalize">
+                        <span className="font-semibold text-gray-900 capitalize normal-case tracking-normal text-sm">
                           {hasColorVariants
                             ? (selectedProduct.colorVariants.find(
                                 (cv) => cv.color.toLowerCase() === selectedColor.toLowerCase()
@@ -2678,15 +2668,15 @@ const ProductDetails = ({ productId }) => {
                             title={cvEntry?.colorName || color}
                             className={`relative transition-all duration-200 ${
                               thumb
-                                ? `w-14 h-14 rounded-xl overflow-hidden border-2 ${
+                                ? `w-14 h-14 rounded-lg overflow-hidden transition-all duration-150 ${
                                     isActive
-                                      ? "border-sky-500 shadow-lg ring-2 ring-sky-200 scale-110"
-                                      : "border-gray-200 hover:border-sky-300 hover:scale-105"
+                                      ? "ring-2 ring-gray-900 ring-offset-2 scale-105"
+                                      : "opacity-60 hover:opacity-100 hover:scale-105"
                                   }`
-                                : `w-9 h-9 rounded-full border-2 ${
+                                : `w-8 h-8 rounded-full transition-all duration-150 ${
                                     isActive
-                                      ? "border-sky-500 scale-110 shadow-md ring-2 ring-sky-100"
-                                      : "border-gray-300 hover:border-gray-400 hover:scale-105"
+                                      ? "ring-2 ring-gray-900 ring-offset-2 scale-110"
+                                      : "hover:scale-110 border border-gray-200"
                                   }`
                             }`}
                             style={!thumb ? { backgroundColor: color.toLowerCase() } : {}}
@@ -2708,10 +2698,10 @@ const ProductDetails = ({ productId }) => {
                 {/* Size Selection */}
                 {effectiveSizes.length > 0 && (
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-semibold text-gray-800">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[11px] font-bold tracking-[0.12em] text-gray-500 uppercase">
                         Size:{" "}
-                        {selectedSize && <span className="font-normal text-gray-600">{selectedSize}</span>}
+                        {selectedSize && <span className="font-bold text-gray-900 normal-case tracking-normal text-sm">{selectedSize}</span>}
                       </p>
                       <button
                         type="button"
@@ -2723,9 +2713,9 @@ const ProductDetails = ({ productId }) => {
                             toast.error("Size chart not available for this product.");
                           }
                         }}
-                        className="text-xs font-semibold text-sky-600 hover:text-sky-800 border-b border-sky-400 transition"
+                        className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2 transition"
                       >
-                        Size Chart
+                        Size Guide
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -2738,12 +2728,12 @@ const ProductDetails = ({ productId }) => {
                           onClick={() => !outOfStock && setSelectedSize(size)}
                           disabled={outOfStock}
                           title={outOfStock ? "Out of stock" : size}
-                          className={`min-w-[48px] h-10 px-3 text-sm font-medium rounded border transition-all relative ${
+                          className={`min-w-[44px] h-10 px-3 text-xs font-semibold border transition-all ${
                             outOfStock
-                              ? "border-gray-200 text-gray-300 bg-gray-50 cursor-not-allowed line-through"
+                              ? "border-gray-100 text-gray-300 bg-white cursor-not-allowed line-through"
                               : selectedSize === size
-                              ? "bg-sky-600 text-white border-sky-600 shadow-sm"
-                              : "border-gray-300 text-gray-700 hover:border-sky-400 hover:text-sky-600"
+                              ? "bg-gray-900 text-white border-gray-900"
+                              : "border-gray-200 text-gray-700 hover:border-gray-900 hover:text-gray-900"
                           }`}
                         >
                           {size}
@@ -2761,30 +2751,30 @@ const ProductDetails = ({ productId }) => {
                 {/* Quantity + Stock */}
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-800">Qty:</span>
-                    <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                    <span className="text-[11px] font-bold tracking-widest text-gray-500 uppercase">Qty</span>
+                    <div className="flex items-center border border-gray-200">
                       <button
                         onClick={() => handleQuantityChange("minus")}
                         disabled={quantity <= 1}
-                        className="w-9 h-9 flex items-center justify-center text-gray-700 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed border-r border-gray-300 transition text-lg font-medium"
+                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-r border-gray-200 transition text-lg"
                       >−</button>
-                      <span className="w-10 text-center text-sm font-bold text-gray-800">{quantity}</span>
+                      <span className="w-10 text-center text-sm font-semibold text-gray-800">{quantity}</span>
                       <button
                         onClick={() => handleQuantityChange("plus")}
                         disabled={quantity >= 10 || quantity >= selectedVariantStock || isOutOfStock}
-                        className="w-9 h-9 flex items-center justify-center text-gray-700 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed border-l border-gray-300 transition text-lg font-medium"
+                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-l border-gray-200 transition text-lg"
                       >+</button>
                     </div>
                   </div>
                   <div>
                     {isOutOfStock ? (
-                      <span className="text-red-600 font-semibold text-sm bg-red-50 px-2 py-1 rounded">Out of Stock</span>
+                      <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 px-2.5 py-1 rounded-full">Out of Stock</span>
                     ) : selectedVariantStock < 10 ? (
-                      <span className="text-orange-600 font-semibold text-sm bg-orange-50 px-2 py-1 rounded">
-                        Only {selectedVariantStock} left! Hurry
+                      <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
+                        Only {selectedVariantStock} left
                       </span>
                     ) : (
-                      <span className="text-green-600 font-semibold text-sm bg-green-50 px-2 py-1 rounded">In Stock</span>
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">In Stock</span>
                     )}
                   </div>
                 </div>
@@ -2795,40 +2785,37 @@ const ProductDetails = ({ productId }) => {
                     <button
                       onClick={handleAddToCart}
                       disabled={isButtonDisabled}
-                      className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-base transition-all active:scale-95 ${
+                      className={`flex-1 flex items-center justify-center gap-2 py-3.5 font-bold text-sm tracking-wide uppercase transition-all active:scale-95 ${
                         isButtonDisabled
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-200"
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-gray-900 text-white hover:bg-gray-700"
                       }`}
                     >
-                      <FaCartShopping className="text-lg" />
-                      {isAddingToCart ? "Adding..." : "Add to Bag"}
+                      <FaCartShopping className="text-base" />
+                      {isAddingToCart ? "Adding…" : "Add to Bag"}
                     </button>
                     <button
                       onClick={handleBuyNow}
                       disabled={isBuyNowDisabled || maxLimitReached}
-                      className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-base transition-all active:scale-95 ${
+                      className={`flex-1 flex items-center justify-center gap-2 py-3.5 font-bold text-sm tracking-wide uppercase border transition-all active:scale-95 ${
                         isBuyNowDisabled || maxLimitReached
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200"
+                          ? "border-gray-200 text-gray-400 cursor-not-allowed"
+                          : "border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white"
                       }`}
                     >
-                      <FiZap className={`text-lg ${isBuyingNow ? "animate-pulse" : ""}`} />
-                      {isBuyingNow ? "Processing..." : "Buy Now"}
+                      <FiZap className={`text-base ${isBuyingNow ? "animate-pulse" : ""}`} />
+                      {isBuyingNow ? "Processing…" : "Buy Now"}
                     </button>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  <div className="border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
                     This product is currently out of stock.
                   </div>
                 )}
 
                 {/* Delivery Check */}
-                <div className="border border-gray-200 rounded-xl p-3 space-y-2.5 bg-gray-50/50">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                    <span>🚚</span>
-                    <span>Check Delivery</span>
-                  </div>
+                <div className="border-t border-gray-100 pt-4 space-y-3">
+                  <p className="text-[11px] font-bold tracking-[0.12em] text-gray-500 uppercase">Check Delivery</p>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -2836,14 +2823,14 @@ const ProductDetails = ({ productId }) => {
                       value={pincode}
                       onChange={(e) => setPincode(e.target.value)}
                       maxLength={6}
-                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
+                      className="flex-1 px-3 py-2.5 text-sm border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-gray-900 transition"
                     />
                     <button
                       onClick={handleDeliveryCheck}
                       disabled={isCheckingDelivery}
-                      className="px-4 py-2 text-sm font-bold text-sky-700 border border-sky-500 rounded-lg hover:bg-sky-50 transition disabled:opacity-50"
+                      className="px-5 py-2.5 text-xs font-bold tracking-wide uppercase border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition disabled:opacity-50"
                     >
-                      {isCheckingDelivery ? "..." : "Check"}
+                      {isCheckingDelivery ? "…" : "Check"}
                     </button>
                   </div>
                   {deliveryInfo && (
@@ -3092,11 +3079,11 @@ const ProductDetails = ({ productId }) => {
 
           {/* Similar Products */}
           {resolvedSimilarProducts.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                Similar Products
+            <div className="border-t border-gray-100 mt-8 pt-8 pb-4 max-w-7xl mx-auto px-4 md:px-6">
+              <h3 className="text-[11px] font-bold tracking-[0.15em] text-gray-500 uppercase mb-6">
+                You May Also Like
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
                 {resolvedSimilarProducts.slice(0, displayCount).map((product) => (
                   <div
                     key={product._id}
@@ -3107,46 +3094,38 @@ const ProductDetails = ({ productId }) => {
                         )}`
                       )
                     }
-                    className="cursor-pointer rounded-xl border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all overflow-hidden bg-white group"
+                    className="cursor-pointer group"
                   >
-                    <div className="relative overflow-hidden">
+                    <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2.5">
                       <img
-                        src={product.images?.[0]?.url || "/no-image.png"}
+                        src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
                         alt={product.name}
-                        className="w-full h-44 md:h-52 object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                       {product.offerPercentage > 0 && (
-                        <div className="absolute top-2 left-2 bg-pink-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm">
-                          {product.offerPercentage}% OFF
+                        <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
+                          {product.offerPercentage}% off
                         </div>
                       )}
                     </div>
-                    <div className="p-2.5">
+                    <div className="pt-0.5">
                       {product.brand && (
-                        <p className="text-xs text-sky-700 font-semibold uppercase mb-0.5 truncate">
+                        <p className="text-[10px] font-bold tracking-[0.12em] text-gray-400 uppercase mb-0.5 truncate">
                           {product.brand}
                         </p>
                       )}
-                      <h4 className="text-sm font-medium text-gray-800 truncate">{product.name}</h4>
-                      {product.rating > 0 && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                            ★ {product.rating?.toFixed(1)}
-                          </span>
-                          <span className="text-gray-400 text-[10px]">({product.numReviews})</span>
-                        </div>
-                      )}
-                      <div className="flex items-baseline gap-1.5 mt-1.5">
+                      <h4 className="text-sm font-medium text-gray-800 line-clamp-1">{product.name}</h4>
+                      <div className="flex items-baseline gap-1.5 mt-1">
                         <span className="font-bold text-sm text-gray-900">
-                          ₹{Math.floor(product.discountPrice || product.price)}
+                          ₹{Math.floor(product.discountPrice || product.price).toLocaleString("en-IN")}
                         </span>
                         {product.discountPrice && product.discountPrice < product.price && (
                           <span className="text-xs line-through text-gray-400">
-                            ₹{Math.floor(product.price)}
+                            ₹{Math.floor(product.price).toLocaleString("en-IN")}
                           </span>
                         )}
                         {product.offerPercentage > 0 && (
-                          <span className="text-pink-600 text-[10px] font-bold">
+                          <span className="text-emerald-600 text-[10px] font-semibold">
                             {product.offerPercentage}% off
                           </span>
                         )}
@@ -3156,10 +3135,10 @@ const ProductDetails = ({ productId }) => {
                 ))}
               </div>
               {resolvedSimilarProducts.length > displayCount && (
-                <div className="flex justify-center mt-4">
+                <div className="flex justify-center mt-6">
                   <button
                     onClick={() => setDisplayCount((prev) => prev + 4)}
-                    className="px-5 py-2 text-sm font-semibold text-sky-700 border border-sky-400 rounded-lg hover:bg-sky-50 transition"
+                    className="px-6 py-2.5 text-xs font-bold tracking-widest uppercase border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition"
                   >
                     Load More
                   </button>

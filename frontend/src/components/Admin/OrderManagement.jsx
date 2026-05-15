@@ -422,10 +422,10 @@ import {
   clearError,
 } from "../../redux/slices/adminOrderSlice";
 import { FaRegTrashCan } from "react-icons/fa6";
-import { FaBoxOpen } from "react-icons/fa";
-import { FaEye } from "react-icons/fa";
+import { FaEye, FaTrash, FaCheckCircle, FaSearch, FaClipboardList } from "react-icons/fa";
+import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi2";
+import { MdFilterList } from "react-icons/md";
 import { toast } from "sonner";
-import { FaCheckCircle } from "react-icons/fa";
 
 const OrderManagement = () => {
   const dispatch = useDispatch();
@@ -512,454 +512,401 @@ const OrderManagement = () => {
     currentPage * ordersPerPage
   );
 
-  if (loading)
+  /* ── status badge ── */
+  const StatusBadge = ({ status }) => {
+    const cfg = {
+      Delivered:          "bg-emerald-100 text-emerald-700 border-emerald-200",
+      Processing:         "bg-amber-100  text-amber-700  border-amber-200",
+      Cancelled:          "bg-red-100    text-red-700    border-red-200",
+      Shipped:            "bg-sky-100    text-sky-700    border-sky-200",
+      Packed:             "bg-violet-100 text-violet-700 border-violet-200",
+      Transfer:           "bg-indigo-100 text-indigo-700 border-indigo-200",
+      "In Transit":       "bg-sky-100    text-sky-700    border-sky-200",
+      "Out For Delivery": "bg-blue-100   text-blue-700   border-blue-200",
+    }[status] || "bg-gray-100 text-gray-600 border-gray-200";
     return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          <p className="mt-2">Loading orders...</p>
-        </div>
-      </div>
+      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cfg}`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{status}
+      </span>
     );
+  };
 
-  if (error)
-    return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <div className="flex justify-between items-center">
-            <span>
-              Error:{" "}
-              {typeof error === "string"
-                ? error
-                : error.message || "Something went wrong"}
-            </span>
-            <button
-              onClick={clearErrorHandler}
-              className="text-red-700 hover:text-red-900"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-        <button
-          onClick={() => dispatch(fetchAllOrders())}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-        >
-          Retry
-        </button>
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">Loading orders…</p>
       </div>
-    );
+    </div>
+  );
+
+  if (error) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6 max-w-sm w-full text-center">
+        <p className="text-red-600 font-semibold mb-3">
+          {typeof error === "string" ? error : error.message || "Something went wrong"}
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={clearErrorHandler}
+            className="px-4 py-2 text-xs font-semibold border border-gray-200 rounded-xl hover:bg-gray-50 transition">
+            Dismiss
+          </button>
+          <button onClick={() => dispatch(fetchAllOrders())}
+            className="px-4 py-2 text-xs font-semibold bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition">
+            Retry
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">Order Management</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            {isAdmin
-              ? "Admin Dashboard"
-              : user?.role === "delivery_boy"
-              ? "Delivery Dashboard"
-              : "Merchantise Dashboard"}
-          </p>
-        </div>
-        <div className="text-sm text-gray-600">
-          Total Orders:{" "}
-          <span className="bg-blue-600 text-white p-1 rounded-full">
-            {" "}
-            {filteredOrders.length}{" "}
-          </span>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 space-y-5">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 shadow-sm">
+            <FaClipboardList className="text-white text-lg" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-gray-900">Orders</h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isAdmin ? "Admin" : user?.role === "delivery_boy" ? "Delivery" : "Merchandise"} · {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-col md:flex-row gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search by ID or customer"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md bg-white outline-0"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full md:w-1/4 px-4 py-2 border border-gray-300 rounded-md bg-white outline-0"
-        >
-          <option value="">All Statuses</option>
-          <option value="Processing">Processing</option>
-          <option value="Packed">Packed</option>
-          <option value="Pickup Scheduled">Pickup Scheduled</option>
-          <option value="Picked Up">Picked Up</option>
-          <option value="Shipped">Shipped</option>
-          <option value="In Transit">In Transit</option>
-          <option value="Out For Delivery">Out For Delivery</option>
-          <option value="Delivered">Delivered</option>
-          <option value="RTO Initiated">RTO Initiated</option>
-          <option value="RTO Delivered">RTO Delivered</option>
-          <option value="Cancelled">Cancelled</option>
-        </select>
+      {/* ── Filter bar ── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-40">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+          <input
+            type="text"
+            placeholder="Search by order ID or customer…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition"
+          />
+        </div>
+        <div className="relative">
+          <MdFilterList className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition appearance-none cursor-pointer"
+          >
+            <option value="">All Statuses</option>
+            <option value="Processing">Processing</option>
+            <option value="Packed">Packed</option>
+            <option value="Transfer">Transfer</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 text-xs font-bold text-violet-700 shrink-0">
+          {filteredOrders.length} result{filteredOrders.length !== 1 ? "s" : ""}
+        </div>
       </div>
 
-      <div className="overflow-x-auto shadow-lg rounded-lg bg-white">
-        <table className="min-w-full text-sm text-left text-gray-700">
-          <thead className="bg-gray-100 text-xs uppercase text-gray-600">
-            <tr>
-              {/* <th className="py-4 px-6">Order ID</th> */}
-              <th className="py-4 px-6">ID</th>
-              <th className="py-4 px-6">Customer</th>
-              <th className="py-4 px-6">Total Price</th>
-              <th className="py-4 px-6">Status</th>
-              <th className="py-4 px-6">Created At</th>
-              <th className="py-4 px-6">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedOrders.length > 0 ? (
-              paginatedOrders.map((order) => (
-                <tr
-                  key={order._id}
-                  className="hover:bg-gray-50 transition-all duration-200 border-b"
-                >
-                  {/* <td className="py-4 px-6 font-semibold text-gray-900 whitespace-nowrap">
-                    #{order._id.slice(-8)}
-                  </td> */}
-                  <td className="py-4 px-6">
-                    {order?.orderId || "Invalid ID"}
-                  </td>
-                  <td className="py-4 px-6">
-                    {order.user?.name || "Unknown User"}
-                  </td>
-                  <td className="py-4 px-6">
-                    ₹{order.totalPrice?.toFixed(2) || "0.00"}
-                  </td>
-                  <td className="py-4 px-6">
-                    <select
-                      value={order.status}
-                      onChange={(e) =>
-                        handleStatusChange(order._id, e.target.value)
-                      }
-                      className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block p-2 w-full"
-                    >
-                      <option value="Processing">Processing</option>
-                      <option value="Packed">Packed</option>
-                      <option value="Pickup Scheduled">Pickup Scheduled</option>
-                      <option value="Picked Up">Picked Up</option>
-                      <option value="Shipped">Shipped</option>
-                      <option value="In Transit">In Transit</option>
-                      <option value="Out For Delivery">Out For Delivery</option>
-                      <option value="Delivered">Delivered</option>
-                      <option value="RTO Initiated">RTO Initiated</option>
-                      <option value="RTO Delivered">RTO Delivered</option>
-                      <option value="Cancelled">Cancelled</option>
-                    </select>
-                  </td>
-
-                  <td className="py-4 px-6">
-                    {new Date(order.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setIsModalOpen(true);
-                        }}
-                        className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-xs"
-                      >
-                        <FaEye className="inline mr-1" /> View
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleStatusChange(order._id, "Delivered")
-                        }
-                        className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition-colors text-xs"
-                      >
-                        <FaBoxOpen className="inline mr-1" /> Delivered
-                      </button>
-
-                      {/* Only show delete button for admin */}
-                      {isAdmin && (
-                        <button
-                          onClick={() => {
-                            setOrderToDelete(order._id);
-                            setShowConfirmModal(true);
-                          }}
-                          className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition-colors text-xs"
-                        >
-                          <FaRegTrashCan className="inline mr-1" /> Delete
-                        </button>
-                      )}
+      {/* ── Table ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                <th className="px-4 py-3 text-left">Order ID</th>
+                <th className="px-4 py-3 text-left">Customer</th>
+                <th className="px-4 py-3 text-left">Amount</th>
+                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Date</th>
+                <th className="px-4 py-3 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {paginatedOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <FaClipboardList className="text-3xl text-gray-200" />
+                      <p className="text-sm font-semibold text-gray-400">No orders found</p>
+                      <p className="text-xs text-gray-300">Try adjusting your search or filter</p>
                     </div>
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="p-6 text-center text-gray-500 italic"
-                >
-                  No orders found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        {showConfirmModal && (
-          <div
-            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in"
-            onClick={() => setShowConfirmModal(false)}
-          >
-            <div
-              className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full animate-fade-in-slow"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Confirm Deletion
-              </h3>
-              <p className="text-sm text-gray-600 mb-6">
-                Are you sure you want to delete this order? This action cannot
-                be undone.
-              </p>
-              <div className="flex justify-end gap-3">
+              ) : (
+                paginatedOrders.map((order) => (
+                  <tr key={order._id} className="hover:bg-gray-50/70 transition group">
+                    {/* Order ID */}
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-lg">
+                        {order?.orderId || `#${order._id?.slice(-8).toUpperCase()}`}
+                      </span>
+                    </td>
+
+                    {/* Customer */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                          {(order.user?.name || "?")[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{order.user?.name || "Unknown"}</p>
+                          <p className="text-[11px] text-gray-400 truncate">{order.user?.email || ""}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Amount */}
+                    <td className="px-4 py-3 font-bold text-gray-900">
+                      ₹{order.totalPrice?.toLocaleString("en-IN") || "0"}
+                    </td>
+
+                    {/* Status dropdown */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={order.status} />
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer appearance-none"
+                        >
+                          <option value="Processing">Processing</option>
+                          <option value="Packed">Packed</option>
+                          <option value="Transfer">Transfer</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                    </td>
+
+                    {/* Date */}
+                    <td className="px-4 py-3 text-xs text-gray-400">
+                      {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setSelectedOrder(order); setIsModalOpen(true); }}
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 border border-sky-100 hover:bg-sky-100 transition"
+                        >
+                          <FaEye className="text-xs" /> View
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => { setOrderToDelete(order._id); setShowConfirmModal(true); }}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition"
+                          >
+                            <FaTrash className="text-[10px]" /> Delete
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <p className="text-xs text-gray-400">
+              Page {currentPage} of {totalPages} · {filteredOrders.length} orders
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                <HiChevronLeft className="text-sm" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                 <button
-                  onClick={() => setShowConfirmModal(false)}
-                  className="px-4 py-2 text-sm rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-8 h-8 rounded-xl text-xs font-bold transition ${
+                    currentPage === page
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
                 >
-                  Cancel
+                  {page}
                 </button>
-                <button
-                  onClick={confirmDeleteOrder}
-                  className="px-4 py-2 text-sm rounded-md bg-red-500 text-white hover:bg-red-600"
-                >
-                  Yes, Delete
-                </button>
-              </div>
+              ))}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                <HiChevronRight className="text-sm" />
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-6 gap-2">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`px-4 py-2 rounded-md border ${
-                page === currentPage
-                  ? "bg-blue-500 text-white"
-                  : "bg-white text-gray-700"
-              } hover:bg-blue-100`}
-            >
-              {page}
-            </button>
-          ))}
+      {/* ── Delete confirm modal ── */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowConfirmModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <FaTrash className="text-red-500 text-lg" />
+            </div>
+            <h3 className="text-base font-bold text-gray-800 text-center mb-1">Delete Order?</h3>
+            <p className="text-sm text-gray-500 text-center mb-5">This action is permanent and cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+                Cancel
+              </button>
+              <button onClick={confirmDeleteOrder}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white shadow-sm transition">
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Modal */}
+      {/* ── Order details modal ── */}
       {isModalOpen && selectedOrder && (
-        <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div
-            className="relative bg-gradient-to-br from-white to-gray-50 p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-3 right-4 text-gray-400 hover:text-red-500 text-2xl"
-            >
-              &times;
-            </button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setIsModalOpen(false)}>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}>
 
-            <h3 className="text-2xl font-bold text-blue-700 mb-6 border-b pb-2">
-              🧾 Order Summary
-            </h3>
-
-            <div className="flex flex-col md:flex-row gap-6 text-sm text-gray-700">
-              {/* Left Section: Order Summary */}
-              <div className="w-full md:w-1/2 space-y-3">
-                <div className="flex justify-between">
-                  <span className="font-medium">Order ID:</span>
-                  <span className="text-gray-900">{selectedOrder.orderId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Customer:</span>
-                  <span>{selectedOrder.user?.name || "Unknown"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Email:</span>
-                  <span>{selectedOrder.user?.email || "N/A"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Status:</span>
-                  <span className="font-semibold text-blue-600">
-                    {selectedOrder.status}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Total:</span>
-                  <span className="text-green-600 font-bold">
-                    ₹{selectedOrder.totalPrice?.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Payment:</span>
-                  <span>{selectedOrder.paymentMethod}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Ordered On:</span>
-                  <span>
-                    {new Date(selectedOrder.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Shipping Address:</span>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {selectedOrder.shippingAddress
-                      ? `${selectedOrder.shippingAddress.address}, ${selectedOrder.shippingAddress.city}, ${selectedOrder.shippingAddress.postalCode}, ${selectedOrder.shippingAddress.country}`
-                      : "N/A"}
-                  </p>
-                </div>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+              <div>
+                <h3 className="text-base font-bold text-gray-800">Order Details</h3>
+                <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                  {selectedOrder.orderId || `#${selectedOrder._id?.slice(-8).toUpperCase()}`}
+                </p>
               </div>
+              <button onClick={() => setIsModalOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 transition">
+                <HiX className="text-sm" />
+              </button>
+            </div>
 
-              {/* Right Section: Order Items */}
-              <div className="w-full md:w-1/2 flex flex-col md:flex-row gap-6">
-                {/* Order Items List */}
-                <div className="w-full md:w-2/3">
-                  <span className="font-medium block mb-2">Items Ordered:</span>
-                  <div className="space-y-3">
-                    {selectedOrder.orderItems &&
-                    selectedOrder.orderItems.length > 0 ? (
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                {/* ── Order info ── */}
+                <div className="md:col-span-1 space-y-3">
+                  <p className="text-[11px] font-bold tracking-widest text-gray-400 uppercase mb-3">Order Info</p>
+                  {[
+                    { label: "Customer",   value: selectedOrder.user?.name || "Unknown" },
+                    { label: "Email",      value: selectedOrder.user?.email || "N/A" },
+                    { label: "Payment",    value: selectedOrder.paymentMethod },
+                    { label: "Ordered On", value: new Date(selectedOrder.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) },
+                    { label: "Total",      value: `₹${selectedOrder.totalPrice?.toLocaleString("en-IN")}`, bold: true },
+                  ].map(({ label, value, bold }) => (
+                    <div key={label} className="flex items-start justify-between gap-3">
+                      <span className="text-xs text-gray-400 shrink-0">{label}</span>
+                      <span className={`text-xs text-right ${bold ? "font-bold text-gray-900" : "text-gray-700 font-medium"}`}>{value}</span>
+                    </div>
+                  ))}
+
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 mb-1">Shipping Address</p>
+                    <p className="text-xs text-gray-700 leading-relaxed">
+                      {selectedOrder.shippingAddress
+                        ? `${selectedOrder.shippingAddress.address}, ${selectedOrder.shippingAddress.city}, ${selectedOrder.shippingAddress.postalCode}, ${selectedOrder.shippingAddress.country}`
+                        : "N/A"}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-[11px] font-bold tracking-widest text-gray-400 uppercase mb-2">Current Status</p>
+                    <StatusBadge status={selectedOrder.status} />
+                  </div>
+                </div>
+
+                {/* ── Items ── */}
+                <div className="md:col-span-1">
+                  <p className="text-[11px] font-bold tracking-widest text-gray-400 uppercase mb-3">Items Ordered</p>
+                  <div className="space-y-2">
+                    {selectedOrder.orderItems?.length > 0 ? (
                       selectedOrder.orderItems.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-start justify-between bg-gray-50 p-3 rounded-lg shadow-sm"
-                        >
-                          <div className="flex items-center gap-4">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-12 h-12 rounded object-cover border"
-                            />
-                            <div>
-                              <p className="text-sm font-semibold text-gray-800">
-                                {item.name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Color: {item.color} | Size: {item.size}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Qty: {item.quantity}
-                              </p>
-                            </div>
+                        <div key={idx} className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                          <img src={item.image} alt={item.name}
+                            className="w-12 h-12 rounded-lg object-cover border border-gray-100 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
+                            <p className="text-[11px] text-gray-500">
+                              {item.color && `Color: ${item.color}`}{item.size && ` · Size: ${item.size}`}
+                            </p>
+                            <p className="text-[11px] text-gray-400">Qty: {item.quantity}</p>
                           </div>
-                          <div className="text-sm text-gray-800 font-semibold">
-                            ₹{(item.price * item.quantity).toFixed(2)}
-                          </div>
+                          <p className="text-xs font-bold text-gray-800 shrink-0">
+                            ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                          </p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-gray-500 italic text-sm">
-                        No items found
-                      </p>
+                      <p className="text-xs text-gray-400 italic">No items found</p>
                     )}
                   </div>
                 </div>
 
-                {/* Vertical Status Tracker */}
-                <div className="w-full md:w-1/3 mt-6 md:mt-0">
-                  <span className="font-medium block mb-2">Order Status:</span>
+                {/* ── Timeline ── */}
+                <div className="md:col-span-1">
+                  <p className="text-[11px] font-bold tracking-widest text-gray-400 uppercase mb-3">Order Timeline</p>
                   <div className="relative pl-6">
-                    {/* Vertical progress line */}
-                    <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-300 z-0">
+                    <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-100 z-0">
                       <div
-                        className="absolute top-0 w-full bg-blue-500 transition-all duration-700 ease-in-out"
+                        className="absolute top-0 w-full bg-violet-500 transition-all duration-700"
                         style={{
-                          height: `${
-                            [
-                              "Ordered",
-                              "Processing",
-                              "Shipped",
-                              selectedOrder.status === "Cancelled"
-                                ? "Cancelled"
-                                : "Delivered",
-                            ].indexOf(selectedOrder.status) * 33.3
-                          }%`,
+                          height: `${["Ordered","Processing","Shipped",
+                            selectedOrder.status === "Cancelled" ? "Cancelled" : "Delivered",
+                          ].indexOf(selectedOrder.status) * 33.3}%`,
                         }}
                       />
                     </div>
-
-                    {/* Status Timeline */}
-                    <div className="space-y-8 relative z-10">
+                    <div className="space-y-6 relative z-10">
                       {[
-                        { label: "Ordered", time: selectedOrder.createdAt },
+                        { label: "Ordered",    time: selectedOrder.createdAt },
                         { label: "Processing", time: selectedOrder.updatedAt },
+                        { label: "Shipped",    time: selectedOrder.shippedAt || selectedOrder.updatedAt },
                         {
-                          label: "Shipped",
-                          time:
-                            selectedOrder.shippedAt || selectedOrder.updatedAt,
-                        },
-                        {
-                          label:
-                            selectedOrder.status === "Cancelled"
-                              ? "Cancelled"
-                              : "Delivered",
-                          time:
-                            selectedOrder.status === "Cancelled"
-                              ? selectedOrder.cancelledAt ||
-                                selectedOrder.updatedAt
-                              : selectedOrder.deliveredAt ||
-                                selectedOrder.updatedAt,
+                          label: selectedOrder.status === "Cancelled" ? "Cancelled" : "Delivered",
+                          time: selectedOrder.status === "Cancelled"
+                            ? selectedOrder.cancelledAt || selectedOrder.updatedAt
+                            : selectedOrder.deliveredAt || selectedOrder.updatedAt,
                         },
                       ].map((step, index, steps) => {
-                        const currentIndex = steps.findIndex(
-                          (s) =>
-                            s.label ===
-                            (selectedOrder.status === "Cancelled"
-                              ? "Cancelled"
-                              : selectedOrder.status)
+                        const currentIndex = steps.findIndex((s) =>
+                          s.label === (selectedOrder.status === "Cancelled" ? "Cancelled" : selectedOrder.status)
                         );
-
                         const isCompleted = index < currentIndex;
-                        const isCurrent = index === currentIndex;
-
+                        const isCurrent   = index === currentIndex;
                         return (
-                          <div
-                            key={step.label}
-                            className="relative flex items-start gap-3"
-                          >
-                            {/* Dot / Checkmark */}
-                            <div className="relative z-20 w-5 h-5 flex items-center justify-center">
+                          <div key={step.label} className="relative flex items-start gap-3">
+                            <div className="relative z-20 w-5 h-5 flex items-center justify-center shrink-0">
                               {isCompleted ? (
-                                <FaCheckCircle className="text-green-600 text-lg" />
+                                <FaCheckCircle className="text-emerald-500 text-base" />
                               ) : isCurrent ? (
-                                <div className="w-3 h-3 bg-blue-600 rounded-full animate-pulse" />
+                                <div className="w-3 h-3 bg-violet-600 rounded-full ring-2 ring-violet-200 animate-pulse" />
                               ) : (
-                                <div className="w-3 h-3 bg-gray-300 rounded-full" />
+                                <div className="w-3 h-3 bg-gray-200 rounded-full" />
                               )}
                             </div>
-
-                            {/* Label & Time */}
                             <div>
-                              <p
-                                className={`text-sm font-medium ${
-                                  isCompleted || isCurrent
-                                    ? "text-blue-600"
-                                    : "text-gray-400"
-                                }`}
-                              >
+                              <p className={`text-xs font-semibold ${isCompleted || isCurrent ? "text-gray-800" : "text-gray-400"}`}>
                                 {step.label}
                               </p>
-                              <p className="text-xs text-gray-500">
-                                {step.time
-                                  ? new Date(step.time).toLocaleString()
-                                  : "Pending"}
+                              <p className="text-[11px] text-gray-400">
+                                {step.time ? new Date(step.time).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Pending"}
                               </p>
                             </div>
                           </div>

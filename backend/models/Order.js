@@ -91,6 +91,7 @@ const orderSchema = new mongoose.Schema(
       enum: [
         "Processing",
         "Packed",
+        "Transfer",
         "Pickup Scheduled",
         "Picked Up",
         "Shipped",
