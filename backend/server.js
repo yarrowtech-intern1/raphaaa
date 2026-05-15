@@ -1,7 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-dotenv.config();
+const path = require("path");
+dotenv.config({ path: path.join(__dirname, ".env") });
 const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const axios = require("axios");
