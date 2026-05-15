@@ -418,12 +418,10 @@ import { useNavigate } from "react-router-dom";
 import {
   fetchAllOrders,
   updateOrderStatus,
-  deleteOrder,
   clearError,
 } from "../../redux/slices/adminOrderSlice";
-import { FaRegTrashCan } from "react-icons/fa6";
-import { FaEye, FaTrash, FaCheckCircle, FaSearch, FaClipboardList } from "react-icons/fa";
-import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi2";
+import { FaEye, FaCheckCircle, FaSearch, FaClipboardList } from "react-icons/fa";
+import { HiChevronLeft, HiChevronRight, HiXMark } from "react-icons/hi2";
 import { MdFilterList } from "react-icons/md";
 import { toast } from "sonner";
 
@@ -440,8 +438,6 @@ const OrderManagement = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const ordersPerPage = 10;
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState(null);
 
   // Check if user has permission to access this page
   const hasPermission =
@@ -450,14 +446,6 @@ const OrderManagement = () => {
       user.role === "merchantise" ||
       user.role === "delivery_boy");
   const isAdmin = user && user.role === "admin";
-  const confirmDeleteOrder = () => {
-    if (orderToDelete) {
-      dispatch(deleteOrder(orderToDelete));
-      toast.success("Order deleted successfully!");
-      setShowConfirmModal(false);
-      setOrderToDelete(null);
-    }
-  };
 
   useEffect(() => {
     if (!user) {
@@ -477,21 +465,14 @@ const OrderManagement = () => {
     dispatch(updateOrderStatus({ id: orderId, status }));
   };
 
-  const handleDeleteOrder = (orderId) => {
-    if (window.confirm("Are you sure you want to delete this order?")) {
-      dispatch(deleteOrder(orderId));
+  const handleRefresh = async () => {
+    try {
+      await dispatch(fetchAllOrders()).unwrap();
+      toast.success("Orders refreshed");
+    } catch {
+      toast.error("Failed to refresh orders");
     }
   };
-
-  useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === "Escape") {
-        setShowConfirmModal(false);
-      }
-    };
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, []);
 
   const clearErrorHandler = () => {
     dispatch(clearError());
@@ -527,12 +508,17 @@ const OrderManagement = () => {
     return (
       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cfg}`}>
         <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{status}
+        {/* {status === "Processing" && (
+          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] leading-none">
+            NEW
+          </span>
+        )} */}
       </span>
     );
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
         <p className="text-sm text-gray-500 font-medium">Loading orders…</p>
@@ -541,8 +527,8 @@ const OrderManagement = () => {
   );
 
   if (error) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6 max-w-sm w-full text-center">
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="rounded-2xl border border-red-100 shadow-sm p-6 max-w-sm w-full text-center">
         <p className="text-red-600 font-semibold mb-3">
           {typeof error === "string" ? error : error.message || "Something went wrong"}
         </p>
@@ -561,7 +547,7 @@ const OrderManagement = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 space-y-5">
+    <div className="min-h-screen p-4 md:p-6 space-y-5">
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -579,7 +565,7 @@ const OrderManagement = () => {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 flex flex-col sm:flex-row gap-3 flex-wrap">
+      <div className="p-4 flex flex-col sm:flex-row gap-3 flex-wrap">
         <div className="relative flex-1 min-w-40">
           <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
           <input
@@ -601,14 +587,18 @@ const OrderManagement = () => {
             <option value="Processing">Processing</option>
             <option value="Packed">Packed</option>
             <option value="Transfer">Transfer</option>
-            <option value="Shipped">Shipped</option>
-            <option value="Delivered">Delivered</option>
-            <option value="Cancelled">Cancelled</option>
           </select>
         </div>
         <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 text-xs font-bold text-violet-700 shrink-0">
           {filteredOrders.length} result{filteredOrders.length !== 1 ? "s" : ""}
         </div>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          className="px-3 py-2.5 text-xs font-bold rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 transition"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* ── Table ── */}
@@ -641,9 +631,16 @@ const OrderManagement = () => {
                   <tr key={order._id} className="hover:bg-gray-50/70 transition group">
                     {/* Order ID */}
                     <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                      {order.status === "Processing" && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold leading-none">
+                          NEW
+                        </span>
+                      )}
                       <span className="font-mono text-xs text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-lg">
                         {order?.orderId || `#${order._id?.slice(-8).toUpperCase()}`}
                       </span>
+                      </div>
                     </td>
 
                     {/* Customer */}
@@ -676,9 +673,6 @@ const OrderManagement = () => {
                           <option value="Processing">Processing</option>
                           <option value="Packed">Packed</option>
                           <option value="Transfer">Transfer</option>
-                          <option value="Shipped">Shipped</option>
-                          <option value="Delivered">Delivered</option>
-                          <option value="Cancelled">Cancelled</option>
                         </select>
                       </div>
                     </td>
@@ -697,14 +691,6 @@ const OrderManagement = () => {
                         >
                           <FaEye className="text-xs" /> View
                         </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => { setOrderToDelete(order._id); setShowConfirmModal(true); }}
-                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition"
-                          >
-                            <FaTrash className="text-[10px]" /> Delete
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -753,29 +739,6 @@ const OrderManagement = () => {
         )}
       </div>
 
-      {/* ── Delete confirm modal ── */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setShowConfirmModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-              <FaTrash className="text-red-500 text-lg" />
-            </div>
-            <h3 className="text-base font-bold text-gray-800 text-center mb-1">Delete Order?</h3>
-            <p className="text-sm text-gray-500 text-center mb-5">This action is permanent and cannot be undone.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
-                Cancel
-              </button>
-              <button onClick={confirmDeleteOrder}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white shadow-sm transition">
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Order details modal ── */}
       {isModalOpen && selectedOrder && (
@@ -794,7 +757,7 @@ const OrderManagement = () => {
               </div>
               <button onClick={() => setIsModalOpen(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 transition">
-                <HiX className="text-sm" />
+                <HiXMark className="text-sm" />
               </button>
             </div>
 

@@ -234,184 +234,266 @@ const OrderDetailsPage = () => {
 
 
 
-  if (loading)
-    return (
-      <div className="max-w-7xl mx-auto p-6 animate-pulse">
-        <div className="h-8 w-44 bg-gray-200 mb-4 rounded"></div>
-        <div className="h-64 bg-gray-100 rounded"></div>
-      </div>
-    );
+  /* ── helpers ── */
+  const statusConfig = (status, isPaid) => {
+    if (status === "Delivered")
+      return { pill: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" };
+    if (["Shipped","In Transit","Out For Delivery","Picked Up","Pickup Scheduled"].includes(status))
+      return { pill: "bg-sky-100 text-sky-700 border-sky-200", dot: "bg-sky-500" };
+    if (["Cancelled","RTO Initiated","RTO Delivered"].includes(status))
+      return { pill: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500" };
+    return { pill: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-400" };
+  };
 
-  if (error) return <p className="text-red-600">Error: {error}</p>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">Loading order…</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="bg-white border border-red-100 rounded-2xl shadow-sm p-6 max-w-sm w-full text-center">
+        <p className="text-red-600 font-semibold mb-3">Error: {error}</p>
+        <Link to="/profile" className="text-sm text-sky-600 hover:underline">← Back to My Orders</Link>
+      </div>
+    </div>
+  );
+
+  if (!orderDetails) return (
+    <div className="min-h-screen flex items-center justify-center text-center p-6">
+      <div>
+        <p className="text-3xl mb-3">📋</p>
+        <p className="text-sm font-semibold text-gray-600 mb-4">Order not found</p>
+        <Link to="/profile" className="px-5 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 transition">
+          View My Orders
+        </Link>
+      </div>
+    </div>
+  );
+
+  const { pill, dot } = statusConfig(orderDetails.status);
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-sky-800">
-          Order Details
-        </h2>
+    <div className="min-h-screen py-8 px-4">
+      <div className="max-w-3xl mx-auto space-y-5">
 
-        {orderDetails && (
-          <button
-            onClick={generatePDF}
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 text-white px-4 py-2 font-medium shadow-md hover:bg-sky-700 transition"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M7 16a4 4 0 01.88-2.545l4.12-5.49a2 2 0 113.2 2.31L12.2 15H17a2 2 0 110 4H7a2 2 0 110-4z"
-              />
-            </svg>
-            Download Invoice
-          </button>
-        )}
-      </div>
+        {/* ── Page header ── */}
+        <div className="flex items-center justify-between">
+          <Link to="/profile"
+            className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-sky-700 transition">
+            ← My Orders
+          </Link>
+          {orderDetails && (
+            <button onClick={generatePDF}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-sky-400 hover:text-sky-700 hover:bg-sky-50 transition shadow-sm">
+              📄 Download Invoice
+            </button>
+          )}
+        </div>
 
-      {!orderDetails ? (
-        <p>No Order details found</p>
-      ) : (
-        <div className="rounded-xl bg-white p-4 sm:p-6 shadow-xl border border-sky-100">
-          {/* Header */}
-          <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row">
-            <div>
-              <h3 className="text-lg md:text-xl font-semibold">
-                Order ID:{" "}
-                <span className="text-gray-700"># {orderDetails?._id}</span>
-              </h3>
-              <p className="text-gray-500">
-                {orderDetails?.createdAt
-                  ? new Date(orderDetails.createdAt).toLocaleDateString()
-                  : ""}
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:items-end gap-2">
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${orderDetails?.isPaid
-                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                  : "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
-                  }`}
-              >
-                {orderDetails?.isPaid ? "Paid" : "Unpaid"}
-              </span>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${orderDetails?.status === "Delivered"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : ["Shipped", "In Transit", "Out For Delivery", "Picked Up", "Pickup Scheduled"].includes(orderDetails?.status)
-                    ? "bg-amber-50 text-amber-700"
-                    : ["Cancelled", "RTO Initiated", "RTO Delivered"].includes(orderDetails?.status)
-                      ? "bg-rose-50 text-rose-700"
-                    : "bg-gray-100 text-gray-700"
-                  }`}
-              >
-                {orderDetails?.status || "Pending"}
-              </span>
+        {/* ── Order reference banner ── */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 bg-linear-to-r from-sky-50 to-blue-50">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold text-sky-600 uppercase tracking-widest mb-1">Order Reference</p>
+                <p className="text-sm font-mono font-bold text-gray-800">{orderDetails.orderId || `#${orderDetails._id}`}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {orderDetails.createdAt
+                    ? new Date(orderDetails.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
+                    : "—"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Payment badge */}
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  orderDetails.isPaid
+                    ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                    : "bg-rose-100 text-rose-700 border-rose-200"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${orderDetails.isPaid ? "bg-emerald-500" : "bg-rose-500"}`} />
+                  {orderDetails.isPaid ? "Paid" : "Unpaid"}
+                </span>
+                {/* Delivery status badge */}
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${pill}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                  {orderDetails.status || "Processing"}
+                </span>
+              </div>
             </div>
           </div>
 
-          {orderDetails?.shiprocket?.trackingStatus && (
-            <div className="mb-5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
-              Shiprocket Status: {orderDetails.shiprocket.trackingStatus}
+          {/* Shiprocket tracking */}
+          {orderDetails.shiprocket?.trackingStatus && (
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 text-xs text-sky-700 bg-sky-50">
+              🚚 <span className="font-semibold">Tracking:</span> {orderDetails.shiprocket.trackingStatus}
+              {orderDetails.shiprocket.awbCode && (
+                <span className="ml-auto font-mono text-gray-500">AWB: {orderDetails.shiprocket.awbCode}</span>
+              )}
             </div>
           )}
 
-          {/* Customer Info */}
-          {orderDetails?.user && (
-            <div className="mb-8">
-              <h4 className="mb-2 text-lg font-semibold text-sky-700">
-                Customer Info
-              </h4>
-              <div className="grid sm:grid-cols-3 gap-3 text-sm text-gray-700">
-                <p>
-                  <span className="font-medium text-gray-900">Name:</span>{" "}
-                  {orderDetails?.user?.name}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-900">Email:</span>{" "}
-                  {orderDetails?.user?.email}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-900">Phone:</span>{" "}
-                  {orderDetails?.shippingAddress?.phone
-                    ? `+91 ${orderDetails.shippingAddress.phone}`
-                    : "N/A"}
-                </p>
+          {/* Customer info */}
+          {orderDetails.user && (
+            <div className="px-5 py-4 border-b border-gray-100">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Customer</p>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold shrink-0">
+                  {(orderDetails.user.name || "?")[0].toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{orderDetails.user.name}</p>
+                  <p className="text-xs text-gray-400">{orderDetails.user.email}</p>
+                  {orderDetails.shippingAddress?.phone && (
+                    <p className="text-xs text-gray-400">📞 +91 {orderDetails.shippingAddress.phone}</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
+        </div>
 
-          {/* Products */}
-          <div className="overflow-x-auto">
-            <h4 className="mb-4 text-lg font-semibold text-sky-700">
-              Ordered Products
-            </h4>
-            <table className="min-w-full border border-gray-200 rounded-lg">
-              <thead className="bg-sky-50 text-sky-700">
-                <tr>
-                  <th className="py-2 px-3 text-left">Name</th>
-                  <th className="py-2 px-3">Qty</th>
-                  <th className="py-2 px-3">Price</th>
-                  <th className="py-2 px-3">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(orderDetails?.orderItems || []).map((item, i) => (
-                  <tr key={i} className="border-t hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div className="flex items-start gap-4">
-                        <img
-                          src={item?.image}
-                          alt={item?.name || "Product"}
-                          className="h-12 w-12 rounded-lg object-cover ring-1 ring-gray-200"
-                        />
-                        <div className="text-sm">
-                          <Link
-                            to={`/product/${item?.productId?._id || item?.productId}/p/${item?.sku}`}
-                            className="font-medium text-blue-600 hover:underline"
-                          >
-                            {item?.name || "-"}
-                          </Link>
-                          <p className="text-gray-500">Color: {item?.color || "N/A"}</p>
-                          <p className="text-gray-500">Size: {item?.size || "N/A"}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-2 px-3 text-center">{item?.quantity}</td>
-                    <td className="py-2 px-3 text-center">₹{item?.price}</td>
-                    <td className="py-2 px-3 text-center">
-                      ₹{item?.price * item?.quantity}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* ── Order items ── */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50">
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">
+              Items ({(orderDetails.orderItems || []).length})
+            </p>
           </div>
-
-          {/* Footer */}
-          <div className="mt-6 flex justify-between items-center">
-            <Link to="/my-orders" className="text-sky-600 hover:underline">
-              ← Back to My Orders
-            </Link>
+          <div className="divide-y divide-gray-50">
+            {(orderDetails.orderItems || []).map((item, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4">
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0">
+                  <img src={item?.image} alt={item?.name || "Product"}
+                    className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Link
+                    to={`/product/${item?.productId?._id || item?.productId}/p/${item?.sku}`}
+                    className="text-sm font-semibold text-gray-800 hover:text-sky-600 transition line-clamp-1"
+                  >
+                    {item?.name || "—"}
+                  </Link>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {item?.color && <span>{item.color}</span>}
+                    {item?.color && item?.size && <span> · </span>}
+                    {item?.size && <span>Size {item.size}</span>}
+                    {item?.sku && <span className="ml-2 font-mono">SKU: {item.sku}</span>}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-gray-800">
+                    ₹{((item?.price || 0) * (item?.quantity || 0)).toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-xs text-gray-400">Qty: {item?.quantity}</p>
+                  <p className="text-xs text-gray-400">₹{item?.price} each</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Total row */}
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50">
+            <div className="text-xs text-gray-500">
+              {computedQuantity} item{computedQuantity !== 1 ? "s" : ""}
+            </div>
             <div className="text-right">
-              <p className="text-sm text-gray-500">Total Quantity</p>
-              <p className="text-sm text-gray-500">{computedQuantity} items</p>
-
-              <p className="text-sm text-gray-500 mt-2">Final Amount</p>
-              <p className="text-xl font-semibold text-gray-900">
-                ₹{computedSubtotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              <p className="text-[11px] text-gray-400 uppercase tracking-widest">Order Total</p>
+              <p className="text-lg font-extrabold text-sky-700">
+                ₹{(orderDetails.totalPrice || computedSubtotal).toLocaleString("en-IN")}
               </p>
             </div>
           </div>
         </div>
-      )}
+
+        {/* ── Shipping + Payment ── */}
+        <div className="grid sm:grid-cols-2 gap-4">
+          {/* Shipping */}
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 space-y-3">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Shipping Address</p>
+            <div className="text-sm text-gray-700 leading-relaxed">
+              {orderDetails.shippingAddress ? (
+                <>
+                  {[orderDetails.shippingAddress.firstName, orderDetails.shippingAddress.lastName].filter(Boolean).join(" ") && (
+                    <p className="font-semibold text-gray-800">
+                      {[orderDetails.shippingAddress.firstName, orderDetails.shippingAddress.lastName].filter(Boolean).join(" ")}
+                    </p>
+                  )}
+                  <p className="text-gray-500">{orderDetails.shippingAddress.address}</p>
+                  {orderDetails.shippingAddress.landmark && (
+                    <p className="text-gray-500">{orderDetails.shippingAddress.landmark}</p>
+                  )}
+                  <p className="text-gray-500">
+                    {[orderDetails.shippingAddress.city, orderDetails.shippingAddress.state, orderDetails.shippingAddress.postalCode]
+                      .filter(Boolean).join(", ")}
+                  </p>
+                  <p className="text-gray-500">{orderDetails.shippingAddress.country}</p>
+                </>
+              ) : (
+                <p className="text-gray-400">Address not available</p>
+              )}
+            </div>
+          </div>
+
+          {/* Payment */}
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 space-y-3">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Payment</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Method</span>
+                <span className="font-semibold text-gray-800 capitalize">
+                  {(orderDetails.paymentMethod || "—").replace("_", " ")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Status</span>
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  orderDetails.isPaid
+                    ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                    : "bg-rose-100 text-rose-700 border-rose-200"
+                }`}>
+                  {orderDetails.isPaid ? "Paid" : "Pending"}
+                </span>
+              </div>
+              {orderDetails.paymentResult?.id && (
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-gray-500 shrink-0">Txn ID</span>
+                  <span className="font-mono text-xs text-gray-600 text-right break-all">
+                    {orderDetails.paymentResult.id}
+                  </span>
+                </div>
+              )}
+              {orderDetails.paidAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Paid on</span>
+                  <span className="text-xs text-gray-700">
+                    {new Date(orderDetails.paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Bottom actions ── */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link to="/profile"
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-sky-400 hover:text-sky-700 hover:bg-sky-50 transition">
+            ← Back to My Orders
+          </Link>
+          <button onClick={generatePDF}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition">
+            📄 Download Invoice
+          </button>
+          <Link to="/collections/all"
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-linear-to-r from-sky-600 to-blue-700 text-white text-sm font-bold hover:opacity-90 transition shadow-sm">
+            🛍️ Continue Shopping
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };

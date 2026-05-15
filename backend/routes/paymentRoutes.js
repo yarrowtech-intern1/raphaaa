@@ -589,15 +589,8 @@ router.post("/create-order", protect, async (req, res) => {
       await payment.save({ session });
       console.log("Payment Document Created:", payment._id);
 
-      // Clear cart to prevent reuse
-      const cart = await Cart.findOneAndUpdate(
-        { user: req.user._id },
-        { $set: { products: [], totalPrice: 0 } },
-        { session }
-      );
-      if (cart) {
-        console.log("Cart cleared for user:", req.user._id);
-      }
+      // Do NOT clear cart here.
+      // Cart should only be cleared after successful payment verification.
 
       res.status(201).json({
         success: true,

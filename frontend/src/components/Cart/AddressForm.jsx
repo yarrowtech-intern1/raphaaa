@@ -1,457 +1,381 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { FaHome, FaBriefcase, FaMapMarkerAlt } from "react-icons/fa";
 import { FaLocationCrosshairs } from "react-icons/fa6";
+import { HiCheckCircle, HiTrash } from "react-icons/hi2";
 import axios from "axios";
-import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
-import { FaUserCircle, FaTrash } from "react-icons/fa";
+import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 
+/* ── Indian states for Shiprocket ── */
+const INDIA_STATES = [
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh",
+  "Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka",
+  "Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram",
+  "Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu",
+  "Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
+  "Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry",
+];
 
+const EMPTY_ADDRESS = {
+  firstName: "", lastName: "", phone: "",
+  address: "", landmark: "",
+  city: "", state: "", postalCode: "",
+  country: "India", addressType: "Home",
+};
+
+const inputCls = "w-full px-3.5 py-2.5 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 transition placeholder-gray-400";
+const labelCls = "block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5";
 
 const AddressForm = () => {
-    const { user } = useSelector((state) => state.auth);
-    const navigate = useNavigate();
-    const [addresses, setAddresses] = useState([]);
-    const [newAddress, setNewAddress] = useState({
-        address: "",
-        city: "",
-        postalCode: "",
-        country: "",
-        phone: "",
-    });
-    const [countryList, setCountryList] = useState([]);
-    const [locating, setLocating] = useState(false);
+  const { user } = useSelector((s) => s.auth);
+  const navigate  = useNavigate();
 
-    useEffect(() => {
-        const fetchCountries = async () => {
-            try {
-                const response = await fetch("https://restcountries.com/v3.1/all?fields=name");
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  const [addresses, setAddresses]   = useState([]);
+  const [form,      setForm]        = useState(EMPTY_ADDRESS);
+  const [locating,  setLocating]    = useState(false);
+  const [saving,    setSaving]      = useState(false);
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
 
-                const data = await response.json();
+  useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
 
-                if (!Array.isArray(data)) throw new Error("Invalid data structure");
+  /* ── fetch saved addresses ── */
+  useEffect(() => {
+    if (!user) return;
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
+      { headers: { userid: user._id } })
+      .then(({ data }) => setAddresses(data))
+      .catch(console.error);
+  }, [user]);
 
-                const countries = data
-                    .map((country) => country?.name?.common)
-                    .filter(Boolean)
-                    .sort((a, b) => a.localeCompare(b));
+  const upd = (field, val) => setForm((p) => ({ ...p, [field]: val }));
 
-                setCountryList(countries);
-            } catch (error) {
-                console.error("Failed to load countries:", error.message);
-                toast.error("Could not load country list.");
-                setCountryList(["India", "United States", "Canada", "Australia"]); // fallback
-            }
-        };
+  /* ── Auto-fill city/state from pincode (India only) ── */
+  const handlePincodeChange = async (e) => {
+    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+    upd("postalCode", val);
+    if (val.length === 6 && form.country === "India") {
+      setPincodeLoading(true);
+      try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${val}`);
+        const [result] = await res.json();
+        if (result.Status === "Success" && result.PostOffice?.length > 0) {
+          const po = result.PostOffice[0];
+          setForm((p) => ({
+            ...p, postalCode: val,
+            city: po.District || p.city,
+            state: po.State   || p.state,
+          }));
+          toast.success("City & State auto-filled from pincode!");
+        }
+      } catch { /* silent */ }
+      finally { setPincodeLoading(false); }
+    }
+  };
 
-        fetchCountries();
-    }, []);
-
-    //   useEffect(() => {
-    //     const fetchCoupon = async () => {
-    //       try {
-    //         const token = user?.token || localStorage.getItem("userToken");
-    //         const { data } = await axios.get(
-    //           `${import.meta.env.VITE_BACKEND_URL}/api/users/my-coupon`,
-    //           {
-    //             headers: {
-    //               Authorization: `Bearer ${token}`,
-    //             },
-    //           }
-    //         );
-    //         setCoupon(data);
-    //         setCouponError("");
-    //       } catch (err) {
-    //         setCoupon(null);
-    //         setCouponError(
-    //           err.response?.data?.message || "Could not fetch coupon details"
-    //         );
-    //       }
-    //     };
-
-    //     if (activeTab === "coupon" && user?.role === "customer") {
-    //       fetchCoupon();
-    //     }
-    //   }, [activeTab, user]);
-
-    useEffect(() => {
-        if (!user) navigate("/login");
-    }, [user, navigate]);
-
-    //   useEffect(() => {
-    //     const fetchWishlist = async () => {
-    //       try {
-    //         const token = localStorage.getItem("userToken");
-    //         const { data } = await axios.get(
-    //           `${import.meta.env.VITE_BACKEND_URL}/api/wishlist`,
-    //           {
-    //             headers: {
-    //               Authorization: `Bearer ${token}`,
-    //             },
-    //           }
-    //         );
-    //         setWishlistItems(data);
-    //       } catch (err) {
-    //         console.error("Failed to fetch wishlist:", err);
-    //       }
-    //     };
-
-    //     if (activeTab === "wishlist") fetchWishlist();
-    //   }, [activeTab]);
-
-    const handleRemoveFromWishlist = async (productId) => {
+  /* ── GPS auto-fill ── */
+  const handleGPS = () => {
+    if (!navigator.geolocation) return toast.error("Geolocation not supported");
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords: { latitude, longitude } }) => {
         try {
-            const token = localStorage.getItem("userToken");
-            await axios.delete(
-                `${import.meta.env.VITE_BACKEND_URL}/api/wishlist/remove/${productId}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-            setWishlistItems((prev) => prev.filter((item) => item._id !== productId));
-        } catch (err) {
-            console.error("Failed to remove from wishlist:", err);
-        }
-    };
+          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+          const data = await res.json();
+          const a    = data.address || {};
+          setForm((p) => ({
+            ...p,
+            address:    a.road || a.neighbourhood || a.suburb || a.display_name || p.address,
+            city:       a.city || a.town || a.village || p.city,
+            state:      a.state || p.state,
+            postalCode: a.postcode || p.postalCode,
+            country:    a.country || p.country,
+          }));
+          toast.success("Address auto-filled from your location!");
+        } catch { toast.error("Could not fetch address from location."); }
+        finally { setLocating(false); }
+      },
+      (err) => {
+        toast.error(err.code === 1 ? "Location permission denied." : "Could not get location.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
-    const handleLogout = () => {
-        dispatch(logout());
-        dispatch(clearCart());
-        navigate("/login");
-    };
-
-    const handleIconClick = () => alert("Open profile settings or image upload!");
-
-    //   useEffect(() => {
-    //     const handleOnline = () => {
-    //       if (!isOnline) {
-    //         setIsOnline(true);
-    //         toast.success("You're back online");
-    //       }
-    //     };
-    //     const handleOffline = () => {
-    //       if (isOnline) {
-    //         setIsOnline(false);
-    //         toast.error("You're offline");
-    //       }
-    //     };
-    //     window.addEventListener("online", handleOnline);
-    //     window.addEventListener("offline", handleOffline);
-    //     return () => {
-    //       window.removeEventListener("online", handleOnline);
-    //       window.removeEventListener("offline", handleOffline);
-    //     };
-    //   }, [isOnline]);
-
-    useEffect(() => {
-        const fetchAddresses = async () => {
-            try {
-                const { data } = await axios.get(
-                    `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
-                    { headers: { userid: user?._id } }
-                );
-                setAddresses(data);
-            } catch (err) {
-                console.error("Failed to load addresses", err);
-            }
-        };
-        if (user) fetchAddresses();
-    }, [user]);
-
-    const handleAddressSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const { data } = await axios.post(
-                `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
-                newAddress,
-                { headers: { userid: user._id } }
-            );
-            //   if(addresses === ""){
-            //     toast.warning("Number is required");
-            //   }
-            //   setAddresses(data.addresses);
-            setAddresses(data.addresses);
-            window.dispatchEvent(
-                new CustomEvent("address:list-updated", { detail: data.addresses || data })
-            );
-            toast.success("Address saved!");
-            setNewAddress({
-                address: "",
-                city: "",
-                postalCode: "",
-                country: "",
-                phone: "",
-            });
-        } catch (err) {
-            toast.error("Failed to save address");
-        }
-    };
-
-    const handleDeleteAddress = async (index) => {
-        try {
-            const { data } = await axios.delete(
-                `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${index}`,
-                { headers: { userid: user._id } }
-            );
-            //   setAddresses(data.addresses);
-            setAddresses(data.addresses);
-            window.dispatchEvent(
-                new CustomEvent("address:list-updated", { detail: data.addresses || data })
-            );
-            toast.success("Address deleted");
-        } catch (err) {
-            toast.error("Failed to delete address");
-        }
-    };
-
-    const handleUseCurrentLocation = async () => {
-        if (!navigator.geolocation) {
-            return alert("Geolocation is not supported by your browser.");
-        }
-
-        setLocating(true); // ⬅️ start spinner
-
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                const { latitude, longitude } = position.coords;
-                try {
-                    const response = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-                    );
-                    const data = await response.json();
-                    const { address } = data;
-
-                    if (!address) {
-                        toast.error("Unable to extract address.");
-                        return;
-                    }
-
-                    setNewAddress((prev) => ({
-                        ...prev,
-                        address:
-                            address.road ||
-                            address.neighbourhood ||
-                            address.suburb ||
-                            address.display_name ||
-                            "",
-                        city: address.city || address.town || address.village || "",
-                        postalCode: address.postcode || "",
-                        country: address.country || "",
-                    }));
-
-                    toast.success("Address auto-filled from current location!");
-                } catch (err) {
-                    console.error("Geolocation fetch error:", err);
-                    toast.error("Failed to fetch address from coordinates.");
-                } finally {
-                    setLocating(false); // ⬅️ stop spinner
-                }
-            },
-            (err) => {
-                console.error("Geolocation error:", err);
-                switch (err.code) {
-                    case 1:
-                        toast.error("Permission denied. Please allow location access.");
-                        break;
-                    case 2:
-                        toast.error("Location unavailable.");
-                        break;
-                    case 3:
-                        toast.error("Request timed out.");
-                        break;
-                    default:
-                        toast.error("Unknown geolocation error.");
-                }
-                setLocating(false); // ⬅️ stop spinner on error too
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
-            }
+  /* ── Submit ── */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (form.phone.length < 10) return toast.error("Enter a valid 10-digit phone number.");
+    setSaving(true);
+    try {
+      let data;
+      if (editingIndex !== null) {
+        const putRes = await axios.put(
+          `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/addresses/${editingIndex}`,
+          form,
+          { headers: { userid: user._id } }
         );
-    };
+        data = putRes.data;
+      } else {
+        const postRes = await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
+          form,
+          { headers: { userid: user._id } }
+        );
+        data = postRes.data;
+      }
+      setAddresses(data.addresses);
+      window.dispatchEvent(new CustomEvent("address:list-updated", { detail: data.addresses || data }));
+      toast.success(editingIndex !== null ? "Address updated!" : "Address saved!");
+      setForm(EMPTY_ADDRESS);
+      setEditingIndex(null);
+    } catch { toast.error("Failed to save address."); }
+    finally { setSaving(false); }
+  };
 
-    return (
+  /* ── Delete ── */
+  const handleDelete = async (index) => {
+    if (!window.confirm("Delete this address?")) return;
+    try {
+      const { data } = await axios.delete(
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${index}`,
+        { headers: { userid: user._id } }
+      );
+      setAddresses(data.addresses);
+      window.dispatchEvent(new CustomEvent("address:list-updated", { detail: data.addresses || data }));
+      toast.success("Address removed.");
+    } catch { toast.error("Failed to delete."); }
+  };
+
+  const handleEdit = (index) => {
+    const addr = addresses[index];
+    if (!addr) return;
+    setForm({
+      firstName: addr.firstName || "",
+      lastName: addr.lastName || "",
+      phone: String(addr.phone || ""),
+      address: addr.address || "",
+      landmark: addr.landmark || "",
+      city: addr.city || "",
+      state: addr.state || "",
+      postalCode: addr.postalCode || "",
+      country: addr.country || "India",
+      addressType: addr.addressType || "Home",
+    });
+    setEditingIndex(index);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const typeIcon = { Home: <FaHome />, Work: <FaBriefcase />, Other: <FaMapMarkerAlt /> };
+
+  return (
+    <div className="space-y-6">
+      {/* ── Form ── */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Address type toggle */}
         <div>
-            <h3 className="text-xl font-semibold mb-4">
-                Add New Address
-            </h3>
-            <form
-                onSubmit={handleAddressSubmit}
-                className="space-y-6 "
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                        type="text"
-                        name="address"
-                        value={newAddress.address}
-                        onChange={(e) =>
-                            setNewAddress({
-                                ...newAddress,
-                                address: e.target.value,
-                            })
-                        }
-                        placeholder="Street Address"
-                        className="bg-white w-full p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        required
-                    />
-                    <input
-                        type="text"
-                        name="city"
-                        value={newAddress.city}
-                        onChange={(e) =>
-                            setNewAddress({ ...newAddress, city: e.target.value })
-                        }
-                        placeholder="City"
-                        className="bg-white w-full p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        required
-                    />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                        type="number"
-                        name="postalCode"
-                        value={newAddress.postalCode}
-                        onChange={(e) =>
-                            setNewAddress({
-                                ...newAddress,
-                                postalCode: e.target.value,
-                            })
-                        }
-                        placeholder="Postal Code"
-                        className="bg-white w-full p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        required
-                    />
-                    <select
-                        name="country"
-                        value={newAddress.country}
-                        onChange={(e) =>
-                            setNewAddress({
-                                ...newAddress,
-                                country: e.target.value,
-                            })
-                        }
-                        className="bg-white w-full p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        required
-                    >
-                        <option value="" disabled>Select Country</option>
-                        {countryList.map((country) => (
-                            <option key={country} value={country}>
-                                {country}
-                            </option>
-                        ))}
-                    </select>
-
-                </div>
-                <div className="flex justify-between items-center">
-                    <input
-                        type="number"
-                        name="phone"
-                        value={newAddress.phone}
-                        onChange={(e) => {
-                            const value = e.target.value.slice(0, 10); // ✅ restrict max 10 digits
-                            setNewAddress({ ...newAddress, phone: value });
-                        }}
-                        placeholder="Phone (10 digits)"
-                        className="bg-white w-full p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 appearance-none [-moz-appearance:textfield]"
-                        required
-                    />
-                    {/* ✅ Validation message */}
-                    {/* {newAddress.phone && newAddress.phone.length < 10 && (
-                        <p className="text-red-500 text-xs mt-1">Phone number must be 10 digits.</p>
-                    )} */}
-                    <button
-                        type="button"
-                        onClick={handleUseCurrentLocation}
-                        disabled={locating}
-                        className="ml-2 whitespace-nowrap text-sm bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 disabled:cursor-not-allowed text-white font-medium px-4 py-3 transition flex justify-around items-center gap-2"
-                    >
-                        {/* Spinner while locating */}
-                        {locating ? (
-                            <>
-                                <span className="inline-block h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                                <span>Loading...</span>
-                            </>
-                        ) : (
-                            <>
-                                <FaLocationCrosshairs className="inline" size={25} />
-                                Use my current Location
-                            </>
-                        )}
-                    </button>
-                </div>
-                {newAddress.phone && newAddress.phone.length < 10 && (
-                        <p className="text-red-500 text-xs mt-1">Phone number must be 10 digits.</p>
-                    )}
-
-                <button
-                    type="submit"
-                    className="w-full py-3 text-white font-semibold bg-blue-600 hover:bg-blue-700 transition"
-                >
-                    Save Address
-                </button>
-            </form>
-
-            {/* <h3 className="text-xl font-semibold mt-6 mb-4">
-                Saved Addresses
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {addresses.map((addr, idx) => (
-                    <div
-                        key={idx}
-                        className="relative bg-gradient-to-br from-white to-blue-50 border border-blue-100 p-6 shadow-sm hover:shadow-xl transition-all duration-300"
-                    >
-                        <button
-                            onClick={() => handleDeleteAddress(idx)}
-                            className="absolute top-3 right-3 text-red-500 hover:text-red-600 hover:scale-110 transition-transform"
-                            title="Delete address"
-                        >
-                            <FaTrash size={16} />
-                        </button>
-
-                        <div className="space-y-2 text-sm text-gray-800">
-                            <p>
-                                <span className="font-semibold text-gray-900">
-                                    Address:
-                                </span>{" "}
-                                {addr.address}
-                            </p>
-                            <p>
-                                <span className="font-semibold text-gray-900">
-                                    City:
-                                </span>{" "}
-                                {addr.city}
-                            </p>
-                            <p>
-                                <span className="font-semibold text-gray-900">
-                                    Postal Code:
-                                </span>{" "}
-                                {addr.postalCode}
-                            </p>
-                            <p>
-                                <span className="font-semibold text-gray-900">
-                                    Country:
-                                </span>{" "}
-                                {addr.country}
-                            </p>
-                            {addr.phone && (
-                                <p>
-                                    <span className="font-semibold text-gray-900">
-                                        Phone:
-                                    </span>{" "}
-                                    +91 {addr.phone}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div> */}
+          <label className={labelCls}>Address Type</label>
+          <div className="flex gap-2">
+            {["Home", "Work", "Other"].map((t) => (
+              <button key={t} type="button"
+                onClick={() => upd("addressType", t)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all
+                  ${form.addressType === t
+                    ? "border-sky-500 bg-sky-50 text-sky-700"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+              >
+                {typeIcon[t]} {t}
+              </button>
+            ))}
+          </div>
         </div>
-    )
-}
 
-export default AddressForm
+        {/* Name row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>First Name *</label>
+            <input type="text" value={form.firstName} required
+              onChange={(e) => upd("firstName", e.target.value)}
+              placeholder="Raktim" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Last Name</label>
+            <input type="text" value={form.lastName}
+              onChange={(e) => upd("lastName", e.target.value)}
+              placeholder="Maity" className={inputCls} />
+          </div>
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className={labelCls}>Mobile Number *</label>
+          <div className="flex">
+            <span className="flex items-center px-3 border border-r-0 border-gray-200 bg-gray-100 rounded-l-xl text-sm font-medium text-gray-600 shrink-0">
+              🇮🇳 +91
+            </span>
+            <input type="tel" value={form.phone} required maxLength={10}
+              onChange={(e) => upd("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+              placeholder="10-digit mobile number"
+              className={`${inputCls} rounded-l-none border-l-0 focus:border-l-2`} />
+          </div>
+          {form.phone && form.phone.length < 10 && (
+            <p className="text-xs text-red-500 mt-1">Enter a valid 10-digit number</p>
+          )}
+        </div>
+
+        {/* Street address + landmark */}
+        <div>
+          <label className={labelCls}>Street Address *</label>
+          <input type="text" value={form.address} required
+            onChange={(e) => upd("address", e.target.value)}
+            placeholder="House / Flat no., Street, Area"
+            className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Landmark <span className="text-gray-400 font-normal normal-case tracking-normal">(optional)</span></label>
+          <input type="text" value={form.landmark}
+            onChange={(e) => upd("landmark", e.target.value)}
+            placeholder="Near park, opposite school…"
+            className={inputCls} />
+        </div>
+
+        {/* Pincode + City */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>PIN Code *</label>
+            <div className="relative">
+              <input type="text" value={form.postalCode} required maxLength={6}
+                onChange={handlePincodeChange}
+                placeholder="6-digit PIN"
+                className={inputCls} />
+              {pincodeLoading && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+              )}
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>City *</label>
+            <input type="text" value={form.city} required
+              onChange={(e) => upd("city", e.target.value)}
+              placeholder="Auto-filled from PIN"
+              className={inputCls} />
+          </div>
+        </div>
+
+        {/* State + Country */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>State * <span className="text-sky-500 font-medium normal-case tracking-normal text-[10px]">(required for delivery)</span></label>
+            {form.country === "India" ? (
+              <select value={form.state} required
+                onChange={(e) => upd("state", e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Select State</option>
+                {INDIA_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            ) : (
+              <input type="text" value={form.state} required
+                onChange={(e) => upd("state", e.target.value)}
+                placeholder="State / Province" className={inputCls} />
+            )}
+          </div>
+          <div>
+            <label className={labelCls}>Country *</label>
+            <select value={form.country} required
+              onChange={(e) => { upd("country", e.target.value); upd("state", ""); }}
+              className={inputCls}
+            >
+              {["India","United States","United Kingdom","Canada","Australia",
+                "Germany","France","Japan","Singapore","UAE"].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* GPS button */}
+        <button type="button" onClick={handleGPS} disabled={locating}
+          className="w-full flex items-center justify-center gap-2 py-2.5 border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 text-sm font-semibold rounded-xl transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {locating ? (
+            <><span className="w-4 h-4 border-2 border-sky-400/40 border-t-sky-600 rounded-full animate-spin" /> Detecting location…</>
+          ) : (
+            <><FaLocationCrosshairs className="text-base" /> Use My Current Location</>
+          )}
+        </button>
+
+        {/* Save button */}
+        <button type="submit" disabled={saving}
+          className={`w-full py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2
+            ${saving
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-linear-to-r from-sky-600 to-blue-700 text-white hover:opacity-90 shadow-sm shadow-sky-200"
+            }`}
+        >
+          {saving
+            ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Saving…</>
+            : <><HiCheckCircle className="text-lg" /> {editingIndex !== null ? "Update Address" : "Save Address"}</>
+          }
+        </button>
+      </form>
+
+      {/* ── Saved addresses ── */}
+      {addresses.length > 0 && (
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Saved Addresses</p>
+          <div className="space-y-3">
+            {addresses.map((addr, idx) => (
+              <div key={idx}
+                className="flex items-start gap-3 bg-gray-50 border border-gray-100 rounded-xl p-4 group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center text-sm shrink-0 mt-0.5">
+                  {typeIcon[addr.addressType] || <FaHome />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {[addr.firstName, addr.lastName].filter(Boolean).join(" ") || "—"}
+                    </p>
+                    {addr.addressType && (
+                      <span className="text-[10px] font-bold bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full">{addr.addressType}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    {addr.address}{addr.landmark ? `, ${addr.landmark}` : ""}<br />
+                    {addr.city}{addr.state ? `, ${addr.state}` : ""} — {addr.postalCode}<br />
+                    {addr.country}
+                  </p>
+                  {addr.phone && <p className="text-xs text-gray-500 mt-0.5">📞 +91 {addr.phone}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(idx)}
+                    className="px-2 py-1 text-xs font-semibold rounded-lg bg-white border border-gray-200 text-sky-600 hover:bg-sky-50 hover:border-sky-200 transition"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(idx)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition"
+                  >
+                    <HiTrash className="text-sm" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AddressForm;

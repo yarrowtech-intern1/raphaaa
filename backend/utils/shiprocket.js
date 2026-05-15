@@ -69,12 +69,20 @@ const parseCustomerName = (fullName) => {
 
 const buildShiprocketOrderPayload = (order) => {
   const shipAddress = order.shippingAddress || {};
-  const { first, last } = parseCustomerName(shipAddress.address);
   const pickupLocation = process.env.SHIPROCKET_PICKUP_LOCATION || "Home";
   const fallbackState = process.env.SHIPROCKET_DEFAULT_STATE || "West Bengal";
   const fallbackCountry = shipAddress.country || "India";
   const phone = String(shipAddress.phone || "").replace(/[^\d]/g, "").slice(-10);
   const email = order?.user?.email || "customer@example.com";
+
+  // Prefer explicit firstName/lastName; fall back to parsing the customer name from order user
+  const { first: fallbackFirst, last: fallbackLast } = parseCustomerName(order?.user?.name || "");
+  const billingFirst = String(shipAddress.firstName || "").trim() || fallbackFirst;
+  const billingLast  = String(shipAddress.lastName  || "").trim() || fallbackLast;
+
+  // Full delivery address (include landmark if present)
+  const fullAddress = [shipAddress.address, shipAddress.landmark]
+    .filter(Boolean).join(", ") || "Address not provided";
 
   return {
     order_id: order.orderId || String(order._id),
@@ -82,9 +90,9 @@ const buildShiprocketOrderPayload = (order) => {
     pickup_location: pickupLocation,
     channel_id: "",
     comment: "Created from Raphaaa OMS",
-    billing_customer_name: first,
-    billing_last_name: last,
-    billing_address: shipAddress.address || "Address not provided",
+    billing_customer_name: billingFirst,
+    billing_last_name: billingLast,
+    billing_address: fullAddress,
     billing_city: shipAddress.city || "Unknown",
     billing_pincode: String(shipAddress.postalCode || "000000"),
     billing_state: shipAddress.state || fallbackState,

@@ -188,7 +188,8 @@ export default function Profile() {
           </aside>
 
           {/* ════════ MAIN CONTENT ════════ */}
-          <main className="flex-1 min-w-0 ">
+          <main className="flex-1 min-w-0">
+            <div className=" overflow-hidden">
 
             {/* ─── MY ORDERS ─── */}
             {activeTab === "orders" && (
@@ -382,7 +383,7 @@ export default function Profile() {
                   </div>
 
                   {/* Saved addresses card */}
-                  <div className="rounded-2xl border border-gray-100 overflow-hidden">
+                  {/* <div className="rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 border-b border-gray-100">
                       <div className="w-7 h-7 rounded-lg bg-gray-200 flex items-center justify-center shrink-0">
                         <FaMapMarkerAlt className="text-gray-500 text-xs" />
@@ -392,7 +393,7 @@ export default function Profile() {
                     <div className="p-4 md:p-5 bg-white">
                       <ViewAddress />
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             )}
@@ -710,6 +711,7 @@ export default function Profile() {
                 </div>
               </div>
             )}
+            </div>{/* end white card wrapper */}
           </main>
         </div>
       </div>

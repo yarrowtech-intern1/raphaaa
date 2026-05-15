@@ -1,199 +1,213 @@
 import React from "react";
-import { RiDeleteBin3Line } from "react-icons/ri";
 import { useDispatch } from "react-redux";
-import {
-  removeFromCart,
-  updateCartItemQuantity,
-} from "../../redux/slices/cartSlice";
-import { FaTrash } from "react-icons/fa";
+import { removeFromCart, updateCartItemQuantity } from "../../redux/slices/cartSlice";
+import { HiTrash } from "react-icons/hi2";
 
 const CartContents = ({ cart, userId, guestId }) => {
   const dispatch = useDispatch();
-  const totalCartQuantity = cart.products.reduce(
-    (acc, item) => acc + item.quantity,
+
+  const totalQty = cart.products.reduce((acc, p) => acc + p.quantity, 0);
+
+  const totalAmount = cart.products.reduce(
+    (acc, p) => acc + ((p.discountPrice ?? p.price) * p.quantity),
     0
   );
 
-  // Handle adding or subtracting to cart
-  const handleAddToCart = (productId, delta, quantity, size, color) => {
-    const newQuantity = quantity + delta;
-    if (newQuantity >= 1) {
-      dispatch(
-        updateCartItemQuantity({
-          productId,
-          quantity: newQuantity,
-          guestId,
-          userId,
-          size,
-          color,
-        })
-      );
+  const originalAmount = cart.products.reduce(
+    (acc, p) => acc + (p.price * p.quantity),
+    0
+  );
+
+  const totalSavings = originalAmount - totalAmount;
+
+  const handleQty = (productId, delta, quantity, size, color) => {
+    const next = quantity + delta;
+    if (next >= 1) {
+      dispatch(updateCartItemQuantity({ productId, quantity: next, guestId, userId, size, color }));
     }
   };
 
-  const handleRemoveFromCart = (productId, size, color) => {
+  const handleRemove = (productId, size, color) => {
     dispatch(removeFromCart({ productId, guestId, userId, size, color }));
   };
 
-  // const totalAmount = cart.products.reduce(
-  //   (acc, item) => acc + item.price * item.quantity,
-  //   0
-  // );
-
-  const totalAmount = cart.products.reduce(
-    (acc, item) =>
-      acc + ((item.discountPrice ?? item.price) * item.quantity),
-    0
-  );
-
-
   return (
-    <div className="p-4 space-y-4">
-      {cart.products.map((product, index) => (
-        <div
-          key={index}
-          className="bg-white rounded-2xl shadow-md p-4 flex flex-col sm:flex-row sm:items-start justify-between transition-all hover:shadow-lg"
-        >
-          <div className="flex flex-col sm:flex-row gap-4">
-            <img
-              src={product.image}
-              alt={product.name}
-              className="w-28 h-32 object-cover rounded-xl"
-            />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">
-                {product.name}
-              </h3>
-              <p className="text-sm text-gray-500">
-                Size: {product.size} | Color: {product.color}
-              </p>
-              {/* <p className="text-sm text-gray-600 mt-1">
-                Quantity: {product.quantity}
-              </p>
-              <p className="text-sm text-gray-700 font-semibold mt-1">
-                Price: ₹{(product.price * product.quantity).toLocaleString("en-IN")}
-              </p> */}
+    <div className="space-y-3">
 
-              <div className="flex items-center mt-3 space-x-3">
-                <button
-                  onClick={() =>
-                    handleAddToCart(
-                      product.productId,
-                      -1,
-                      product.quantity,
-                      product.size,
-                      product.color
-                    )
-                  }
-                  className="bg-gray-200 text-gray-800 font-bold rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-300 transition"
-                >
-                  -
-                </button>
-                <span className="text-lg font-medium">{product.quantity}</span>
-                <button
-                  onClick={() => {
-                    if (totalCartQuantity < 10) {
-                      handleAddToCart(
-                        product.productId,
-                        1,
-                        product.quantity,
-                        product.size,
-                        product.color
-                      );
-                    }
-                  }}
-                  disabled={totalCartQuantity >= 10}
-                  className={`font-bold rounded-full w-8 h-8 flex items-center justify-center transition ${totalCartQuantity >= 10
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-gray-800 text-white hover:bg-gray-900"
-                    }`}
-                >
-                  +
-                </button>
+      {/* ── Product rows ── */}
+      {cart.products.map((product, index) => {
+        const hasDiscount = product.discountPrice && product.discountPrice < product.price;
+        const lineTotal   = (product.discountPrice ?? product.price) * product.quantity;
+
+        return (
+          <div
+            key={index}
+            className="flex items-start gap-4 bg-white border border-gray-100 rounded-2xl p-3.5 hover:border-sky-200 hover:shadow-sm transition-all group"
+          >
+            {/* Image */}
+            <div className="w-20 h-24 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0">
+              <img
+                src={product.image}
+                alt={product.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug">
+                {product.name}
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {product.size && (
+                  <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                    Size: {product.size}
+                  </span>
+                )}
+                {product.color && (
+                  <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                    {product.color}
+                  </span>
+                )}
               </div>
-              {totalCartQuantity >= 10 && (
-                <p className="text-xs text-red-600 mt-1">
-                  You can buy up to 10 items only.
+
+              {/* Price row */}
+              <div className="flex items-baseline gap-1.5 mt-2">
+                <span className="text-sm font-bold text-gray-900">
+                  ₹{(product.discountPrice ?? product.price).toLocaleString("en-IN")}
+                </span>
+                {hasDiscount && (
+                  <span className="text-xs text-gray-400 line-through">
+                    ₹{product.price.toLocaleString("en-IN")}
+                  </span>
+                )}
+              </div>
+
+              {/* Qty stepper */}
+              <div className="flex items-center gap-2 mt-2.5">
+                <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => handleQty(product.productId, -1, product.quantity, product.size, product.color)}
+                    className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition text-base border-r border-gray-200 font-medium"
+                  >
+                    −
+                  </button>
+                  <span className="w-8 text-center text-xs font-bold text-gray-800">
+                    {product.quantity}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (totalQty < 10)
+                        handleQty(product.productId, 1, product.quantity, product.size, product.color);
+                    }}
+                    disabled={totalQty >= 10}
+                    className={`w-7 h-7 flex items-center justify-center transition text-base border-l border-gray-200 font-medium
+                      ${totalQty >= 10 ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
+                  >
+                    +
+                  </button>
+                </div>
+                {totalQty >= 10 && (
+                  <p className="text-[10px] text-red-500 font-medium">Max 10 items</p>
+                )}
+              </div>
+            </div>
+
+            {/* Right: total + remove */}
+            <div className="flex flex-col items-end justify-between h-24 shrink-0">
+              <p className="text-sm font-bold text-gray-900">
+                ₹{lineTotal.toLocaleString("en-IN")}
+              </p>
+              <button
+                onClick={() => handleRemove(product.productId, product.size, product.color)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition"
+                title="Remove from cart"
+              >
+                <HiTrash className="text-sm" />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ── Coupon badge (if applied) ── */}
+      {cart.products.length > 0 && cart.couponApplied && (
+        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-emerald-600 text-lg">🎟️</span>
+            <div>
+              <p className="text-xs font-bold text-emerald-700">Coupon Applied!</p>
+              <p className="text-[11px] text-emerald-600 font-mono">COUPON50</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200">
+            50% OFF
+          </span>
+        </div>
+      )}
+
+      {/* ── Cart Summary ── */}
+      {cart.products.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-100 bg-linear-to-r from-sky-50 to-blue-50">
+            <p className="text-[11px] font-bold text-sky-700 uppercase tracking-widest">
+              Order Summary
+            </p>
+          </div>
+
+          <div className="px-4 py-4 space-y-2.5">
+            {/* Items count */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Items ({totalQty})</span>
+              <span className="font-semibold text-gray-800">
+                ₹{originalAmount.toLocaleString("en-IN")}
+              </span>
+            </div>
+
+            {/* Discount row */}
+            {totalSavings > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Product Discount</span>
+                <span className="font-semibold text-emerald-600">
+                  − ₹{totalSavings.toLocaleString("en-IN")}
+                </span>
+              </div>
+            )}
+
+            {/* Shipping */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Delivery</span>
+              <span className="font-semibold text-emerald-600">Free</span>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-dashed border-gray-200 pt-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-900">Total Amount</span>
+                <span className="text-lg font-extrabold text-sky-700">
+                  ₹{totalAmount.toLocaleString("en-IN")}
+                </span>
+              </div>
+              {totalSavings > 0 && (
+                <p className="text-[11px] text-emerald-600 font-semibold mt-1 text-right">
+                  You save ₹{totalSavings.toLocaleString("en-IN")} 🎉
                 </p>
               )}
             </div>
           </div>
 
-          <div className="mt-4 sm:mt-0 sm:ml-4">
-            <button
-              onClick={() =>
-                handleRemoveFromCart(
-                  product.productId,
-                  product.size,
-                  product.color
-                )
-              }
-              className="text-red-500 hover:text-red-800 transition flex flex-wrap justify-center items-center gap-0.5"
-            >
-              <FaTrash size={18} className="inline" /> Remove
-            </button>
-          </div>
-        </div>
-      ))}
-
-
-      {/* 🎟️ 50% Discount Coupon Section - Modern UI */}
-      {cart.products.length > 0 && (
-        <div className="mt-6 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-100 via-blue-50 to-indigo-100 border border-blue-200 shadow-lg p-6 backdrop-blur-sm">
-          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_left,_#93C5FD,_transparent_70%)]"></div>
-
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <h2 className="text-xl font-bold text-blue-800 flex items-center gap-2">
-              🎉 Coupon Applied Successfully!
-            </h2>
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm px-4 py-1.5 rounded-full shadow-md font-semibold tracking-wide">
-              COUPON50
-            </span>
-          </div>
-
-          <div className="relative bg-white/70 backdrop-blur-sm rounded-xl shadow-inner p-4 border border-blue-100">
-            <div className="flex justify-between text-gray-700 font-medium">
-              <span>Original Price:</span>
-              <span className="font-semibold text-gray-900">
-                ₹{(totalAmount / 0.5).toLocaleString("en-IN")}
+          {/* Trust badges */}
+          <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-gray-100 bg-gray-50">
+            {[
+              { icon: "🔒", text: "Secure Checkout" },
+              { icon: "🚚", text: "Free Delivery" },
+              { icon: "↩", text: "Easy Returns" },
+            ].map(({ icon, text }) => (
+              <span key={text} className="flex items-center gap-1 text-[10px] font-medium text-gray-400">
+                {icon} {text}
               </span>
-            </div>
-            <div className="flex justify-between text-gray-600 mt-2">
-              <span>Discount (50% OFF):</span>
-              <span className="text-red-600 font-medium">
-                -₹{(totalAmount / 0.5 - totalAmount).toLocaleString("en-IN")}
-              </span>
-            </div>
-            <div className="flex justify-between text-green-700 font-bold text-lg border-t border-dashed border-green-300 mt-3 pt-3">
-              <span>Final Price After Discount:</span>
-              <span>₹{totalAmount.toLocaleString("en-IN")}</span>
-            </div>
-          </div>
-
-          {/* <div className="mt-4 flex justify-end">
-            <button className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.03] transition-all">
-              Proceed to Checkout
-            </button>
-          </div> */}
-        </div>
-      )}
-
-
-      {/* ✅ Total Cart Summary Section */}
-      {cart.products.length > 0 && (
-        <div className="mt-6 p-4 bg-gray-50 rounded-xl shadow-inner">
-          <h2 className="text-lg font-semibold text-gray-700 mb-2">
-            Cart Summary
-          </h2>
-          <div className="flex justify-between text-gray-800 font-medium text-base">
-            <span>Total Items:</span>
-            <span>
-              {cart.products.reduce((acc, item) => acc + item.quantity, 0)}
-            </span>
-          </div>
-          <div className="flex justify-between text-gray-800 font-semibold text-lg mt-1">
-            <span>Total Price:</span>
-            <span>₹{totalAmount.toLocaleString("en-IN")}</span>
+            ))}
           </div>
         </div>
       )}

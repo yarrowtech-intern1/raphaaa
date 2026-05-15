@@ -31,12 +31,17 @@ const userSchema = new mongoose.Schema(
     },
     addresses: [
       {
-        address: { type: String, required: true, trim: true },
-        city: { type: String, required: true, trim: true },
+        firstName:  { type: String, trim: true, default: "" },
+        lastName:   { type: String, trim: true, default: "" },
+        address:    { type: String, required: true, trim: true },
+        landmark:   { type: String, trim: true, default: "" },
+        city:       { type: String, required: true, trim: true },
+        state:      { type: String, required: true, trim: true },
         postalCode: { type: String, required: true, trim: true },
-        country: { type: String, required: true, trim: true },
-        phone: { type: Number, required: true, trim: true },
-        isDefault: { type: Boolean, default: false },
+        country:    { type: String, required: true, trim: true, default: "India" },
+        phone:      { type: String, required: true, trim: true },
+        addressType:{ type: String, enum: ["Home", "Work", "Other"], default: "Home" },
+        isDefault:  { type: Boolean, default: false },
       },
     ],
     coupon: {
