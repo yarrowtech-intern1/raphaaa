@@ -98,42 +98,54 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
+  // ── Validate input ──────────────────────────────────────────────
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required." });
+  }
+
   try {
-    // Find the user by email
-    let user = await User.findOne({ email });
+    // Find the user by email (case-insensitive)
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
 
-    if (!user) return res.status(400).json({ message: "Invalid Credentials" });
+    if (!user) {
+      return res.status(400).json({ message: "No account found with this email." });
+    }
+
+    // Check password
     const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Incorrect password. Please try again." });
+    }
 
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid Credentials" });
-
-    // Create JWT Payload
+    // ── Create JWT ────────────────────────────────────────────────
     const payload = { user: { id: user._id, role: user.role } };
 
-    // Sign and return the token along with user data
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
       { expiresIn: getJwtExpiresIn() },
       (err, token) => {
-        if (err) throw err;
+        if (err) {
+          console.error("JWT sign error:", err);
+          return res.status(500).json({ message: "Token generation failed." });
+        }
 
-        // Send the user and token in response
         res.json({
           user: {
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
+            _id:    user._id,
+            name:   user.name,
+            email:  user.email,
+            role:   user.role,
+            photo:  user.photo || "",
+            mobile: user.mobile || "",
           },
           token,
         });
       }
     );
   } catch (error) {
-    console.error(error);
-    res.status(500).send("Internal server Error");
+    console.error("Login route error:", error);
+    res.status(500).json({ message: "Server error. Please try again." });
   }
 });
 
