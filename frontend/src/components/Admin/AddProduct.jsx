@@ -275,8 +275,17 @@ const AddProduct = () => {
     if (!payload.dimensions.length && !payload.dimensions.width && !payload.dimensions.height)
       delete payload.dimensions;
 
-    dispatch(createProduct(payload));
-    toast.success("Product added successfully!");
+    try {
+      await dispatch(createProduct(payload)).unwrap();
+      toast.success("Product added successfully!");
+    } catch (err) {
+      const details = err?.details;
+      const message =
+        err?.message ||
+        (Array.isArray(details) && details.length ? details[0] : "Failed to add product");
+      toast.error(message);
+      return;
+    }
 
     setProductData({
       name: "", description: "", price: "", discountPrice: "",

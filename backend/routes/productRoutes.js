@@ -173,6 +173,21 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
       sizeChart,
     } = req.body;
 
+    const cleanStr = (v) => {
+      if (v === undefined || v === null) return undefined;
+      const s = String(v).trim();
+      return s === "" ? undefined : s;
+    };
+    const normalizeGender = (v) => {
+      const g = cleanStr(v);
+      if (!g) return undefined;
+      const m = g.toLowerCase();
+      if (m === "male" || m === "men" || m === "man") return "Men";
+      if (m === "female" || m === "women" || m === "woman") return "Women";
+      if (m === "kids" || m === "kid" || m === "children" || m === "child") return "Kids";
+      return g;
+    };
+
     // Prefer new colorVariants structure, fall back to legacy variants
     const normalizedColorVariants = normalizeColorVariants(colorVariants);
     const normalizedVariants = normalizeVariants(variants);
@@ -194,69 +209,81 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
     }
 
     const product = new Product({
-      name,
-      description,
-      price,
-      discountPrice,
+      name: cleanStr(name),
+      description: cleanStr(description),
+      price: Number(price),
+      discountPrice: discountPrice !== undefined && discountPrice !== null && discountPrice !== "" ? Number(discountPrice) : undefined,
       countInStock: finalStock,
-      category,
-      brand,
+      category: cleanStr(category),
+      brand: cleanStr(brand),
       sizes: finalSizes,
       colors: finalColors,
       colorVariants: normalizedColorVariants,
       variants: normalizedColorVariants.length > 0 ? [] : normalizedVariants,
-      collections,
-      material,
-      gender,
+      collections: cleanStr(collections),
+      material: cleanStr(material),
+      gender: normalizeGender(gender),
       images: normalizedColorVariants.length > 0 ? (images || []) : (images || []),
       isFeatured,
       isPublished,
-      tags,
+      tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
       dimensions,
       weight,
       sku: finalSku,
-      offerPercentage,
+      offerPercentage: Number(offerPercentage || 0),
       sizeChart,
       user: req.user._id,
     });
 
     const createdProduct = await product.save();
-    // Get all subscribed users
-    const Subscriber = require("../models/Subscriber");
-    const { sendMail } = require("../utils/sendMail");
-
-    const subscribers = await Subscriber.find({ isSubscribed: true });
-
-    if (subscribers.length > 0) {
-      const productUrl = `https://raphaaa.onrender.com/product/${createdProduct._id}`; // Update this as needed
-      const subject = `New Arrival: ${createdProduct.name} just dropped!`;
-
-      const message = `
-    <h2>New Product Alert!</h2>
-    <p>We just added <strong>${
-      createdProduct.name
-    }</strong> to our collection.</p>
-    <p><a href="${productUrl}">Click here</a> to view it now!</p>
-    <p>Thanks for being a part of Raphaaa.</p>
-     <p style="margin-top:20px; font-size:12px;">
-    Not interested? <a href="https://raphaaa-backend.onrender.com/api/unsubscribe/${encodeURIComponent(
-      subscribers.email
-    )}">Unsubscribe</a>
-  </p>
-  `;
-
-      for (const subscriber of subscribers) {
-        await sendMail({
-          to: subscriber.email,
-          subject,
-          message,
-        });
-      }
-    }
-
     res.status(201).json(createdProduct);
+
+    // Send notifications after responding. Do not fail product creation if email fails.
+    try {
+      const Subscriber = require("../models/Subscriber");
+      const { sendMail } = require("../utils/sendMail");
+      const subscribers = await Subscriber.find({ isSubscribed: true });
+
+      if (subscribers.length > 0) {
+        const productUrl = `https://raphaaa.onrender.com/product/${createdProduct._id}`;
+        const subject = `New Arrival: ${createdProduct.name} just dropped!`;
+
+        for (const subscriber of subscribers) {
+          const message = `
+        <h2>New Product Alert!</h2>
+        <p>We just added <strong>${createdProduct.name}</strong> to our collection.</p>
+        <p><a href="${productUrl}">Click here</a> to view it now!</p>
+        <p>Thanks for being a part of Raphaaa.</p>
+        <p style="margin-top:20px; font-size:12px;">
+          Not interested? <a href="https://raphaaa-backend.onrender.com/api/unsubscribe/${encodeURIComponent(
+            subscriber.email
+          )}">Unsubscribe</a>
+        </p>
+      `;
+
+          await sendMail({
+            to: subscriber.email,
+            subject,
+            message,
+          });
+        }
+      }
+    } catch (notifyErr) {
+      console.error("Product created, but failed to send subscriber notifications:", notifyErr);
+    }
   } catch (error) {
     console.error(error);
+    if (error?.name === "ValidationError") {
+      return res.status(400).json({
+        message: "Invalid product data",
+        details: Object.values(error.errors || {}).map((e) => e.message),
+      });
+    }
+    if (error?.code === 11000) {
+      return res.status(400).json({
+        message: "SKU already exists. Please use a unique SKU.",
+      });
+    }
     res.status(500).send("Internal Server Error");
   }
 });
