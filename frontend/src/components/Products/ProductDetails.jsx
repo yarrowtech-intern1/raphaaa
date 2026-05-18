@@ -2451,7 +2451,7 @@ const ProductDetails = ({ productId }) => {
       {selectedProduct && (
         <>
           {/* Breadcrumb */}
-          <div className="border-b border-gray-100">
+          <div className="bg-linear-to-r from-sky-200 to-sky-100">
             <div className="max-w-7xl mx-auto px-4 py-3 text-xs text-gray-400 font-medium flex items-center gap-1.5 flex-wrap">
               <span onClick={() => navigate("/")} className="hover:text-gray-800 cursor-pointer transition">Home</span>
               <span className="text-gray-500">/</span>
