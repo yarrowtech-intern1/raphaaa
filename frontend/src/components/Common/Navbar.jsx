@@ -96,14 +96,14 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="container mx-auto flex items-center justify-between py-4 px-6">
+      <nav className="container mx-auto flex items-center justify-between py-3 md:py-4 px-3 sm:px-4 md:px-6 lg:px-8 gap-2">
         {/* Logo */}
-        <Link to="/" className="flex items-center space-x-2 group" title="Raphaaa">
-          <img src={logo} alt="Logo" className="h-10 w-auto transition-transform duration-300 group-hover:scale-105" />
+        <Link to="/" className="flex items-center space-x-2 group shrink-0" title="Raphaaa">
+          <img src={logo} alt="Logo" className="h-8 sm:h-9 md:h-10 w-auto transition-transform duration-300 group-hover:scale-105" />
         </Link>
 
         {/* Center Navigation */}
-        <div className="hidden md:flex space-x-6 items-center">
+        <div className="hidden lg:flex space-x-5 xl:space-x-6 items-center">
           {/* ✅ Show Exclusive Drop only when collab is active */}
           {collabActive && (
             <Link
@@ -139,7 +139,7 @@ const Navbar = () => {
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 shrink-0">
           {user &&
             (user.role === "admin" ||
               user.role === "merchantise" ||
@@ -147,7 +147,7 @@ const Navbar = () => {
               user.role === "delivery_boy") && (
               <Link
                 to={user.role === "delivery_boy" ? "/admin/orders" : "/admin"}
-                className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-sky-500 to-blue-600 rounded-full shadow hover:shadow-md hover:from-sky-600 hover:to-blue-700 transition-all duration-300"
+                className="hidden sm:inline-flex px-3 md:px-4 py-2 text-xs md:text-sm font-semibold text-white bg-gradient-to-r from-sky-500 to-blue-600 rounded-full shadow hover:shadow-md hover:from-sky-600 hover:to-blue-700 transition-all duration-300 whitespace-nowrap"
               >
                 {user.role === "admin"
                   ? "Admin Panel"
@@ -178,7 +178,7 @@ const Navbar = () => {
                     </div>
                   )}
 
-                  <span className="text-sm font-medium text-gray-800 hidden md:inline">
+                  <span className="text-sm font-medium text-gray-800 hidden lg:inline">
                     {user.name}
                   </span>
                   <HiChevronDown className="h-4 w-4 text-gray-500" />
@@ -217,7 +217,7 @@ const Navbar = () => {
           ) : (
             <Link
               to="/login"
-              className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-sky-500 to-blue-600 rounded-full shadow hover:from-sky-600 hover:to-blue-700 transition duration-300"
+              className="hidden sm:inline-flex px-3 md:px-4 py-2 text-xs md:text-sm font-semibold text-white bg-gradient-to-r from-sky-500 to-blue-600 rounded-full shadow hover:from-sky-600 hover:to-blue-700 transition duration-300 whitespace-nowrap"
               title="Login"
             >
               Login
@@ -246,21 +246,24 @@ const Navbar = () => {
   )}
 </button>
 
-          <div className="overflow-hidden" title="Search">
+          <div className="hidden md:block overflow-hidden max-w-[170px] lg:max-w-[220px]" title="Search">
             <SearchBar />
           </div>
 
-          <button onClick={toggleNavDrawer} className="md:hidden transition-transform hover:scale-110">
+          <button onClick={toggleNavDrawer} className="lg:hidden transition-transform hover:scale-110">
             <HiMiniBars3BottomRight className="h-6 w-6 text-gray-700" />
           </button>
         </div>
       </nav>
+      <div className="container mx-auto px-3 sm:px-4 md:hidden pb-2">
+        <SearchBar />
+      </div>
 
       <CartDrawer drawerOpen={drawerOpen} toggleCartDrawer={toggleCartDrawer} />
 
       {/* Mobile Drawer */}
       <div
-        className={`fixed top-0 left-0 w-3/4 sm:w-1/2 md:w-1/3 h-full bg-white shadow-xl transform transition-transform duration-300 z-50 ${navDrawerOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed top-0 left-0 w-[86%] sm:w-[70%] md:w-[48%] h-full bg-white shadow-xl transform transition-transform duration-300 z-50 ${navDrawerOpen ? "translate-x-0" : "-translate-x-full"
           }`}
       >
         <div className="flex justify-end p-4">

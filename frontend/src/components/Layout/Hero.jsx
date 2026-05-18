@@ -80,9 +80,9 @@ const Hero = () => {
   <div className="pointer-events-none absolute top-0 left-0 h-full w-16 bg-gradient-to-r from-purple-900 to-transparent"></div>
   <div className="pointer-events-none absolute top-0 right-0 h-full w-16 bg-gradient-to-l from-indigo-900 to-transparent"></div>
 </div> */}
-      <div className="md:h-[80vh] flex flex-col sm:flex-row justify-between gap-2 px-6 md:px-28 py-8 md:py-2 relative transition-all duration-700">
+      <div className="w-full flex flex-col lg:flex-row items-stretch justify-between gap-4 md:gap-6 px-3 sm:px-4 md:px-8 lg:px-16 xl:px-24 py-4 md:py-6 relative transition-all duration-700">
         {/* 🔥 Floating Offer Badge */}
-        <div className="absolute top-4 md:top-12 right-4 sm:right-10 md:right-[500px] z-10">
+        <div className="absolute top-2 sm:top-3 lg:top-5 right-3 sm:right-4 lg:right-6 z-10">
           <div className="bg-gradient-to-r from-red-600 to-orange-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-md animate-pulse">
             🔥 Limited Time Offer!
           </div>
@@ -90,10 +90,10 @@ const Hero = () => {
 
         {/* Left Side */}
         <div
-          className="w-full sm:w-1/2 flex items-center justify-center py-10 sm:py-0 
+          className="w-full lg:w-1/2 flex items-center justify-center py-8 sm:py-10 lg:py-8 
         bg-white/80 backdrop-blur-xl border border-white/30 shadow-[0_12px_40px_rgba(0,0,0,0.1)] rounded-2xl hover:shadow-2xl transition-shadow duration-500"
         >
-          <div className="text-[#202020] px-4 space-y-4">
+          <div className="text-[#202020] px-3 sm:px-5 lg:px-6 space-y-4">
             <div className="flex items-center gap-2">
               <span className="w-8 h-[2px] bg-gradient-to-r from-blue-600 to-sky-400 rounded-full"></span>
               <p className="text-xs md:text-sm font-semibold tracking-wider text-sky-700 uppercase">
@@ -101,11 +101,11 @@ const Hero = () => {
               </p>
             </div>
 
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight text-transparent bg-clip-text bg-gradient-to-r from-black to-blue-600">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl xl:text-5xl font-extrabold leading-tight text-transparent bg-clip-text bg-gradient-to-r from-black to-blue-600">
               <span className="text-black">Refresh your </span>wardrobe with Raphaaa
             </h1>
 
-            <p className="text-gray-600 text-sm md:text-base font-medium tracking-wide">
+            <p className="text-gray-600 text-sm sm:text-base font-medium tracking-wide">
               Discover styles loved by thousands. Limited stocks available!
             </p>
 
@@ -120,7 +120,7 @@ const Hero = () => {
             hrs
           </div> */}
 
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex flex-wrap items-center gap-3 mt-4">
               <Link
                 to="/collections/all"
                 className="px-5 py-2.5 text-white bg-gradient-to-r from-sky-600 to-blue-700 font-semibold rounded-md shadow-lg hover:scale-105 hover:shadow-2xl transition-all duration-300"
@@ -135,7 +135,7 @@ const Hero = () => {
         </div>
 
         {/* Right Side */}
-        <div className="w-full sm:w-1/2 aspect-square overflow-hidden rounded-full md:rounded-l-none md:rounded-r-full shadow-lg border-4 border-white">
+        <div className="w-full lg:w-1/2 h-[280px] sm:h-[360px] md:h-[460px] lg:h-auto lg:aspect-square overflow-hidden rounded-2xl lg:rounded-l-none lg:rounded-r-[999px] shadow-lg border-4 border-white">
           <Swiper
             loop
             autoplay={{ delay: 3000, disableOnInteraction: false }}
@@ -159,7 +159,7 @@ const Hero = () => {
       </div>
       {/* <marquee behavior="scroll" direction="left">🔥 Limited Time Offer!</marquee> */}
       {/* USP strip */}
-      <div className="px-6 md:px-28 mt-20 mb-8">
+      <div className="px-3 sm:px-4 md:px-8 lg:px-16 xl:px-24 mt-8 sm:mt-10 md:mt-12 mb-8">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 backdrop-blur px-4 py-3 shadow-sm">
             <span className="text-xl text-sky-600"><FaShippingFast /></span>
