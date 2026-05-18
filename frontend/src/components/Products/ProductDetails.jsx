@@ -2580,7 +2580,7 @@ const ProductDetails = ({ productId }) => {
 
                 {/* Rating row */}
                 {selectedProduct.rating > 0 && selectedProduct.numReviews > 0 && (
-                  <div className="flex items-center gap-3 flex-wrap border-b border-sky-300 pb-4">
+                  <div className="flex items-center gap-3 flex-wrap pb-4">
                     <div className="flex items-center gap-1 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded">
                       {selectedProduct.rating.toFixed(1)} ★
                     </div>
@@ -2629,7 +2629,7 @@ const ProductDetails = ({ productId }) => {
                 </div>
 
                 {/* Offers strip */}
-                <div className="flex flex-wrap gap-3 py-3 border-y border-sky-300">
+                <div className="flex flex-wrap gap-3 py-3">
                   {[
                     { icon: "🚚", label: "Free delivery above ₹999" },
                     { icon: "↩", label: "7-day returns" },
@@ -2833,7 +2833,7 @@ const ProductDetails = ({ productId }) => {
                 )}
 
                 {/* Delivery Check */}
-                <div className="border-t border-sky-300 pt-4 space-y-3">
+                <div className="pt-4 space-y-3">
                   <p className="text-[11px] font-bold tracking-[0.12em] text-gray-500 uppercase">Check Delivery</p>
                   <div className="flex gap-2">
                     <input
@@ -2880,7 +2880,7 @@ const ProductDetails = ({ productId }) => {
                       )}
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1 border-t border-sky-300">
+                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
                     <span>✅ Free delivery above ₹999</span>
                     <span>🔄 7-day easy returns</span>
                     <span>🔒 Secure checkout</span>
@@ -2898,7 +2898,7 @@ const ProductDetails = ({ productId }) => {
 
           {/* Product Details + Specs */}
           <div className="p-4 md:p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-sky-300">Product Details</h3>
+            <h3 className="text-lg font-bold text-gray-900 border-b border-sky-400 mb-4 pb-2">Product Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {selectedProduct.description && (
                 <div>
