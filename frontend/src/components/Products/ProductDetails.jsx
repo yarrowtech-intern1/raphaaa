@@ -2493,7 +2493,7 @@ const ProductDetails = ({ productId }) => {
                         </div>
                       )}
                       <div
-                        className="relative w-full aspect-square bg-gray-50 rounded-md border border-gray-100 overflow-hidden cursor-zoom-in"
+                        className="relative w-full aspect-square overflow-hidden cursor-zoom-in"
                         onMouseEnter={handleZoomEnter}
                         onMouseLeave={handleZoomLeave}
                         onMouseMove={handleZoomMove}
