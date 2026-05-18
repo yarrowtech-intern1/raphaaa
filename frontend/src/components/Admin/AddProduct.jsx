@@ -49,6 +49,11 @@ const generateColorOptions = () => {
 };
 
 const COLOR_OPTIONS = generateColorOptions();
+const selectPortalTarget = typeof document !== "undefined" ? document.body : null;
+const selectMenuStyles = {
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
 
 const emptySize = () => ({ size: "", sku: "", countInStock: "" });
 const emptyColorVariant = (index) => ({
@@ -518,7 +523,7 @@ const AddProduct = () => {
 
 // ─── Section card wrapper ─────────────────────────────────────────────────────
 const SectionCard = ({ title, subtitle, children, action }) => (
-  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-visible">
     <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-100">
       <div>
         <h4 className="text-sm font-bold text-gray-800">{title}</h4>
@@ -538,7 +543,7 @@ const ColorVariantCard = ({
   onAddSize, onRemoveSize, onSizeChange,
   onRemoveColor,
 }) => (
-  <div className="border border-gray-200 rounded-xl overflow-hidden">
+  <div className="border border-gray-200 rounded-xl overflow-visible">
     {/* Card header */}
     <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
       <div className="flex items-center gap-3">
@@ -570,6 +575,9 @@ const ColorVariantCard = ({
             value={cv.color ? { value: cv.color, label: getColorName(cv.color) } : null}
             onChange={(sel) => onColorChange(sel?.value || "")}
             placeholder="Pick a colour…"
+            menuPortalTarget={selectPortalTarget}
+            menuPosition="fixed"
+            styles={selectMenuStyles}
             formatOptionLabel={(opt) => (
               <div className="flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
@@ -640,6 +648,9 @@ const ColorVariantCard = ({
                 onChange={(sel) => onSizeChange(idx, "size", sel?.value || "")}
                 placeholder="Size"
                 classNamePrefix="sz-select"
+                menuPortalTarget={selectPortalTarget}
+                menuPosition="fixed"
+                styles={selectMenuStyles}
               />
               <input type="text" value={sz.sku}
                 onChange={(e) => onSizeChange(idx, "sku", e.target.value)}
