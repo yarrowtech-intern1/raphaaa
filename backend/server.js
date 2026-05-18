@@ -41,6 +41,7 @@ sendScheduledEmails(); // Run once on startup
 const metaOptionRoutes = require("./routes/metaOptionRoutes");
 const campaignsRoutes = require("./routes/campaignRoutes");
 const complaintRoutes = require("./routes/complaintRoutes");
+const sizeChartRoutes = require("./routes/sizeChartRoutes");
 const { syncShiprocketStatusesForOpenOrders } = require("./utils/shiprocket");
 
 // Run every day at 7:00 PM IST
@@ -134,6 +135,7 @@ app.use("/api/admin/orders", adminOrderRoutes);
 // app.use("/api/merch", merchRoutes);
 app.use("/api/meta-options", metaOptionRoutes);
 app.use("/api/complaints", complaintRoutes);
+app.use("/api/size-charts", sizeChartRoutes);
 
 // Health check endpoint
 app.get('/healthz', (req, res) => {

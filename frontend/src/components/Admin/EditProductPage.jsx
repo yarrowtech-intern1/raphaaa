@@ -46,6 +46,11 @@ const generateColorOptions = () => {
   return colors.map((hex) => ({ value: hex, label: getColorName(hex) }));
 };
 const COLOR_OPTIONS = generateColorOptions();
+const selectPortalTarget = typeof document !== "undefined" ? document.body : null;
+const selectMenuStyles = {
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
 
 const emptySize  = () => ({ size: "", sku: "", countInStock: "" });
 const makeId     = () => Date.now() + Math.random();
@@ -96,6 +101,16 @@ const EditProductPage = () => {
   const [uploadingColor, setUploadingColor] = useState(null);
   const [deleting, setDeleting]           = useState(null);
   const [metaOptions, setMetaOptions]     = useState({ category: [], collection: [], gender: [], material: [] });
+  const [sizeCharts, setSizeCharts]       = useState([]);
+  const [selectedSizeChartId, setSelectedSizeChartId] = useState("");
+  const [creatingSizeChart, setCreatingSizeChart] = useState(false);
+  const [newSizeChart, setNewSizeChart] = useState({
+    name: "",
+    audience: "Unisex",
+    chartImageUrl: "",
+    measureImageUrl: "",
+    unit: "in",
+  });
 
   // Load meta options
   useEffect(() => {
@@ -110,6 +125,18 @@ const EditProductPage = () => {
       );
       setMetaOptions(b);
     }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const fetchSizeCharts = async () => {
+      try {
+        const { data } = await axios.get(`${API_BASE}/api/size-charts`);
+        setSizeCharts(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to fetch size charts:", err);
+      }
+    };
+    fetchSizeCharts();
   }, []);
 
   useEffect(() => {
@@ -175,6 +202,7 @@ const EditProductPage = () => {
         sizes: [{ size: selectedProduct.sizes?.[0] || "", sku: selectedProduct.sku || "", countInStock: selectedProduct.countInStock || "" }],
       }]);
     }
+    setSelectedSizeChartId(selectedProduct?.sizeChart?.templateId || "");
   }, [selectedProduct]);
 
   // Recalculate total stock from colorVariants
@@ -225,6 +253,55 @@ const EditProductPage = () => {
       toast.success("Size chart uploaded");
     } catch { toast.error("Failed to upload size chart"); }
     finally { setUploading(false); }
+  };
+
+  const handleNewSizeChartImage = async (field, file) => {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("image", file);
+    try {
+      setUploading(true);
+      const { data } = await axios.post(`${API_BASE}/api/upload`, fd, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNewSizeChart((p) => ({ ...p, [field]: data.imageUrl }));
+      toast.success("Size chart image uploaded");
+    } catch {
+      toast.error("Failed to upload image");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCreateSizeChart = async () => {
+    if (!newSizeChart.name.trim() || !newSizeChart.chartImageUrl) {
+      toast.error("Size chart name and chart image are required");
+      return;
+    }
+    try {
+      setCreatingSizeChart(true);
+      const { data } = await axios.post(`${API_BASE}/api/size-charts`, newSizeChart, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSizeCharts((prev) => [data, ...prev]);
+      setSelectedSizeChartId(data._id);
+      setProductData((p) => ({
+        ...p,
+        sizeChart: {
+          templateId: data._id,
+          imageUrl: data.chartImageUrl,
+          measureImageUrl: data.measureImageUrl || "",
+          title: data.name || "Size Chart",
+          audience: data.audience || "Unisex",
+        },
+      }));
+      setNewSizeChart({ name: "", audience: "Unisex", chartImageUrl: "", measureImageUrl: "", unit: "in" });
+      toast.success("Size chart saved to library");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to create size chart");
+    } finally {
+      setCreatingSizeChart(false);
+    }
   };
 
   // ─── Color variant helpers ───────────────────────────────────────────────
@@ -475,6 +552,71 @@ const EditProductPage = () => {
 
         {/* ── Size Chart ── */}
         <SectionCard title="Size Chart" subtitle="Upload a size guide image for customers">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Use Saved Size Chart">
+              <select
+                value={selectedSizeChartId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedSizeChartId(id);
+                  const selected = sizeCharts.find((s) => s._id === id);
+                  if (selected) {
+                    setProductData((p) => ({
+                      ...p,
+                      sizeChart: {
+                        templateId: selected._id,
+                        imageUrl: selected.chartImageUrl,
+                        measureImageUrl: selected.measureImageUrl || "",
+                        title: selected.name || "Size Chart",
+                        audience: selected.audience || "Unisex",
+                      },
+                    }));
+                  }
+                }}
+                className={inputCls}
+              >
+                <option value="">Select from library…</option>
+                {sizeCharts.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name} ({s.audience})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="New Size Chart Name">
+              <input
+                type="text"
+                value={newSizeChart.name}
+                onChange={(e) => setNewSizeChart((p) => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Women Slim Fit"
+                className={inputCls}
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Audience">
+              <select
+                value={newSizeChart.audience}
+                onChange={(e) => setNewSizeChart((p) => ({ ...p, audience: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="Men">Men</option>
+                <option value="Women">Women</option>
+                <option value="Kids">Kids</option>
+                <option value="Unisex">Unisex</option>
+              </select>
+            </Field>
+            <Field label="Unit">
+              <select
+                value={newSizeChart.unit}
+                onChange={(e) => setNewSizeChart((p) => ({ ...p, unit: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="in">in</option>
+                <option value="cm">cm</option>
+              </select>
+            </Field>
+          </div>
           <div className="flex flex-col sm:flex-row gap-4 items-start">
             <label className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl cursor-pointer transition
               ${uploading ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100"}`}>
@@ -489,6 +631,34 @@ const EditProductPage = () => {
               <img src={productData.sizeChart.imageUrl} alt="Size chart"
                 className="w-32 rounded-xl border border-gray-200 shadow-sm" />
             )}
+          </div>
+          <div className="flex flex-wrap gap-3 items-center">
+            <label className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-xl cursor-pointer hover:bg-blue-100 transition">
+              Upload Chart Image
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleNewSizeChartImage("chartImageUrl", e.target.files?.[0])}
+              />
+            </label>
+            <label className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-xl cursor-pointer hover:bg-blue-100 transition">
+              Upload How-To-Measure Image
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleNewSizeChartImage("measureImageUrl", e.target.files?.[0])}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={creatingSizeChart}
+              onClick={handleCreateSizeChart}
+              className="px-4 py-2 bg-gray-900 text-white text-xs font-semibold rounded-xl disabled:opacity-60"
+            >
+              {creatingSizeChart ? "Saving..." : "Save in Size Chart Library"}
+            </button>
           </div>
         </SectionCard>
 
@@ -528,7 +698,7 @@ const EditProductPage = () => {
         >
           <div className="space-y-4">
             {colorVariants.map((cv, cvIdx) => (
-              <div key={cv.id} className="border border-gray-200 rounded-xl overflow-hidden">
+              <div key={cv.id} className="border border-gray-200 rounded-xl overflow-visible">
                 {/* Color card header */}
                 <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                   <div className="flex items-center gap-3">
@@ -561,6 +731,9 @@ const EditProductPage = () => {
                           updateCV(cv.id, "colorName", getColorName(sel?.value || ""));
                         }}
                         placeholder="Pick a colour…"
+                        menuPortalTarget={selectPortalTarget}
+                        menuPosition="fixed"
+                        styles={selectMenuStyles}
                         formatOptionLabel={(opt) => (
                           <div className="flex items-center gap-2">
                             <span className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
@@ -635,6 +808,9 @@ const EditProductPage = () => {
                             value={sz.size ? { value: normalizeSize(sz.size), label: normalizeSize(sz.size) } : null}
                             onChange={(sel) => updateSize(cv.id, idx, "size", sel?.value || "")}
                             placeholder="Size"
+                            menuPortalTarget={selectPortalTarget}
+                            menuPosition="fixed"
+                            styles={selectMenuStyles}
                           />
                           <input type="text" value={sz.sku}
                             onChange={(e) => updateSize(cv.id, idx, "sku", e.target.value)}
@@ -689,7 +865,7 @@ const EditProductPage = () => {
 
 // ─── Section card ─────────────────────────────────────────────────────────────
 const SectionCard = ({ title, subtitle, children, action }) => (
-  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-visible">
     <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-100">
       <div>
         <h4 className="text-sm font-bold text-gray-800">{title}</h4>

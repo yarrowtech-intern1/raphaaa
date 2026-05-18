@@ -118,13 +118,26 @@ const productSchema = new mongoose.Schema({
         },
     ],
     sizeChart: {
+        templateId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SizeChart",
+        },
         imageUrl: {
+            type: String,
+            default: "",
+        },
+        measureImageUrl: {
             type: String,
             default: "",
         },
         title: {
             type: String,
             default: "Size Chart",
+        },
+        audience: {
+            type: String,
+            enum: ["Men", "Women", "Kids", "Unisex"],
+            default: "Unisex",
         },
     },
     isFeatured: {

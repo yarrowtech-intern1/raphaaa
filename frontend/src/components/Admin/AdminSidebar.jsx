@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   FaBoxOpen, FaClipboardList, FaShoppingBag, FaSignOutAlt,
-  FaStore, FaUser, FaCog, FaLock, FaTasks, FaRupeeSign, FaUsers,
+  FaStore, FaUser, FaCog, FaLock, FaTasks, FaRupeeSign, FaUsers, FaRulerCombined,
 } from "react-icons/fa";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { RiDashboardHorizontalFill } from "react-icons/ri";
@@ -244,6 +244,7 @@ const AdminSidebar = () => {
             <AccordionGroup icon={FaBoxOpen} label="Products">
               <SubItem to="/admin/add-product" icon={HiPlusCircle}  label="Add Product" />
               <SubItem to="/admin/products"    icon={FaShoppingBag} label="All Products" />
+              <SubItem to="/admin/size-charts" icon={FaRulerCombined} label="Size Charts" />
             </AccordionGroup>
             <AccordionGroup icon={BiSolidOffer} label="Offers">
               <SubItem to="/admin/create-offers" icon={HiPlusCircle} label="Create Offer" />

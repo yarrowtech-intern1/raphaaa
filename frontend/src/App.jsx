@@ -63,6 +63,7 @@ import MarketingBroadcast from "./pages/MarketingBroadcast";
 import Chatbot from "./components/Chatbot/Chatbot";
 import ResetPassword from "./pages/ResetPassword";
 import ResetPasswordUser from "./pages/ResetPasswordUser";
+import AdminSizeCharts from "./pages/AdminSizeCharts";
 // import AdminAboutSettings from "./pages/AdminAboutSettings";
 
 const App = () => {
@@ -400,6 +401,14 @@ const App = () => {
               element={
                 <ProtectedRoute role={["admin", "marketing"]}>
                   <CampaignTracker/>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="size-charts"
+              element={
+                <ProtectedRoute role={["admin", "merchantise"]}>
+                  <AdminSizeCharts />
                 </ProtectedRoute>
               }
             />
