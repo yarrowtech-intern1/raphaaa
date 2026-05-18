@@ -2438,18 +2438,18 @@ const ProductDetails = ({ productId }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen pb-20">
       {selectedProduct && (
         <>
           {/* Breadcrumb */}
-          <div className="border-b border-gray-100 bg-white">
+          <div className="bg-linear-to-r from-sky-200 to-sky-100">
             <div className="max-w-7xl mx-auto px-4 py-3 text-xs text-gray-400 font-medium flex items-center gap-1.5 flex-wrap">
               <span onClick={() => navigate("/")} className="hover:text-gray-800 cursor-pointer transition">Home</span>
-              <span className="text-gray-300">/</span>
+              <span className="text-gray-500">/</span>
               {selectedProduct.category && (
                 <>
                   <span onClick={() => navigate(`/collections/${selectedProduct.category.toLowerCase()}`)} className="hover:text-gray-800 cursor-pointer capitalize transition">{selectedProduct.category}</span>
-                  <span className="text-gray-300">/</span>
+                  <span className="text-gray-500">/</span>
                 </>
               )}
               <span className="text-gray-700 font-semibold truncate max-w-[200px]">{selectedProduct.name}</span>
@@ -2457,10 +2457,10 @@ const ProductDetails = ({ productId }) => {
           </div>
 
           <div className="max-w-7xl mx-auto px-4 md:px-6 pt-6">
-          <div className="bg-white overflow-hidden">
+          <div className="overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-12">
               {/* LEFT: Image Gallery */}
-              <div className="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-gray-100 p-4 lg:p-6">
+              <div className="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-sky-300 p-4 lg:p-6">
                 <div className="lg:sticky lg:top-20">
                   <div className="flex gap-3">
                     {/* Thumbnails (desktop) */}
@@ -2580,7 +2580,7 @@ const ProductDetails = ({ productId }) => {
 
                 {/* Rating row */}
                 {selectedProduct.rating > 0 && selectedProduct.numReviews > 0 && (
-                  <div className="flex items-center gap-3 flex-wrap border-b border-gray-100 pb-4">
+                  <div className="flex items-center gap-3 flex-wrap border-b border-sky-300 pb-4">
                     <div className="flex items-center gap-1 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded">
                       {selectedProduct.rating.toFixed(1)} ★
                     </div>
@@ -2629,7 +2629,7 @@ const ProductDetails = ({ productId }) => {
                 </div>
 
                 {/* Offers strip */}
-                <div className="flex flex-wrap gap-3 py-3 border-y border-gray-100">
+                <div className="flex flex-wrap gap-3 py-3 border-y border-sky-300">
                   {[
                     { icon: "🚚", label: "Free delivery above ₹999" },
                     { icon: "↩", label: "7-day returns" },
@@ -2771,17 +2771,17 @@ const ProductDetails = ({ productId }) => {
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold tracking-widest text-gray-500 uppercase">Qty</span>
-                    <div className="flex items-center border border-gray-200">
+                    <div className="flex items-center border border-sky-300">
                       <button
                         onClick={() => handleQuantityChange("minus")}
                         disabled={quantity <= 1}
-                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-r border-gray-200 transition text-lg"
+                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-r border-sky-300 transition text-lg"
                       >−</button>
                       <span className="w-10 text-center text-sm font-semibold text-gray-800">{quantity}</span>
                       <button
                         onClick={() => handleQuantityChange("plus")}
                         disabled={quantity >= 10 || quantity >= selectedVariantStock || isOutOfStock}
-                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-l border-gray-200 transition text-lg"
+                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-l border-sky-300 transition text-lg"
                       >+</button>
                     </div>
                   </div>
@@ -2827,13 +2827,13 @@ const ProductDetails = ({ productId }) => {
                     </button>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
+                  <div className="border border-sky-300 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
                     This product is currently out of stock.
                   </div>
                 )}
 
                 {/* Delivery Check */}
-                <div className="border-t border-gray-100 pt-4 space-y-3">
+                <div className="border-t border-sky-300 pt-4 space-y-3">
                   <p className="text-[11px] font-bold tracking-[0.12em] text-gray-500 uppercase">Check Delivery</p>
                   <div className="flex gap-2">
                     <input
@@ -2880,25 +2880,25 @@ const ProductDetails = ({ productId }) => {
                       )}
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1 border-t border-gray-200">
+                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1 border-t border-sky-300">
                     <span>✅ Free delivery above ₹999</span>
                     <span>🔄 7-day easy returns</span>
                     <span>🔒 Secure checkout</span>
                   </div>
                 </div>
 
-                {selectedVariantSku && (
+                {/* {selectedVariantSku && (
                   <p className="text-xs text-gray-400">
                     SKU: <span className="font-mono">{selectedVariantSku}</span>
                   </p>
-                )}
+                )} */}
               </div>
             </div>
           </div>
 
           {/* Product Details + Specs */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">Product Details</h3>
+          <div className="p-4 md:p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-sky-300">Product Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {selectedProduct.description && (
                 <div>
@@ -2951,8 +2951,8 @@ const ProductDetails = ({ productId }) => {
           </div>
 
           {/* Ratings & Reviews */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+          <div className="bp-4 md:p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-sky-400">
               Ratings &amp; Reviews
             </h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
