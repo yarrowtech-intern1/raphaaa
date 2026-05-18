@@ -444,7 +444,7 @@ const RazorpayButton = ({
       onClick={handlePayment}
       className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200 font-medium text-lg"
     >
-      Pay ₹{amount?.toLocaleString()} with Razorpay
+      Pay ₹{amount?.toLocaleString()} Online
     </button>
   );
 };

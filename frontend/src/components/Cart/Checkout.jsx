@@ -108,13 +108,11 @@ const Checkout = () => {
 
   const [paymentMethod, setPaymentMethod] = useState("razorpay");
   const [orderProcessing, setOrderProcessing] = useState(false);
-  const [addressLoading, setAddressLoading] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [submitDisabled, setSubmitDisabled] = useState(false);
   const [orderInitiated, setOrderInitiated] = useState(false);
   const [selectedAddressIndex, setSelectedAddressIndex] = useState(null);
   const [fullUser, setFullUser] = useState(null);
-  const [useNewAddress, setUseNewAddress] = useState(false);
   // const [similarProducts, setSimilarProducts] = useState([]);
   const [displayCount, setDisplayCount] = useState(4);
   const [addressesOpen, setAddressesOpen] = useState(false); // collapsible toggle
@@ -287,56 +285,12 @@ const Checkout = () => {
     return true;
   };
 
-  const handlePhoneChange = (e) => {
-    let value = e.target.value;
-    if (!value.startsWith("+91")) {
-      value = "+91" + value.replace(/^\+91/, "");
-    }
-    value = "+91" + value.slice(3).replace(/\D/g, "");
-    if (value.length > 13) {
-      value = value.slice(0, 13);
-    }
-    setShippingAddress({ ...shippingAddress, phone: value });
-    validatePhone(value);
-  };
-
-  const handlePinCodeChange = async (e) => {
-    const pinCode = e.target.value;
-    setShippingAddress({ ...shippingAddress, postalCode: pinCode });
-
-    if (pinCode.length === 6 && /^\d{6}$/.test(pinCode)) {
-      setAddressLoading(true);
-      try {
-        const response = await axios.get(
-          `https://api.postalpincode.in/pincode/${pinCode}`
-        );
-        if (
-          response.data &&
-          response.data[0] &&
-          response.data[0].Status === "Success"
-        ) {
-          const postOffice = response.data[0].PostOffice[0];
-          setShippingAddress((prev) => ({
-            ...prev,
-            city: postOffice.District,
-            country: "India",
-          }));
-        }
-      } catch (error) {
-        console.error("[ERROR] Error fetching pin code data:", error);
-      } finally {
-        setAddressLoading(false);
-      }
-    }
-  };
-
   const handleAddressSelect = (address, index) => {
     setSelectedAddressIndex(index);
-
-    // Split full name into first and last
-    const nameParts = fullUser?.name?.split(" ") || [];
-    const firstName = nameParts[0] || "";
-    const lastName = nameParts.slice(1).join(" ") || "";
+    const firstName = address?.firstName || fullUser?.name?.split(" ")?.[0] || "";
+    const lastName =
+      address?.lastName ||
+      (fullUser?.name ? fullUser.name.split(" ").slice(1).join(" ") : "");
     setShippingAddress({
       firstName: firstName,
       lastName: lastName,
@@ -344,13 +298,17 @@ const Checkout = () => {
       city: address.city || "",
       postalCode: address.postalCode || "",
       country: address.country || "India",
-      phone: address.phone?.toString() || "",
+      phone: String(address.phone || ""),
     });
-    validatePhone(address.phone?.toString() || "");
+    validatePhone(String(address.phone || ""));
   };
 
   const handleCreateOrder = async (e) => {
     e.preventDefault();
+    if (!shippingAddress.address) {
+      toast.error("Please select an address first.");
+      return;
+    }
     if (!validatePhone(shippingAddress.phone)) return;
     if (orderInitiated || submitDisabled) return;
 
@@ -531,12 +489,24 @@ const Checkout = () => {
       // (optional) close the modal after successful save:
       setIsModalOpen(false);
 
-      // (optional) auto-select the newly added address:
-      // handleAddressSelect(next[next.length - 1], next.length - 1);
+      // auto-select newly added address for a simple flow
+      if (next.length > 0) {
+        const idx = next.length - 1;
+        handleAddressSelect(next[idx], idx);
+      }
     };
     window.addEventListener("address:list-updated", onAddressUpdated);
     return () => window.removeEventListener("address:list-updated", onAddressUpdated);
   }, []);
+
+  useEffect(() => {
+    const list = fullUser?.addresses || [];
+    if (!Array.isArray(list) || list.length === 0) return;
+    if (selectedAddressIndex !== null) return;
+    const defaultIndex = list.findIndex((a) => a?.isDefault);
+    const index = defaultIndex >= 0 ? defaultIndex : 0;
+    handleAddressSelect(list[index], index);
+  }, [fullUser?.addresses]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -571,7 +541,6 @@ const Checkout = () => {
   );
 
   /* ─────────────────── RENDER ─────────────────── */
-  const inputCls = "w-full px-4 py-2.5 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 transition";
   const labelCls = "block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5";
 
   return (
@@ -607,21 +576,9 @@ const Checkout = () => {
               </div>
               <div className="p-5 space-y-4">
                 <form onSubmit={handleCreateOrder} id="checkout-form">
-                  {/* Name row */}
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div>
-                      <label className={labelCls}>First Name</label>
-                      <input type="text" className={inputCls} required
-                        value={shippingAddress.firstName}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, firstName: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Last Name</label>
-                      <input type="text" className={inputCls} required
-                        value={shippingAddress.lastName}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, lastName: e.target.value })} />
-                    </div>
-                  </div>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Select a saved address or add a new one.
+                  </p>
 
                   {/* Saved addresses */}
                   {fullUser?.addresses?.length > 0 && (
@@ -669,11 +626,23 @@ const Checkout = () => {
 
                   {/* Add new address */}
                   <button type="button"
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => {
+                      if (!user) {
+                        navigate("/login?redirect=%2Fcheckout");
+                        return;
+                      }
+                      setIsModalOpen(true);
+                    }}
                     className="flex items-center gap-2 text-sm font-semibold text-sky-600 hover:text-sky-800 border border-sky-200 hover:border-sky-400 bg-sky-50 hover:bg-sky-100 px-4 py-2 rounded-xl transition"
                   >
                     <FaPlus className="text-xs" /> Add New Address
                   </button>
+
+                  {selectedAddressIndex === null && (
+                    <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      No address selected yet.
+                    </p>
+                  )}
                 </form>
               </div>
             </div>
@@ -728,7 +697,7 @@ const Checkout = () => {
                   {loading || orderProcessing ? (
                     <><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                   ) : paymentMethod === "razorpay" ? (
-                    <><FaLock className="text-sm" /> Pay ₹{computedTotal.toLocaleString("en-IN")} with Razorpay</>
+                    <><FaLock className="text-sm" /> Pay ₹{computedTotal.toLocaleString("en-IN")} online</>
                   ) : (
                     <>📦 Place Order — Cash on Delivery</>
                   )}

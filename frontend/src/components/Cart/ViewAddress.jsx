@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { FaLocationCrosshairs } from "react-icons/fa6";
 import axios from "axios";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaUserCircle, FaTrash, FaMapMarkerAlt } from "react-icons/fa";
 
 
@@ -11,6 +11,11 @@ import { FaUserCircle, FaTrash, FaMapMarkerAlt } from "react-icons/fa";
 const ViewAddress = () => {
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
+  const location = useLocation();
+  const authHeaders = () => {
+    const token = localStorage.getItem("userToken");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
   const [addresses, setAddresses] = useState([]);
   const [newAddress, setNewAddress] = useState({
     address: "",
@@ -87,8 +92,11 @@ const ViewAddress = () => {
   //   }, [activeTab, user]);
 
   useEffect(() => {
-    if (!user) navigate("/login");
-  }, [user, navigate]);
+    if (!user) {
+      const redirect = encodeURIComponent(location.pathname || "/checkout");
+      navigate(`/login?redirect=${redirect}`);
+    }
+  }, [user, navigate, location.pathname]);
 
   //   useEffect(() => {
   //     const fetchWishlist = async () => {
@@ -162,14 +170,14 @@ const ViewAddress = () => {
       try {
         const { data } = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
-          { headers: { userid: user?._id } }
+          { headers: authHeaders() }
         );
         setAddresses(data);
       } catch (err) {
         console.error("Failed to load addresses", err);
       }
     };
-    if (user) fetchAddresses();
+    if (user && localStorage.getItem("userToken")) fetchAddresses();
   }, [user]);
 
   const handleAddressSubmit = async (e) => {
@@ -178,7 +186,7 @@ const ViewAddress = () => {
       const { data } = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
         newAddress,
-        { headers: { userid: user._id } }
+        { headers: authHeaders() }
       );
       //   if(addresses === ""){
       //     toast.warning("Number is required");
@@ -201,7 +209,7 @@ const ViewAddress = () => {
     try {
       const { data } = await axios.delete(
         `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${index}`,
-        { headers: { userid: user._id } }
+        { headers: authHeaders() }
       );
       setAddresses(data.addresses);
       toast.success("Address deleted");

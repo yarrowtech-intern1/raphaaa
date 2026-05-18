@@ -5,7 +5,7 @@ import { FaLocationCrosshairs } from "react-icons/fa6";
 import { HiCheckCircle, HiTrash } from "react-icons/hi2";
 import axios from "axios";
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* ── Indian states for Shiprocket ── */
 const INDIA_STATES = [
@@ -31,6 +31,11 @@ const labelCls = "block text-[11px] font-bold text-gray-500 uppercase tracking-w
 const AddressForm = () => {
   const { user } = useSelector((s) => s.auth);
   const navigate  = useNavigate();
+  const location = useLocation();
+  const authHeaders = () => {
+    const token = localStorage.getItem("userToken");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const [addresses, setAddresses]   = useState([]);
   const [form,      setForm]        = useState(EMPTY_ADDRESS);
@@ -39,13 +44,19 @@ const AddressForm = () => {
   const [pincodeLoading, setPincodeLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
 
-  useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
+  useEffect(() => {
+    if (!user) {
+      const redirect = encodeURIComponent(location.pathname || "/checkout");
+      navigate(`/login?redirect=${redirect}`);
+    }
+  }, [user, navigate, location.pathname]);
 
   /* ── fetch saved addresses ── */
   useEffect(() => {
     if (!user) return;
+    if (!localStorage.getItem("userToken")) return;
     axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
-      { headers: { userid: user._id } })
+      { headers: authHeaders() })
       .then(({ data }) => setAddresses(data))
       .catch(console.error);
   }, [user]);
@@ -114,16 +125,16 @@ const AddressForm = () => {
       let data;
       if (editingIndex !== null) {
         const putRes = await axios.put(
-          `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/addresses/${editingIndex}`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${editingIndex}`,
           form,
-          { headers: { userid: user._id } }
+          { headers: authHeaders() }
         );
         data = putRes.data;
       } else {
         const postRes = await axios.post(
           `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`,
           form,
-          { headers: { userid: user._id } }
+          { headers: authHeaders() }
         );
         data = postRes.data;
       }
@@ -142,7 +153,7 @@ const AddressForm = () => {
     try {
       const { data } = await axios.delete(
         `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${index}`,
-        { headers: { userid: user._id } }
+        { headers: authHeaders() }
       );
       setAddresses(data.addresses);
       window.dispatchEvent(new CustomEvent("address:list-updated", { detail: data.addresses || data }));

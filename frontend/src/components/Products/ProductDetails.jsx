@@ -1720,8 +1720,10 @@ const ProductDetails = ({ productId }) => {
   const [displayCount, setDisplayCount] = useState(8); // Initial 8 products shown
 
   const [featuredCollab, setFeaturedCollab] = useState(null);
-  // zoom state + position (in % of the image box)
+  // zoom: pct cursor position inside the image box
   const [zoom, setZoom] = useState({ active: false, x: 50, y: 50 });
+  // fixed-viewport coordinates for the floating zoom panel
+  const [zoomPanel, setZoomPanel] = useState({ top: 0, left: 0, size: 0 });
 
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1834,22 +1836,29 @@ const ProductDetails = ({ productId }) => {
     selectedProduct?.skuCode ||
     selectedProduct?.sku;
 
-  const handleZoomEnter = () => setZoom((s) => ({ ...s, active: true }));
+  const handleZoomEnter = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Panel is the same size as the image box — sits right-aligned to its top
+    const size = Math.min(rect.height, 440);
+    setZoomPanel({ top: rect.top, left: rect.right + 14, size });
+    setZoom((s) => ({ ...s, active: true }));
+  };
+
   const handleZoomLeave = () => setZoom({ active: false, x: 50, y: 50 });
+
   const handleZoomMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
     setZoom((prev) => ({ ...prev, x, y }));
   };
 
-  // (optional) mobile touch support
   const handleZoomTouchMove = (e) => {
     const t = e.touches?.[0];
     if (!t) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((t.clientX - rect.left) / rect.width) * 100;
-    const y = ((t.clientY - rect.top) / rect.height) * 100;
+    const x = Math.max(0, Math.min(100, ((t.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((t.clientY - rect.top) / rect.height) * 100));
     setZoom((prev) => ({ ...prev, x, y }));
   };
 
@@ -2442,7 +2451,7 @@ const ProductDetails = ({ productId }) => {
       {selectedProduct && (
         <>
           {/* Breadcrumb */}
-          <div className="bg-linear-to-r from-sky-200 to-sky-100">
+          <div className="border-b border-gray-100">
             <div className="max-w-7xl mx-auto px-4 py-3 text-xs text-gray-400 font-medium flex items-center gap-1.5 flex-wrap">
               <span onClick={() => navigate("/")} className="hover:text-gray-800 cursor-pointer transition">Home</span>
               <span className="text-gray-500">/</span>
@@ -2457,43 +2466,50 @@ const ProductDetails = ({ productId }) => {
           </div>
 
           <div className="max-w-7xl mx-auto px-4 md:px-6 pt-6">
-          <div className="overflow-hidden">
+          <div className="overflow-visible">
             <div className="grid grid-cols-1 lg:grid-cols-12">
               {/* LEFT: Image Gallery */}
-              <div className="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-sky-300 p-4 lg:p-6">
+              <div className="lg:col-span-5 p-4 lg:p-6">
                 <div className="lg:sticky lg:top-20">
-                  <div className="flex gap-3">
-                    {/* Thumbnails (desktop) */}
-                    <div className="hidden md:flex flex-col gap-2 flex-shrink-0">
+                  <div className="flex gap-3 relative">
+                    {/* Thumbnails (desktop) — vertical strip */}
+                    <div className="hidden md:flex flex-col gap-2 flex-shrink-0 w-16">
                       {displayImages.map((img, i) => (
-                        <img
+                        <button
                           key={i}
-                          src={img.url}
-                          alt={img.altText || `View ${i + 1}`}
                           onClick={() => setMainImage(img.url)}
-                          className={`w-[60px] h-[60px] object-cover rounded-sm cursor-pointer transition-all ${
+                          className={`w-16 h-16 rounded-md overflow-hidden border-2 transition-all flex-shrink-0 ${
                             effectiveMainImage === img.url
-                              ? "ring-2 ring-gray-900 ring-offset-1"
-                              : "opacity-60 hover:opacity-100"
+                              ? "border-sky-500 shadow-sm"
+                              : "border-transparent hover:border-sky-300 opacity-70 hover:opacity-100"
                           }`}
-                        />
+                        >
+                          <img
+                            src={img.url}
+                            alt={img.altText || `View ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
                       ))}
                     </div>
 
-                    {/* Main image */}
+                    {/* Main image + zoom */}
                     <div className="flex-1 relative">
+                      {/* Badges */}
                       {selectedProduct.offerPercentage > 0 && (
                         <div className="absolute top-3 left-3 z-10 bg-red-600 text-white text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
                           {selectedProduct.offerPercentage}% off
                         </div>
                       )}
                       {new Date() - new Date(selectedProduct.createdAt) < 2 * 24 * 60 * 60 * 1000 && (
-                        <div className="absolute top-3 right-14 z-10 bg-black text-white text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-sm">
+                        <div className="absolute top-3 right-12 z-10 bg-sky-600 text-white text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-sm">
                           New
                         </div>
                       )}
+
+                      {/* Main image — hover zone */}
                       <div
-                        className="relative w-full aspect-square overflow-hidden cursor-zoom-in"
+                        className={`relative w-full aspect-square overflow-hidden  select-none ${zoom.active ? "cursor-crosshair" : "cursor-zoom-in"}`}
                         onMouseEnter={handleZoomEnter}
                         onMouseLeave={handleZoomLeave}
                         onMouseMove={handleZoomMove}
@@ -2506,17 +2522,26 @@ const ProductDetails = ({ productId }) => {
                           src={effectiveMainImage || selectedProduct.images?.[0]?.url}
                           alt="Main Product"
                           onClick={() => handleImageClick(effectiveMainImage)}
-                          className="w-full h-full object-contain"
-                          style={{
-                            transform: zoom.active ? "scale(2)" : "scale(1)",
-                            transformOrigin: `${zoom.x}% ${zoom.y}%`,
-                            transition: "transform 120ms ease-out",
-                            willChange: "transform",
-                          }}
+                          className="w-full h-full object-contain pointer-events-none select-none"
+                          draggable={false}
                         />
+
+                        {/* Lens square — 1/3 of the container (matches 3× zoom) */}
+                        {zoom.active && (
+                          <div
+                            className="hidden md:block absolute pointer-events-none border-2 border-sky-500 bg-sky-400/15"
+                            style={{
+                              width:     "33.33%",
+                              height:    "33.33%",
+                              left:      `calc(${zoom.x}% - 16.67%)`,
+                              top:       `calc(${zoom.y}% - 16.67%)`,
+                            }}
+                          />
+                        )}
                       </div>
+
                       {/* Action buttons */}
-                      <div className="absolute top-2 right-2 flex flex-col gap-2">
+                      <div className="absolute top-2 right-2 flex flex-col gap-2 z-10">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2525,18 +2550,19 @@ const ProductDetails = ({ productId }) => {
                               : handleAddToWishlist(selectedProduct);
                           }}
                           className={`w-9 h-9 flex items-center justify-center rounded-full border bg-white transition-all hover:scale-110 shadow-sm ${
-                            isInWishlist(selectedProduct._id) ? "text-red-500 border-red-200" : "text-gray-400 hover:text-red-400 border-gray-200"
+                            isInWishlist(selectedProduct._id)
+                              ? "text-red-500 border-red-200"
+                              : "text-gray-400 hover:text-red-400 border-gray-200"
                           }`}
                         >
-                          {isInWishlist(selectedProduct._id) ? (
-                            <AiFillHeart className="text-lg" />
-                          ) : (
-                            <AiOutlineHeart className="text-lg" />
-                          )}
+                          {isInWishlist(selectedProduct._id)
+                            ? <AiFillHeart className="text-lg" />
+                            : <AiOutlineHeart className="text-lg" />
+                          }
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); setShareOpen(true); }}
-                          className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:scale-110 transition shadow-sm"
+                          className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 hover:text-sky-600 hover:border-sky-300 hover:scale-110 transition shadow-sm"
                         >
                           <FiShare2 className="text-base" />
                         </button>
@@ -2544,28 +2570,35 @@ const ProductDetails = ({ productId }) => {
                     </div>
                   </div>
 
+                  {/* zoom panel rendered at root level — see below */}
+
                   {/* Mobile thumbnails */}
                   <div className="flex md:hidden mt-3 gap-2 overflow-x-auto pb-1">
                     {displayImages.map((img, i) => (
-                      <img
+                      <button
                         key={i}
-                        src={img.url}
-                        alt={img.altText || `View ${i + 1}`}
                         onClick={() => setMainImage(img.url)}
-                        className={`w-16 h-16 object-cover rounded-sm cursor-pointer flex-shrink-0 transition-all ${
-                          effectiveMainImage === img.url ? "ring-2 ring-gray-900 ring-offset-1" : "opacity-55 hover:opacity-100"
+                        className={`w-16 h-16 rounded-md overflow-hidden border-2 flex-shrink-0 transition-all ${
+                          effectiveMainImage === img.url
+                            ? "border-sky-500"
+                            : "border-transparent opacity-60 hover:opacity-100"
                         }`}
-                      />
+                      >
+                        <img src={img.url} alt={img.altText || `View ${i + 1}`} className="w-full h-full object-cover" />
+                      </button>
                     ))}
                   </div>
-                  <p className="hidden md:flex items-center justify-center gap-1.5 mt-3 text-xs text-gray-400">
-                    <BsSearch size={11} /> Hover to zoom · Click to enlarge
+
+                  <p className="hidden md:flex items-center gap-1.5 mt-3 text-[11px] text-gray-400">
+                    <BsSearch size={10} />
+                    Move mouse over image to zoom
                   </p>
                 </div>
               </div>
 
               {/* RIGHT: Product Info + Buy Box */}
-              <div className="lg:col-span-7 p-4 lg:p-8 space-y-5">
+              {/* isolate creates a new stacking context so nothing here leaks above the fixed zoom panel */}
+              <div className="lg:col-span-7 p-4 lg:p-8 space-y-5 isolate">
                 {/* Brand + Title */}
                 <div>
                   {selectedProduct.brand && (
@@ -2608,7 +2641,7 @@ const ProductDetails = ({ productId }) => {
                         <span className="text-base text-gray-400 line-through">
                           ₹{Math.floor(selectedProduct.price)}
                         </span>
-                        <span className="text-pink-600 font-bold text-base">
+                        <span className="text-sky-600 font-bold text-base">
                           {selectedProduct.offerPercentage}% off
                         </span>
                       </>
@@ -2737,27 +2770,43 @@ const ProductDetails = ({ productId }) => {
                         Size Guide
                       </button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3">
                       {effectiveSizes.map((size) => {
                         const sizeStock = getSizeStock(size);
                         const outOfStock = sizeStock <= 0;
+                        const isLow     = !outOfStock && sizeStock <= 5;
+
                         return (
-                        <button
-                          key={size}
-                          onClick={() => !outOfStock && setSelectedSize(size)}
-                          disabled={outOfStock}
-                          title={outOfStock ? "Out of stock" : size}
-                          className={`min-w-[44px] h-10 px-3 text-xs font-semibold border transition-all ${
-                            outOfStock
-                              ? "border-gray-100 text-gray-300 bg-white cursor-not-allowed line-through"
-                              : selectedSize === size
-                              ? "bg-gray-900 text-white border-gray-900"
-                              : "border-gray-200 text-gray-700 hover:border-gray-900 hover:text-gray-900"
-                          }`}
-                        >
-                          {size}
-                        </button>
-                      ); })}
+                          <div key={size} className="flex flex-col items-center gap-1">
+                            {/* Size button */}
+                            <button
+                              onClick={() => !outOfStock && setSelectedSize(size)}
+                              disabled={outOfStock}
+                              title={outOfStock ? "Out of stock" : `${size} — ${sizeStock} left`}
+                              className={`w-11 h-11 rounded-full text-xs font-semibold border transition-all relative ${
+                                outOfStock
+                                  ? "border-gray-100 text-gray-300 bg-white cursor-not-allowed line-through"
+                                  : selectedSize === size
+                                  ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+                                  : "border-gray-200 text-gray-700 hover:border-sky-500 hover:text-sky-700 bg-white"
+                              }`}
+                            >
+                              {size}
+                            </button>
+
+                            {/* Stock count badge — only shown when low or out */}
+                            {outOfStock ? (
+                              <span className="text-[9px] font-bold text-gray-300 tracking-wide">
+                                sold out
+                              </span>
+                            ) : isLow ? (
+                              <span className="text-[10px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full leading-none whitespace-nowrap">
+                                {sizeStock} left
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                     {matchedColorSizeEntry?.designName && (
                       <p className="text-xs text-gray-600 mt-2">
@@ -2771,17 +2820,17 @@ const ProductDetails = ({ productId }) => {
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold tracking-widest text-gray-500 uppercase">Qty</span>
-                    <div className="flex items-center border border-sky-300">
+                    <div className="flex items-center border border-gray-200 rounded-md overflow-hidden">
                       <button
                         onClick={() => handleQuantityChange("minus")}
                         disabled={quantity <= 1}
-                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-r border-sky-300 transition text-lg"
+                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-sky-50 hover:text-sky-700 disabled:opacity-30 disabled:cursor-not-allowed border-r border-gray-200 transition text-lg font-medium"
                       >−</button>
                       <span className="w-10 text-center text-sm font-semibold text-gray-800">{quantity}</span>
                       <button
                         onClick={() => handleQuantityChange("plus")}
                         disabled={quantity >= 10 || quantity >= selectedVariantStock || isOutOfStock}
-                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed border-l border-sky-300 transition text-lg"
+                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-sky-50 hover:text-sky-700 disabled:opacity-30 disabled:cursor-not-allowed border-l border-gray-200 transition text-lg font-medium"
                       >+</button>
                     </div>
                   </div>
@@ -2804,10 +2853,10 @@ const ProductDetails = ({ productId }) => {
                     <button
                       onClick={handleAddToCart}
                       disabled={isButtonDisabled}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3.5 font-bold text-sm tracking-wide uppercase transition-all active:scale-95 ${
+                      className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm tracking-wide transition-all active:scale-[0.98] shadow-sm ${
                         isButtonDisabled
                           ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-gray-900 text-white hover:bg-gray-700"
+                          : "bg-linear-to-r from-sky-600 to-blue-700 text-white hover:opacity-90 shadow-sky-200"
                       }`}
                     >
                       <FaCartShopping className="text-base" />
@@ -2816,10 +2865,10 @@ const ProductDetails = ({ productId }) => {
                     <button
                       onClick={handleBuyNow}
                       disabled={isBuyNowDisabled || maxLimitReached}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3.5 font-bold text-sm tracking-wide uppercase border transition-all active:scale-95 ${
+                      className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm tracking-wide border-2 transition-all active:scale-[0.98] ${
                         isBuyNowDisabled || maxLimitReached
                           ? "border-gray-200 text-gray-400 cursor-not-allowed"
-                          : "border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white"
+                          : "border-sky-600 text-sky-700 hover:bg-sky-600 hover:text-white"
                       }`}
                     >
                       <FiZap className={`text-base ${isBuyingNow ? "animate-pulse" : ""}`} />
@@ -2827,7 +2876,7 @@ const ProductDetails = ({ productId }) => {
                     </button>
                   </div>
                 ) : (
-                  <div className="border border-sky-300 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700 text-center">
                     This product is currently out of stock.
                   </div>
                 )}
@@ -2842,12 +2891,12 @@ const ProductDetails = ({ productId }) => {
                       value={pincode}
                       onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                       maxLength={6}
-                      className="flex-1 px-3 py-2.5 text-sm border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:border-gray-900 transition"
+                      className="flex-1 px-3 py-2.5 text-sm border border-gray-200 bg-gray-50 rounded-lg focus:bg-white focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition"
                     />
                     <button
                       onClick={handleDeliveryCheck}
                       disabled={isCheckingDelivery}
-                      className="px-5 py-2.5 text-xs font-bold tracking-wide uppercase border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition disabled:opacity-50"
+                      className="px-5 py-2.5 text-xs font-bold tracking-wide rounded-lg border-2 border-sky-600 text-sky-700 hover:bg-sky-600 hover:text-white transition disabled:opacity-50"
                     >
                       {isCheckingDelivery ? "Checking…" : "Check"}
                     </button>
@@ -2898,7 +2947,7 @@ const ProductDetails = ({ productId }) => {
 
           {/* Product Details + Specs */}
           <div className="p-4 md:p-6">
-            <h3 className="text-lg font-bold text-gray-900 border-b border-sky-400 mb-4 pb-2">Product Details</h3>
+            <h3 className="text-lg font-bold text-gray-900 border-b-2 border-sky-500 mb-4 pb-2 inline-block">Product Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {selectedProduct.description && (
                 <div>
@@ -3166,6 +3215,31 @@ const ProductDetails = ({ productId }) => {
             </div>
           )}
           </div>
+
+          {/* ── ZOOM PANEL ──────────────────────────────────────────────
+              Rendered here, at the TOP LEVEL of the fragment — a sibling
+              of the breadcrumb and the product grid, NOT inside either
+              column.  This guarantees it paints over EVERYTHING in the
+              product grid because it appears later in the DOM.
+              position:fixed removes it from flow; the high z-index keeps
+              it above any modals.  bg-position tracks the cursor exactly.
+          ── */}
+          {zoom.active && (
+            <div
+              className="hidden md:block fixed rounded-xl border-2 border-sky-300 shadow-2xl pointer-events-none overflow-hidden"
+              style={{
+                zIndex:             99999,
+                top:                zoomPanel.top,
+                left:               zoomPanel.left,
+                width:              zoomPanel.size,
+                height:             zoomPanel.size,
+                backgroundImage:    `url(${effectiveMainImage || selectedProduct?.images?.[0]?.url})`,
+                backgroundSize:     "300%",
+                backgroundRepeat:   "no-repeat",
+                backgroundPosition: `${zoom.x}% ${zoom.y}%`,
+              }}
+            />
+          )}
         </>
       )}
 
