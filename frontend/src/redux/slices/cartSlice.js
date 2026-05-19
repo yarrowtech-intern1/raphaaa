@@ -227,10 +227,12 @@ export const fetchCart = createAsyncThunk(
   "cart/fetchCart",
   async ({ userId, guestId }, { rejectWithValue }) => {
     try {
+      const token = localStorage.getItem("userToken");
       const response = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/cart`,
         {
           params: { userId, guestId },
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
       );
       return response.data;
@@ -249,6 +251,7 @@ export const addToCart = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
+      const token = localStorage.getItem("userToken");
       const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/cart`,
         { 
@@ -259,6 +262,9 @@ export const addToCart = createAsyncThunk(
           sku,
           guestId, 
           userId 
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
       );
       return response.data;
@@ -273,6 +279,7 @@ export const updateCartItemQuantity = createAsyncThunk(
   "cart/updateCartItemQuantity", async ({ productId, quantity, guestId, userId, size, color },
     { rejectWithValue }) => {
     try {
+      const token = localStorage.getItem("userToken");
       const response = await axios.put(
         `${import.meta.env.VITE_BACKEND_URL}/api/cart`,
         {
@@ -282,6 +289,9 @@ export const updateCartItemQuantity = createAsyncThunk(
           userId,
           size,
           color,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
       );
       return response.data;
@@ -296,10 +306,12 @@ export const removeFromCart = createAsyncThunk(
   "cart/removeFromCart",
   async ({ productId, guestId, userId, size, color }, { rejectWithValue }) => {
     try {
+      const token = localStorage.getItem("userToken");
       const response = await axios({
         method: "DELETE",
         url: `${import.meta.env.VITE_BACKEND_URL}/api/cart`,
         data: { productId, guestId, userId, size, color },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       return response.data;
     } catch (error) {

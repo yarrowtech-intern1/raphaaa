@@ -253,8 +253,25 @@ const express = require("express");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { protect } = require("../middleware/authMiddleware");
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
 const router = express.Router();
+
+const resolveAuthUser = async (req) => {
+    const auth = req.headers.authorization || "";
+    if (!auth.startsWith("Bearer ")) return null;
+    try {
+        const token = auth.split(" ")[1];
+        if (!token || token.split(".").length !== 3) return null;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded?.user?.id || decoded?.id;
+        if (!userId) return null;
+        return await User.findById(userId).select("_id");
+    } catch {
+        return null;
+    }
+};
 
 // helper function to get a cart by user ID or guest ID
 const getCart = async (userId, guestId) => {
@@ -312,6 +329,14 @@ const resolveSkuFromProduct = (product, color, size, skuFromRequest) => {
 router.post("/", async(req, res) => {
     const { productId, quantity, size, color, sku, guestId, userId } = req.body;
     try {
+        const authUser = await resolveAuthUser(req);
+        const effectiveUserId = authUser?._id?.toString();
+        const effectiveGuestId = effectiveUserId ? null : guestId;
+
+        if (!effectiveUserId && !effectiveGuestId) {
+            return res.status(400).json({ message: "guestId is required for guest cart" });
+        }
+
         const product = await Product.findById(productId);
         if (!product) return res.status(404).json({ message: "Product not found" });
 
@@ -319,7 +344,7 @@ router.post("/", async(req, res) => {
         const productImage = getProductImageForColor(product, color);
 
         // Determine if the user is logged in or guest
-        let cart = await getCart(userId, guestId);
+        let cart = await getCart(effectiveUserId, effectiveGuestId);
 
         // If the cart exists, update it
         if(cart) {
@@ -362,8 +387,8 @@ router.post("/", async(req, res) => {
         } else {
             // create a new cart for guest or user
             const newCart = await Cart.create({
-                user: userId ? userId : undefined,
-                guestId: guestId ? guestId : "guest_" + new Date().getTime(),
+                user: effectiveUserId ? effectiveUserId : undefined,
+                guestId: effectiveGuestId ? effectiveGuestId : "guest_" + new Date().getTime(),
                 products: [
                     {
                         productId,
@@ -393,7 +418,15 @@ router.put("/", async(req, res) => {
     const { productId, quantity, size, color, guestId, userId } = req.body;
 
     try {
-        let cart = await getCart(userId, guestId);
+        const authUser = await resolveAuthUser(req);
+        const effectiveUserId = authUser?._id?.toString();
+        const effectiveGuestId = effectiveUserId ? null : guestId;
+
+        if (!effectiveUserId && !effectiveGuestId) {
+            return res.status(400).json({ message: "guestId is required for guest cart" });
+        }
+
+        let cart = await getCart(effectiveUserId, effectiveGuestId);
         if(!cart) return res.status(404).json({ message: "Cart not found" });
 
         const productIndex = cart.products.findIndex(
@@ -432,7 +465,15 @@ router.put("/", async(req, res) => {
 router.delete("/", async (req, res) => {
     const { productId, size, color, guestId, userId } = req.body;
     try {
-        let cart = await getCart(userId, guestId);
+        const authUser = await resolveAuthUser(req);
+        const effectiveUserId = authUser?._id?.toString();
+        const effectiveGuestId = effectiveUserId ? null : guestId;
+
+        if (!effectiveUserId && !effectiveGuestId) {
+            return res.status(400).json({ message: "guestId is required for guest cart" });
+        }
+
+        let cart = await getCart(effectiveUserId, effectiveGuestId);
 
         if (!cart) return res.status(404).json({ message: "cart not found" });
 
@@ -468,7 +509,15 @@ router.get("/", async(req, res) => {
     const { userId, guestId } = req.query;
 
     try {
-        const cart = await getCart(userId, guestId);
+        const authUser = await resolveAuthUser(req);
+        const effectiveUserId = authUser?._id?.toString();
+        const effectiveGuestId = effectiveUserId ? null : guestId;
+
+        if (!effectiveUserId && !effectiveGuestId) {
+            return res.status(400).json({ message: "guestId is required for guest cart" });
+        }
+
+        const cart = await getCart(effectiveUserId, effectiveGuestId);
         if(cart) {
             res.json(cart);
         } else {

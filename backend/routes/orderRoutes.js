@@ -167,7 +167,17 @@ const applyStockDeduction = (product, item) => {
 // @access  Private
 router.post("/cod", protect, async (req, res) => {
   try {
-    const { orderItems, shippingAddress, totalPrice } = req.body;
+    const { orderItems, shippingAddress, totalPrice, idempotencyKey } = req.body;
+
+    if (idempotencyKey) {
+      const existingOrder = await Order.findOne({
+        user: req.user._id,
+        idempotencyKey,
+      });
+      if (existingOrder) {
+        return res.status(200).json(existingOrder);
+      }
+    }
 
     if (!orderItems || orderItems.length === 0) {
       return res.status(400).json({ message: "No order items provided" });
@@ -247,6 +257,7 @@ router.post("/cod", protect, async (req, res) => {
       isPaid: false,
       paymentStatus: "pending",
       status: "Processing",
+      idempotencyKey: idempotencyKey || undefined,
     });
 
     const createdOrder = await order.save();

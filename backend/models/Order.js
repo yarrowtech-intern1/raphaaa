@@ -100,6 +100,7 @@ const orderSchema = new mongoose.Schema(
         "Delivered",
         "RTO Initiated",
         "RTO Delivered",
+        "Refunded",
         "Cancelled",
       ],
       default: "Processing",
@@ -115,6 +116,11 @@ const orderSchema = new mongoose.Schema(
       channel: { type: String, default: "shiprocket" },
       lastSyncAt: { type: Date },
       rawTracking: { type: mongoose.Schema.Types.Mixed },
+    },
+    idempotencyKey: {
+      type: String,
+      index: true,
+      sparse: true,
     },
   },
   { timestamps: true }

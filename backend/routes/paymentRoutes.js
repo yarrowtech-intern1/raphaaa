@@ -491,6 +491,24 @@ router.post("/create-order", protect, async (req, res) => {
             });
           }
         }
+
+        const existingOrder = await Order.findOne({
+          user: req.user._id,
+          idempotencyKey,
+        }).session(session);
+        if (existingOrder) {
+          const existingPaymentByOrder = await Payment.findOne({ orderId: existingOrder._id }).session(session);
+          if (existingPaymentByOrder && existingOrder.paymentStatus === "pending") {
+            return res.status(200).json({
+              success: true,
+              orderId: existingOrder._id,
+              razorpayOrderId: existingPaymentByOrder.razorpayOrderId,
+              amount: existingOrder.totalPrice,
+              currency: existingPaymentByOrder.currency,
+              key: process.env.RAZORPAY_KEY_ID,
+            });
+          }
+        }
       }
 
       // Backfill SKU if frontend didn't send it
@@ -604,6 +622,27 @@ router.post("/create-order", protect, async (req, res) => {
   } catch (error) {
     console.error("Error creating Razorpay order:", error.message);
     console.error("Stack trace:", error.stack);
+
+    if (error?.code === 11000 && req.body?.idempotencyKey) {
+      try {
+        const existingPayment = await Payment.findOne({ idempotencyKey: req.body.idempotencyKey });
+        if (existingPayment) {
+          const order = await Order.findById(existingPayment.orderId);
+          if (order) {
+            return res.status(200).json({
+              success: true,
+              orderId: order._id,
+              razorpayOrderId: existingPayment.razorpayOrderId,
+              amount: order.totalPrice,
+              currency: existingPayment.currency,
+              key: process.env.RAZORPAY_KEY_ID,
+            });
+          }
+        }
+      } catch (lookupErr) {
+        console.error("Duplicate key lookup failed:", lookupErr.message);
+      }
+    }
     
     if (error.code === 'BAD_REQUEST_ERROR') {
       return res.status(400).json({ 
