@@ -121,7 +121,13 @@ const App = () => {
               element={<OrderConfirmationPage />}
             />
             <Route path="order/:id" element={<OrderDetailsPage />} />
-            <Route path="/my-orders" element={<MyOrders />} />
+            <Route path="/my-orders" element={
+              <div className="min-h-screen py-8">
+                <div className="max-w-3xl mx-auto px-4">
+                  <MyOrders />
+                </div>
+              </div>
+            } />
             <Route path="/about" element={<About />} />
             <Route path="/contact-us" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

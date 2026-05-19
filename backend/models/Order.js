@@ -117,6 +117,23 @@ const orderSchema = new mongoose.Schema(
       lastSyncAt: { type: Date },
       rawTracking: { type: mongoose.Schema.Types.Mixed },
     },
+    cancellation: {
+      isCancelledByUser: { type: Boolean, default: false },
+      reason: { type: String, default: "" },
+      cancelledAt: { type: Date },
+    },
+    refundTimeline: {
+      status: {
+        type: String,
+        enum: ["none", "initiated", "processed", "completed"],
+        default: "none",
+      },
+      initiatedAt: { type: Date },
+      processedAt: { type: Date },
+      completedAt: { type: Date },
+      expectedDate: { type: Date },
+      note: { type: String, default: "" },
+    },
     idempotencyKey: {
       type: String,
       index: true,

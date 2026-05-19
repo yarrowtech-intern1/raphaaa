@@ -1,15 +1,19 @@
 // src/pages/OrderDetailsPage.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useParams } from "react-router-dom";
-import { fetchOrderDetails } from "../redux/slices/orderSlice";
+import { cancelOrder, createReturnRequest, fetchOrderDetails } from "../redux/slices/orderSlice";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "sonner";
 
 const OrderDetailsPage = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
   const { orderDetails, loading, error } = useSelector((state) => state.orders);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   useEffect(() => {
     dispatch(fetchOrderDetails(id));
@@ -276,6 +280,50 @@ const OrderDetailsPage = () => {
   );
 
   const { pill, dot } = statusConfig(orderDetails.status);
+  const canCancel = !!orderDetails?.cancellationEligibility?.canCancel;
+  const showReturnReplace = orderDetails.status === "Delivered";
+
+  const handleCancelOrder = async () => {
+    if (!canCancel) return;
+    const reason = cancelReason.trim();
+    if (!reason) {
+      toast.error("Please provide cancellation reason");
+      return;
+    }
+    setCancelSubmitting(true);
+    const res = await dispatch(cancelOrder({ orderId: orderDetails._id, reason }));
+    if (res.meta.requestStatus === "fulfilled") {
+      toast.success("Order cancelled successfully");
+      setShowCancelModal(false);
+      setCancelReason("");
+    } else {
+      toast.error(res.payload?.message || "Failed to cancel order");
+    }
+    setCancelSubmitting(false);
+  };
+
+  const handleReturnReplace = async (requestType) => {
+    const reason = window.prompt(
+      `Enter ${requestType === "replace" ? "replacement" : "return"} reason`
+    );
+    if (!reason || !reason.trim()) return;
+    const productIds = (orderDetails.orderItems || [])
+      .map((it) => String(it.productId?._id || it.productId || ""))
+      .filter(Boolean);
+    const res = await dispatch(
+      createReturnRequest({
+        orderId: orderDetails._id,
+        requestType,
+        reason: reason.trim(),
+        itemProductIds: productIds,
+      })
+    );
+    if (res.meta.requestStatus === "fulfilled") {
+      toast.success(`${requestType === "replace" ? "Replacement" : "Return"} request created`);
+    } else {
+      toast.error(res.payload?.message || "Failed to create request");
+    }
+  };
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -474,12 +522,40 @@ const OrderDetailsPage = () => {
                   </span>
                 </div>
               )}
+              {orderDetails.refundTimeline?.status && orderDetails.refundTimeline.status !== "none" && (
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">Refund Timeline</p>
+                  <p className="text-xs text-gray-600 capitalize">
+                    Status: {String(orderDetails.refundTimeline.status).replace("_", " ")}
+                  </p>
+                  {orderDetails.refundTimeline.initiatedAt && (
+                    <p className="text-xs text-gray-500">
+                      Initiated: {new Date(orderDetails.refundTimeline.initiatedAt).toLocaleDateString("en-IN")}
+                    </p>
+                  )}
+                  {orderDetails.refundTimeline.processedAt && (
+                    <p className="text-xs text-gray-500">
+                      Processed: {new Date(orderDetails.refundTimeline.processedAt).toLocaleDateString("en-IN")}
+                    </p>
+                  )}
+                  {orderDetails.refundTimeline.completedAt && (
+                    <p className="text-xs text-gray-500">
+                      Completed: {new Date(orderDetails.refundTimeline.completedAt).toLocaleDateString("en-IN")}
+                    </p>
+                  )}
+                  {orderDetails.refundTimeline.expectedDate && (
+                    <p className="text-xs text-gray-500">
+                      Expected by: {new Date(orderDetails.refundTimeline.expectedDate).toLocaleDateString("en-IN")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* ── Bottom actions ── */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <Link to="/profile"
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-sky-400 hover:text-sky-700 hover:bg-sky-50 transition">
             ← Back to My Orders
@@ -492,8 +568,75 @@ const OrderDetailsPage = () => {
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-linear-to-r from-sky-600 to-blue-700 text-white text-sm font-bold hover:opacity-90 transition shadow-sm">
             🛍️ Continue Shopping
           </Link>
+          <button
+            onClick={() => canCancel && setShowCancelModal(true)}
+            disabled={!canCancel}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition ${
+              canCancel
+                ? "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                : "border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            Cancel Order
+          </button>
+          {showReturnReplace && (
+            <>
+              <button
+                onClick={() => handleReturnReplace("return")}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-amber-200 bg-amber-50 text-sm font-semibold text-amber-700 hover:bg-amber-100 transition"
+              >
+                Return Order
+              </button>
+              <button
+                onClick={() => handleReturnReplace("replace")}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+              >
+                Replace Order
+              </button>
+            </>
+          )}
         </div>
       </div>
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/35">
+          <div className="w-full max-w-md rounded-2xl border border-sky-100 bg-white shadow-xl overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-sky-50 to-blue-100 border-b border-sky-100">
+              <h3 className="text-sm font-bold text-sky-800">Cancel Order</h3>
+              <p className="text-xs text-sky-700 mt-1">
+                Please provide cancellation reason
+              </p>
+            </div>
+            <div className="p-5 space-y-4">
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Write your reason..."
+                rows={4}
+                className="w-full rounded-xl border border-sky-200 bg-sky-50/30 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-300"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => {
+                    if (cancelSubmitting) return;
+                    setShowCancelModal(false);
+                    setCancelReason("");
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleCancelOrder}
+                  disabled={cancelSubmitting}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-sky-600 to-blue-700 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+                >
+                  {cancelSubmitting ? "Cancelling..." : "Confirm Cancel"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

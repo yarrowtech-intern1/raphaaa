@@ -1105,6 +1105,19 @@ router.post("/refund/:paymentId", protect, async (req, res) => {
       if (order) {
         order.paymentStatus = "refunded";
         order.status = "Refunded";
+        const expectedDate = order.refundTimeline?.expectedDate || new Date();
+        if (!order.refundTimeline?.expectedDate) expectedDate.setDate(expectedDate.getDate() + 7);
+        const initiatedAt = order.refundTimeline?.initiatedAt || new Date();
+        const processedAt = new Date();
+        const completedAt = new Date();
+        order.refundTimeline = {
+          status: "completed",
+          initiatedAt,
+          processedAt,
+          completedAt,
+          expectedDate,
+          note: reason || "Refund completed",
+        };
         await order.save({ session });
       }
 

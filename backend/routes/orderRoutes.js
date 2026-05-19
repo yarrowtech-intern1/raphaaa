@@ -65,6 +65,9 @@ const Collab = require("../models/Collab");
 const { buildInvoicePDF } = require("../utils/invoice");
 const { getJson, setJson } = require("../utils/redisCache");
 
+const USER_CANCELLABLE_STATUSES = new Set(["Processing", "Packed", "Transfer"]);
+const USER_CANCEL_WINDOW_HOURS = Number(process.env.USER_CANCEL_WINDOW_HOURS || 24);
+
 const applyStockDeduction = (product, item) => {
   const qty = Number(item?.quantity || 0);
   if (!product || qty <= 0) return { ok: true };
@@ -480,6 +483,21 @@ router.get("/:id", protect, async (req, res) => {
     }
 
     const responseOrder = order.toObject();
+    const createdAtMs = new Date(order.createdAt).getTime();
+    const withinCancelWindow =
+      Date.now() - createdAtMs <= USER_CANCEL_WINDOW_HOURS * 60 * 60 * 1000;
+    const canCancelByUser =
+      !order.cancellation?.isCancelledByUser &&
+      USER_CANCELLABLE_STATUSES.has(order.status) &&
+      withinCancelWindow;
+    responseOrder.cancellationEligibility = {
+      canCancel: canCancelByUser,
+      windowHours: USER_CANCEL_WINDOW_HOURS,
+      reason: canCancelByUser
+        ? ""
+        : "Cancellation window closed or order already shipped/cancelled",
+    };
+
     if (!responseOrder.paymentResult?.id) {
       const payment = await Payment.findOne({ orderId: order._id }).lean();
       if (payment?.razorpayPaymentId) {
@@ -596,6 +614,60 @@ router.get("/revenue/total", protect, adminOrMerchantise, async (req, res) => {
     res.json(payload);
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// @desc Customer cancellation request
+// @route POST /api/orders/:id/cancel
+// @access Private
+router.post("/:id/cancel", protect, async (req, res) => {
+  try {
+    const { reason = "" } = req.body || {};
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (String(order.user) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const createdAtMs = new Date(order.createdAt).getTime();
+    const withinCancelWindow =
+      Date.now() - createdAtMs <= USER_CANCEL_WINDOW_HOURS * 60 * 60 * 1000;
+    const canCancel =
+      !order.cancellation?.isCancelledByUser &&
+      USER_CANCELLABLE_STATUSES.has(order.status) &&
+      withinCancelWindow;
+
+    if (!canCancel) {
+      return res.status(400).json({
+        message: "Order cannot be cancelled at this stage",
+      });
+    }
+
+    order.status = "Cancelled";
+    order.cancellation = {
+      isCancelledByUser: true,
+      reason: String(reason || "").trim(),
+      cancelledAt: new Date(),
+    };
+    if (!order.isPaid) {
+      order.paymentStatus = "cancelled";
+    } else {
+      const expectedDate = new Date();
+      expectedDate.setDate(expectedDate.getDate() + 7);
+      order.refundTimeline = {
+        status: "initiated",
+        initiatedAt: new Date(),
+        expectedDate,
+        note: "Refund initiated due to customer cancellation",
+      };
+    }
+    const updated = await order.save();
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Cancel order error:", error);
+    res.status(500).json({ message: "Failed to cancel order" });
   }
 });
 
