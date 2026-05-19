@@ -2030,6 +2030,31 @@ const ProductDetails = ({ productId }) => {
     );
 
     try {
+      if (!user) {
+        if (!alreadyInCart) {
+          const guestId = localStorage.getItem("guestId");
+          const res = await dispatch(
+            addToCart({
+              productId: selectedProduct._id,
+              quantity,
+              size: selectedSize,
+              color: selectedColor,
+              sku: selectedVariantSku,
+              guestId,
+            })
+          );
+
+          if (res.meta.requestStatus !== "fulfilled") {
+            toast.error("Failed to add product. Try again.");
+            return;
+          }
+        }
+
+        toast.warning("Please login to continue.");
+        navigate("/login?redirect=%2Fcheckout");
+        return;
+      }
+
       if (!alreadyInCart) {
         const user = JSON.parse(localStorage.getItem("userInfo"));
         const guestId = localStorage.getItem("guestId");
@@ -3356,7 +3381,7 @@ const ProductDetails = ({ productId }) => {
 
 const ProductDetailsSkeleton = () => {
   return (
-    <div className="max-w-6xl mx-auto bg-white/80 backdrop-blur-md shadow-2xl rounded-3xl p-8 md:p-12 animate-pulse">
+    <div className="max-w-6xl mx-auto backdrop-blur-md p-8 md:p-12 animate-pulse">
       <div className="flex flex-col md:flex-row gap-8">
         <div className="hidden md:flex flex-col space-y-4">
           {[...Array(4)].map((_, i) => (

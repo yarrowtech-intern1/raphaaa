@@ -18,6 +18,7 @@ import { toast } from "sonner";
 const Navbar = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+  const [isNavbarFixed, setIsNavbarFixed] = useState(false);
   const { cart } = useSelector((state) => state.cart);
   const { user } = useSelector((state) => state.auth);
   const location = useLocation();
@@ -31,6 +32,16 @@ const Navbar = () => {
   useEffect(() => {
   window.cartIconRef = cartIconRef; // 👈 expose it globally
 }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsNavbarFixed(window.scrollY > 10);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
 
   useEffect(() => {
@@ -96,6 +107,14 @@ const Navbar = () => {
 
   return (
     <>
+      {isNavbarFixed && <div className="h-[104px] md:h-[88px]" />}
+      <div
+        className={`w-full ${
+          isNavbarFixed
+            ? "fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-sm border-b border-gray-100"
+            : "relative bg-transparent"
+        }`}
+      >
       <nav className="container mx-auto flex items-center justify-between py-3 md:py-4 px-3 sm:px-4 md:px-6 lg:px-8 gap-2">
         {/* Logo */}
         <Link to="/" className="flex items-center space-x-2 group shrink-0" title="Raphaaa">
@@ -257,6 +276,7 @@ const Navbar = () => {
       </nav>
       <div className="container mx-auto px-3 sm:px-4 md:hidden pb-2">
         <SearchBar />
+      </div>
       </div>
 
       <CartDrawer drawerOpen={drawerOpen} toggleCartDrawer={toggleCartDrawer} />

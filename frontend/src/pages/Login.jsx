@@ -25,8 +25,9 @@ const Login = () => {
   const { cart } = useSelector((state) => state.cart);
   const [showPassword, setShowPassword] = useState(false); // 👁️ Added
 
-  const redirect = new URLSearchParams(location.search).get("redirect") || "/";
-  const isCheckoutRedirect = redirect.includes("checkout");
+  const redirectParam = new URLSearchParams(location.search).get("redirect");
+  const redirect =
+    redirectParam && redirectParam.startsWith("/") ? redirectParam : "/";
 
   useEffect(() => {
     if (user) {
@@ -42,13 +43,13 @@ const Login = () => {
       }
       if (cart?.products.length > 0 && guestId) {
         dispatch(mergecart({ guestId, user })).then(() => {
-          navigate(isCheckoutRedirect ? "/checkout" : "/");
+          navigate(redirect);
         });
       } else {
-        navigate(isCheckoutRedirect ? "/checkout" : "/");
+        navigate(redirect);
       }
     }
-  }, [user, guestId, cart, navigate, isCheckoutRedirect, dispatch]);
+  }, [user, guestId, cart, navigate, redirect, dispatch]);
 
   //   useEffect(() => {
   //   if (user) {

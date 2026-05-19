@@ -32,20 +32,21 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);   // 👁️
 
-  const redirect = new URLSearchParams(location.search).get("redirect") || "/";
-  const isCheckoutRedirect = redirect.includes("checkout");
+  const redirectParam = new URLSearchParams(location.search).get("redirect");
+  const redirect =
+    redirectParam && redirectParam.startsWith("/") ? redirectParam : "/";
 
   useEffect(() => {
     if (user) {
       if (cart?.products.length > 0 && guestId) {
         dispatch(mergecart({ guestId, user })).then(() => {
-          navigate(isCheckoutRedirect ? "/checkout" : "/");
+          navigate(redirect);
         });
       } else {
-        navigate(isCheckoutRedirect ? "/checkout" : "/");
+        navigate(redirect);
       }
     }
-  }, [user, guestId, cart, navigate, isCheckoutRedirect, dispatch]);
+  }, [user, guestId, cart, navigate, redirect, dispatch]);
 
   // Password strength calculator
   useEffect(() => {
