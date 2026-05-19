@@ -2614,7 +2614,7 @@ const ProductDetails = ({ productId }) => {
                     ))}
                   </div>
 
-                  <p className="hidden md:flex items-center gap-1.5 mt-3 text-[11px] text-gray-400">
+                  <p className="hidden md:flex items-center justify-center text-centergap-1.5 mt-3 text-[11px] text-gray-400">
                     <BsSearch size={10} />
                     Move mouse over image to zoom
                   </p>
