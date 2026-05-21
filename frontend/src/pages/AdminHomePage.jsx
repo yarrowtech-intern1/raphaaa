@@ -498,7 +498,7 @@ const AdminHomePage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Recent user signups */}
-        {(isAdmin || isMerch) && (
+        {(isAdmin) && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div>
@@ -536,7 +536,7 @@ const AdminHomePage = () => {
         )}
 
         {/* Latest messages */}
-        {(isAdmin || isMerch || isMarketing) && (
+        {(isAdmin || isMarketing) && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div>
