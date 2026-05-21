@@ -3036,7 +3036,7 @@ const ProductDetails = ({ productId }) => {
                     })()}
                   </div>
 
-                  <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+                  {/* <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
                     <p className="text-[11px] font-bold tracking-[0.12em] text-gray-500 uppercase mb-2">Compare Offers</p>
                     <div className="flex flex-wrap gap-2">
                       {(() => {
@@ -3066,7 +3066,7 @@ const ProductDetails = ({ productId }) => {
                       })()}
                     </div>
                     <p className="mt-2 text-[11px] text-gray-400">External links may have different prices and policies.</p>
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* {selectedVariantSku && (
