@@ -185,7 +185,7 @@ startJobWorker({
 // Self-ping every 1 minute to prevent sleeping (Render free tier)
 setInterval(() => {
   axios
-    .get("https://raphaaa-backend.onrender.com/healthz" || "http://localhost:9000/healthz")
+    .get("https://raphaaa-backend.onrender.com/healthz" || "http://localhost:9000/healthz" || "https://raphaaa-backend-glnl.onrender.com/healthz")
     .then(() => console.log("[SELF-PING] Success. Server responding OK."))
     .catch((err) => console.error("[SELF-PING ERROR]:", err.message));
 }, 10 * 60 * 1000); // every 1 minute
