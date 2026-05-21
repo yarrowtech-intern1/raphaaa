@@ -440,7 +440,7 @@ router.post("/create-order", protect, async (req, res) => {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const { amount, currency = "INR", receipt, orderItems, shippingAddress, idempotencyKey } = req.body;
+      const { amount, currency = "INR", receipt, orderItems, shippingAddress, idempotencyKey, couponCodes, walletRedeem } = req.body;
 
       console.log("Creating order for user:", req.user._id);
       console.log("Order amount:", amount);
@@ -466,12 +466,23 @@ router.post("/create-order", protect, async (req, res) => {
         }
       }
 
-      // Calculate total price and verify with frontend amount
-      const calculatedTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-      
-      if (Math.abs(amount - calculatedTotal) > 0.01) {
-        console.error("Amount mismatch - Frontend:", amount, "Calculated:", calculatedTotal);
-        throw new Error("Amount mismatch between frontend and calculated total");
+      // Server-side pricing (promos + wallet). We keep item.price as the base unit price.
+      const { priceQuote } = require("../services/pricingService");
+      const { getAvailableCredits } = require("../services/walletService");
+      const quote = await priceQuote({
+        items: orderItems,
+        userId: req.user._id,
+        paymentMethod: "Razorpay",
+        couponCodes,
+        shippingAddress,
+      });
+      const walletBalance = await getAvailableCredits(req.user._id);
+      const requested = Math.max(0, Number(walletRedeem || 0));
+      const walletApplied = Math.min(walletBalance, requested, quote.total);
+      const calculatedTotal = Math.max(0, Number(quote.total) - walletApplied);
+
+      if (amount && Math.abs(Number(amount) - calculatedTotal) > 0.01) {
+        console.warn("Amount mismatch - Frontend:", amount, "Server:", calculatedTotal);
       }
 
       // Check for existing pending order with idempotencyKey
@@ -564,6 +575,7 @@ router.post("/create-order", protect, async (req, res) => {
         },
         paymentMethod: "RazorPay",
         totalPrice: calculatedTotal,
+        walletApplied,
         isPaid: false,
         paymentStatus: "pending",
         status: "Processing",
@@ -769,6 +781,23 @@ router.post("/verify-payment", protect, async (req, res) => {
         email_address: req.user.email,
       };
       await order.save({ session });
+
+      // Redeem wallet only after payment is captured
+      try {
+        const { redeem } = require("../services/walletService");
+        const walletApplied = Number(order.walletApplied || 0);
+        if (walletApplied > 0) {
+          await redeem({
+            userId: order.user,
+            amount: walletApplied,
+            refType: "order_razorpay",
+            refId: String(order._id),
+            note: `Redeemed for Razorpay order ${order.orderId}`,
+          });
+        }
+      } catch (walletErr) {
+        console.error("Wallet redeem after capture failed:", walletErr?.message || walletErr);
+      }
 
       // Update product stock
       for (const item of order.orderItems) {

@@ -25,6 +25,7 @@ const AdminSizeCharts = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [genderOptions, setGenderOptions] = useState([]);
+  const [uploadField, setUploadField] = useState("");
 
   const token = localStorage.getItem("userToken");
 
@@ -63,25 +64,31 @@ const AdminSizeCharts = () => {
 
   const uploadImage = async (field, file) => {
     if (!file) return;
+    if (!token) {
+      toast.error("Please login again (missing token)");
+      return;
+    }
     const fd = new FormData();
     fd.append("image", file);
     try {
       setUploading(true);
+      setUploadField(field);
       const { data } = await axios.post(`${API_BASE}/api/upload`, fd, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
       setForm((p) => ({ ...p, [field]: data.imageUrl }));
     } catch {
       toast.error("Image upload failed");
     } finally {
       setUploading(false);
+      setUploadField("");
     }
   };
 
   const createChart = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.chartImageUrl) {
-      toast.error("Name and chart image are required");
+    if (!form.name.trim() || !form.chartImageUrl || !form.measureImageUrl) {
+      toast.error("Name, chart image, and how-to-measure image are required");
       return;
     }
     try {
@@ -147,16 +154,35 @@ const AdminSizeCharts = () => {
 
         <div className="flex flex-wrap gap-3">
           <label className="px-4 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold cursor-pointer">
-            Upload Chart Image
+            {uploading && uploadField === "chartImageUrl" ? "Uploading Chart..." : "Upload Chart Image"}
             <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadImage("chartImageUrl", e.target.files?.[0])} />
           </label>
           <label className="px-4 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold cursor-pointer">
-            Upload How-To-Measure Image
+            {uploading && uploadField === "measureImageUrl" ? "Uploading Measure..." : "Upload How-To-Measure Image"}
             <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadImage("measureImageUrl", e.target.files?.[0])} />
           </label>
           <button disabled={loading || uploading} className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold disabled:opacity-60">
             {loading ? "Saving..." : "Save Size Chart"}
           </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Chart Preview</p>
+            {form.chartImageUrl ? (
+              <img src={form.chartImageUrl} alt="Chart preview" className="w-full h-40 object-cover rounded-lg border border-gray-200" />
+            ) : (
+              <p className="text-sm text-gray-400">No chart image uploaded yet.</p>
+            )}
+          </div>
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">How To Measure Preview</p>
+            {form.measureImageUrl ? (
+              <img src={form.measureImageUrl} alt="How to measure preview" className="w-full h-40 object-cover rounded-lg border border-gray-200" />
+            ) : (
+              <p className="text-sm text-gray-400">No how-to-measure image uploaded yet.</p>
+            )}
+          </div>
         </div>
       </form>
 
@@ -165,7 +191,20 @@ const AdminSizeCharts = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {charts.map((c) => (
             <div key={c._id} className="border border-gray-200 rounded-xl p-3 space-y-2">
-              <img src={c.chartImageUrl} alt={c.name} className="w-full h-36 object-cover rounded-lg border border-gray-200" />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Chart</p>
+                  <img src={c.chartImageUrl} alt={c.name} className="w-full h-28 object-cover rounded-lg border border-gray-200" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Measure</p>
+                  <img
+                    src={c.measureImageUrl || c.chartImageUrl}
+                    alt={`${c.name} measure`}
+                    className="w-full h-28 object-cover rounded-lg border border-gray-200"
+                  />
+                </div>
+              </div>
               <p className="font-semibold text-gray-900">{c.name}</p>
               <p className="text-xs text-gray-500">{c.audience} • {c.unit}</p>
               <button

@@ -4,14 +4,56 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const { protect } = require("../middleware/authMiddleware");
+const { priceQuote } = require("../services/pricingService");
+const { getAvailableCredits, redeem } = require("../services/walletService");
 
 const router = express.Router();
+
+// @route POST /api/checkout/quote
+// @desc Server-side pricing quote (promos/shipping). Client should use this before creating checkout.
+// @access Private
+router.post("/quote", protect, async (req, res) => {
+  try {
+    const { checkoutItems, paymentMethod, couponCodes, walletRedeem } = req.body;
+    if (!Array.isArray(checkoutItems) || checkoutItems.length === 0) {
+      return res.status(400).json({ message: "no items in checkout" });
+    }
+
+    const quote = await priceQuote({
+      items: checkoutItems,
+      userId: req.user._id,
+      paymentMethod,
+      couponCodes,
+    });
+
+    const walletBalance = await getAvailableCredits(req.user._id);
+    const requested = Math.max(0, Number(walletRedeem || 0));
+    const walletApplied = Math.min(walletBalance, requested, quote.total);
+    const totalAfterWallet = Math.max(0, Number(quote.total) - walletApplied);
+
+    res.json({
+      success: true,
+      quote: {
+        ...quote,
+        wallet: {
+          balance: walletBalance,
+          requested,
+          applied: walletApplied,
+        },
+        totalAfterWallet,
+      },
+    });
+  } catch (error) {
+    console.error("checkout quote error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 // @route POST /api/checkout
 // @desc Create a new checkout session
 // @access Private
 router.post("/", protect, async (req, res) => {
-    const { checkoutItems, shippingAddress, paymentMethod, totalPrice } =
+    const { checkoutItems, shippingAddress, paymentMethod, couponCodes, walletRedeem } =
         req.body;
 
         if(!checkoutItems || checkoutItems.length === 0){
@@ -19,13 +61,31 @@ router.post("/", protect, async (req, res) => {
         }
 
         try {
+            const quote = await priceQuote({
+                items: checkoutItems,
+                userId: req.user._id,
+                paymentMethod,
+                couponCodes,
+                shippingAddress,
+            });
+
+            const walletBalance = await getAvailableCredits(req.user._id);
+            const requested = Math.max(0, Number(walletRedeem || 0));
+            const walletApplied = Math.min(walletBalance, requested, quote.total);
+            const totalAfterWallet = Math.max(0, Number(quote.total) - walletApplied);
+
             // Create a new checkout session
             const newCheckout = await Checkout.create({
                 user: req.user._id,
                 checkoutItems: checkoutItems,
                 shippingAddress,
                 paymentMethod,
-                totalPrice,
+                totalPrice: totalAfterWallet,
+                pricing: {
+                  ...quote,
+                  wallet: { balance: walletBalance, requested, applied: walletApplied },
+                  totalAfterWallet,
+                },
                 paymentStatus: "Pending",
                 isPaid: false,
             });
@@ -90,6 +150,18 @@ router.post("/:id/finalize", protect, async(req, res) => {
                 paymentStatus: "paid",
                 paymentDetails: checkout.paymentDetails,
             });
+
+            // Wallet redemption is applied at finalize to prevent double-spend on abandoned checkouts.
+            const walletApplied = Number(checkout?.pricing?.wallet?.applied || 0);
+            if (walletApplied > 0) {
+              await redeem({
+                userId: checkout.user,
+                amount: walletApplied,
+                refType: "checkout",
+                refId: String(checkout._id),
+                note: `Redeemed for order ${finalOrder.orderId}`,
+              });
+            }
 
             // mark the checkout as finalized
             checkout.isFinalized = true;

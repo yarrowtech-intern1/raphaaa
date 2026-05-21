@@ -64,6 +64,8 @@ const { sendMail } = require("../utils/sendMail");
 const Collab = require("../models/Collab");
 const { buildInvoicePDF } = require("../utils/invoice");
 const { getJson, setJson } = require("../utils/redisCache");
+const { priceQuote } = require("../services/pricingService");
+const { getAvailableCredits, redeem } = require("../services/walletService");
 
 const USER_CANCELLABLE_STATUSES = new Set(["Processing", "Packed", "Transfer"]);
 const USER_CANCEL_WINDOW_HOURS = Number(process.env.USER_CANCEL_WINDOW_HOURS || 24);
@@ -170,7 +172,7 @@ const applyStockDeduction = (product, item) => {
 // @access  Private
 router.post("/cod", protect, async (req, res) => {
   try {
-    const { orderItems, shippingAddress, totalPrice, idempotencyKey } = req.body;
+    const { orderItems, shippingAddress, couponCodes, walletRedeem, idempotencyKey } = req.body;
 
     if (idempotencyKey) {
       const existingOrder = await Order.findOne({
@@ -256,14 +258,38 @@ router.post("/cod", protect, async (req, res) => {
         phone: shippingAddress.phone,
       },
       paymentMethod: "cash_on_delivery",
-      totalPrice,
+      totalPrice: 0,
       isPaid: false,
       paymentStatus: "pending",
       status: "Processing",
       idempotencyKey: idempotencyKey || undefined,
     });
 
+    // Server-side pricing (promos + wallet)
+    const quote = await priceQuote({
+      items: orderItems,
+      userId: req.user._id,
+      paymentMethod: "cash_on_delivery",
+      couponCodes,
+      shippingAddress,
+    });
+    const walletBalance = await getAvailableCredits(req.user._id);
+    const requested = Math.max(0, Number(walletRedeem || 0));
+    const walletApplied = Math.min(walletBalance, requested, quote.total);
+    order.totalPrice = Math.max(0, Number(quote.total) - walletApplied);
+    order.walletApplied = walletApplied;
+
     const createdOrder = await order.save();
+
+    if (walletApplied > 0) {
+      await redeem({
+        userId: req.user._id,
+        amount: walletApplied,
+        refType: "order_cod",
+        refId: String(createdOrder._id),
+        note: `Redeemed for COD order ${createdOrder.orderId}`,
+      });
+    }
 
     // 🔹 Check if there's an active collab and if any product matches
     let gifHtml = "";

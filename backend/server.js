@@ -36,6 +36,8 @@ const policyRoutes = require("./routes/policyRoutes");
 const offerRoutes = require("./routes/offerRoutes");
 const wishlistRoutes = require("./routes/wishlistRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
+const walletRoutes = require("./routes/walletRoutes");
+const alertRoutes = require("./routes/alertRoutes");
 // require("./emailScheduler");
 const { sendScheduledEmails } = require("./offerScheduler");
 sendScheduledEmails(); // Run once on startup
@@ -45,6 +47,8 @@ const complaintRoutes = require("./routes/complaintRoutes");
 const sizeChartRoutes = require("./routes/sizeChartRoutes");
 const returnRequestRoutes = require("./routes/returnRequestRoutes");
 const { syncShiprocketStatusesForOpenOrders } = require("./utils/shiprocket");
+const { expireDueCredits } = require("./services/walletService");
+const { scanAndTriggerAlerts } = require("./services/alertService");
 
 // Run every day at 7:00 PM IST
 cron.schedule("0 19 * * *", async () => {
@@ -129,6 +133,8 @@ app.use("/api/settings/policy", policyRoutes);
 app.use("/api/offers", offerRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/recommendations", recommendationRoutes);
+app.use("/api/wallet", walletRoutes);
+app.use("/api/alerts", alertRoutes);
 app.use("/api/campaigns", campaignsRoutes);
 
 // Admin routes
@@ -167,6 +173,25 @@ setInterval(async () => {
     console.error("[SHIPROCKET SYNC ERROR]:", error.message);
   }
 }, 15 * 60 * 1000);
+
+// Wallet expiry + alert scanning (Phase 4)
+cron.schedule("10 * * * *", async () => {
+  try {
+    const r = await expireDueCredits({ limit: 500 });
+    if (r?.expiredCount) console.log(`[WALLET] Expired credits: ${r.expiredCount}`);
+  } catch (e) {
+    console.error("[WALLET EXPIRY ERROR]:", e?.message || e);
+  }
+});
+
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    const r = await scanAndTriggerAlerts({ limitProducts: 200 });
+    if (r?.totalTriggered) console.log(`[ALERTS] Triggered: ${r.totalTriggered}`);
+  } catch (e) {
+    console.error("[ALERT SCAN ERROR]:", e?.message || e);
+  }
+});
 // const webpush = require("web-push");
 // const vapidKeys = webpush.generateVAPIDKeys();
 // console.log(vapidKeys);

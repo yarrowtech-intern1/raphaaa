@@ -62,6 +62,11 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    walletApplied: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     isPaid: {
       type: Boolean,
       default: false,

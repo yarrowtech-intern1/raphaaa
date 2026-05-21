@@ -265,7 +265,7 @@ const Navbar = () => {
   )}
 </button>
 
-          <div className="hidden md:block overflow-hidden max-w-[170px] lg:max-w-[220px]" title="Search">
+          <div className="block overflow-hidden max-w-[44px] md:max-w-[170px] lg:max-w-[220px]" title="Search">
             <SearchBar />
           </div>
 
@@ -274,9 +274,6 @@ const Navbar = () => {
           </button>
         </div>
       </nav>
-      <div className="container mx-auto px-3 sm:px-4 md:hidden pb-2">
-        <SearchBar />
-      </div>
       </div>
 
       <CartDrawer drawerOpen={drawerOpen} toggleCartDrawer={toggleCartDrawer} />

@@ -55,6 +55,10 @@ const checkoutSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    pricing: {
+      type: mongoose.Schema.Types.Mixed, // quote breakdown: discounts/shipping/offers
+      default: null,
+    },
     isPaid: {
       type: Boolean,
       default: false,

@@ -1678,6 +1678,11 @@ import { flyToCart } from "../../utils/flyToCart";
 import { FiShare2 } from "react-icons/fi";
 import { FiCopy } from "react-icons/fi";
 
+// Local CSS for the size-chart drawer animation (kept here to avoid global CSS churn)
+const _sizeChartDrawerAnim = `
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+`;
+
 const ProductDetails = ({ productId }) => {
   const imgRef = useRef(null); // 👈 ref to product image
   const cartIconRef = window.cartIconRef;
@@ -1730,8 +1735,24 @@ const ProductDetails = ({ productId }) => {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [fbtProducts, setFbtProducts] = useState([]);
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
+  const [sizeChartTab, setSizeChartTab] = useState("chart"); // "chart" | "measure"
 
   const cart = useSelector((state) => state.cart);
+
+  useEffect(() => {
+    const styleTag = document.createElement("style");
+    styleTag.setAttribute("data-sizechart-drawer", "true");
+    styleTag.innerHTML = _sizeChartDrawerAnim;
+    document.head.appendChild(styleTag);
+    return () => {
+      try {
+        document.head.removeChild(styleTag);
+      } catch (_) {
+        // ignore
+      }
+    };
+  }, []);
 
   // ── Derived variant data (supports both new colorVariants and legacy variants) ──
   const hasColorVariants =
@@ -2044,6 +2065,15 @@ const ProductDetails = ({ productId }) => {
       .then((res) => setFbtProducts(Array.isArray(res.data) ? res.data : []))
       .catch(() => setFbtProducts([]));
   }, [selectedProduct?._id]);
+
+  useEffect(() => {
+    if (!sizeChartOpen) return;
+    const escHandler = (e) => {
+      if (e.key === "Escape") setSizeChartOpen(false);
+    };
+    document.addEventListener("keydown", escHandler);
+    return () => document.removeEventListener("keydown", escHandler);
+  }, [sizeChartOpen]);
 
   const handleBuyNow = async () => {
     if (isOutOfStock) {
@@ -2843,12 +2873,12 @@ const ProductDetails = ({ productId }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          if (selectedProduct?.sizeChart?.imageUrl) {
-                            setModalImage(selectedProduct.sizeChart.imageUrl);
-                            setShowModal(true);
-                          } else {
+                          if (!selectedProduct?.sizeChart?.imageUrl && !selectedProduct?.sizeChart?.measureImageUrl) {
                             toast.error("Size chart not available for this product.");
+                            return;
                           }
+                          setSizeChartTab("chart");
+                          setSizeChartOpen(true);
                         }}
                         className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2 transition"
                       >
@@ -3487,6 +3517,86 @@ const ProductDetails = ({ productId }) => {
                 />
                 <span className="text-xs text-gray-600">{copied ? "Copied!" : "Copy link"}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SIZE CHART DRAWER (Myntra-style) */}
+      {sizeChartOpen && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+            onClick={() => setSizeChartOpen(false)}
+          />
+          <div className="absolute inset-y-0 right-0 w-full max-w-md sm:max-w-lg lg:max-w-2xl bg-white shadow-2xl border-l border-gray-200 animate-[slideIn_200ms_ease-out]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Size Guide</p>
+                <h3 className="text-base font-extrabold text-gray-900">
+                  {selectedProduct?.sizeChart?.title || "Size Chart"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSizeChartOpen(false)}
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition"
+                aria-label="Close size chart"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-5 pt-4">
+              <div className="flex gap-2 rounded-xl bg-gray-50 border border-gray-200 p-1">
+                <button
+                  type="button"
+                  onClick={() => setSizeChartTab("chart")}
+                  className={`flex-1 text-sm font-bold py-2 rounded-lg transition ${
+                    sizeChartTab === "chart" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  Size Chart
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSizeChartTab("measure")}
+                  className={`flex-1 text-sm font-bold py-2 rounded-lg transition ${
+                    sizeChartTab === "measure" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  How to Measure
+                </button>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 overflow-y-auto h-[calc(100vh-132px)]">
+              {sizeChartTab === "chart" ? (
+                selectedProduct?.sizeChart?.imageUrl ? (
+                  <img
+                    src={selectedProduct.sizeChart.imageUrl}
+                    alt="Size chart"
+                    className="w-full rounded-xl border border-gray-200 bg-white lg:max-w-none"
+                  />
+                ) : (
+                  <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-600">
+                    Size chart image not available for this product.
+                  </div>
+                )
+              ) : selectedProduct?.sizeChart?.measureImageUrl ? (
+                <img
+                  src={selectedProduct.sizeChart.measureImageUrl}
+                  alt="How to measure"
+                  className="w-full rounded-xl border border-gray-200 bg-white lg:max-w-none"
+                />
+              ) : (
+                <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-600">
+                  How-to-measure image not available for this product.
+                </div>
+              )}
+              <p className="mt-3 text-[11px] text-gray-400">
+                Tip: If you are between sizes, choose the larger size for a relaxed fit.
+              </p>
             </div>
           </div>
         </div>

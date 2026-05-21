@@ -1,0 +1,258 @@
+const Offer = require("../models/offer");
+const Order = require("../models/Order");
+
+const clampMoney = (n) => Math.max(0, Math.round((Number(n) || 0) * 100) / 100);
+
+const normalizePaymentMethod = (v) => String(v || "").trim();
+
+const isOfferInWindow = (offer, now) => {
+  const s = new Date(offer.startDate);
+  const e = new Date(offer.endDate);
+  return now >= s && now <= e && offer.isActive !== false;
+};
+
+const itemMatchesOffer = (offer, item) => {
+  const c = offer.conditions || {};
+  const pid = String(item.productId || item._id || "");
+  const category = String(item.category || "");
+  const brand = String(item.brand || "");
+
+  if (Array.isArray(c.excludeProductIds) && c.excludeProductIds.some((x) => String(x) === pid)) return false;
+  if (Array.isArray(c.includeProductIds) && c.includeProductIds.length > 0) {
+    if (!c.includeProductIds.some((x) => String(x) === pid)) return false;
+  }
+  if (Array.isArray(c.includeCategories) && c.includeCategories.length > 0) {
+    if (!c.includeCategories.some((x) => String(x).toLowerCase() === category.toLowerCase())) return false;
+  }
+  if (Array.isArray(c.includeBrands) && c.includeBrands.length > 0) {
+    if (!c.includeBrands.some((x) => String(x).toLowerCase() === brand.toLowerCase())) return false;
+  }
+
+  return true;
+};
+
+const computeBaseShipping = ({ subtotal }) => {
+  // Matches storefront messaging: free delivery above 999.
+  if (subtotal >= 999) return 0;
+  return 99;
+};
+
+async function userIsNew(userId) {
+  if (!userId) return false;
+  const count = await Order.countDocuments({ user: userId, isPaid: true }).limit(1);
+  return count === 0;
+}
+
+function buildLineTotals(items) {
+  const normalized = (items || []).map((it) => {
+    const quantity = Number(it.quantity || 0);
+    const unitPrice = Number(it.price || 0);
+    const lineSubtotal = clampMoney(unitPrice * quantity);
+    return {
+      productId: it.productId || it._id,
+      sku: it.sku,
+      name: it.name,
+      category: it.category,
+      brand: it.brand,
+      quantity,
+      unitPrice: clampMoney(unitPrice),
+      lineSubtotal,
+    };
+  });
+
+  const subtotal = clampMoney(normalized.reduce((s, it) => s + it.lineSubtotal, 0));
+  return { items: normalized, subtotal };
+}
+
+function applyOfferToContext({ offer, context, state }) {
+  const benefit = offer.benefit || {};
+  const scope = benefit.scope || "product";
+  const type = benefit.type || "percent";
+
+  if (scope === "shipping") {
+    if (type === "free_shipping") {
+      const amount = state.shipping; // discount up to full shipping
+      return { shippingDiscount: amount };
+    }
+    if (type === "flat") {
+      return { shippingDiscount: Math.min(state.shipping, Number(benefit.amount || 0)) };
+    }
+    if (type === "percent") {
+      const pct = Number(benefit.percent || offer.offerPercentage || 0);
+      return { shippingDiscount: clampMoney((state.shipping * pct) / 100) };
+    }
+    return {};
+  }
+
+  if (scope === "cart") {
+    const base = state.subtotal - state.itemDiscountTotal;
+    if (base <= 0) return {};
+    if (type === "flat") {
+      return { cartDiscount: Math.min(base, Number(benefit.amount || 0)) };
+    }
+    const pct = Number(benefit.percent || offer.offerPercentage || 0);
+    const raw = clampMoney((base * pct) / 100);
+    const cap = benefit.maxDiscount !== undefined && benefit.maxDiscount !== null ? Number(benefit.maxDiscount) : null;
+    return { cartDiscount: cap ? Math.min(raw, cap) : raw };
+  }
+
+  // product scope
+  const eligibleIdx = state.items
+    .map((it, idx) => ({ it, idx }))
+    .filter(({ it }) => itemMatchesOffer(offer, it));
+
+  if (eligibleIdx.length === 0) return {};
+
+  const perItemDiscounts = new Map();
+  for (const { it, idx } of eligibleIdx) {
+    const base = it.lineSubtotal - (state.itemDiscounts[idx] || 0);
+    if (base <= 0) continue;
+
+    let d = 0;
+    if (type === "flat") {
+      // Flat amount spread across eligible quantity: apply per line up to base
+      d = Math.min(base, Number(benefit.amount || 0));
+    } else {
+      const pct = Number(benefit.percent || offer.offerPercentage || 0);
+      d = clampMoney((base * pct) / 100);
+      if (benefit.maxDiscount !== undefined && benefit.maxDiscount !== null) {
+        d = Math.min(d, Number(benefit.maxDiscount));
+      }
+    }
+
+    perItemDiscounts.set(idx, d);
+  }
+
+  return { perItemDiscounts };
+}
+
+async function priceQuote({
+  items,
+  userId,
+  paymentMethod,
+  couponCodes = [],
+  shippingAddress,
+}) {
+  const now = new Date();
+  const pm = normalizePaymentMethod(paymentMethod);
+
+  const { items: normItems, subtotal } = buildLineTotals(items);
+  const shipping = computeBaseShipping({ subtotal, shippingAddress });
+
+  const activeOffers = await Offer.find({ isActive: true }).lean();
+  const filteredByWindow = activeOffers.filter((o) => isOfferInWindow(o, now));
+
+  const newUser = await userIsNew(userId);
+  const couponSet = new Set((couponCodes || []).map((c) => String(c || "").trim().toUpperCase()).filter(Boolean));
+
+  // Sort by priority (lower number = higher priority)
+  const offers = filteredByWindow.sort((a, b) => (a.priority || 100) - (b.priority || 100));
+
+  const state = {
+    items: normItems,
+    subtotal,
+    shipping,
+    itemDiscounts: Array(normItems.length).fill(0),
+    itemDiscountTotal: 0,
+    cartDiscount: 0,
+    shippingDiscount: 0,
+    appliedOffers: [],
+    usedExclusiveGroups: new Set(),
+    blocked: false,
+  };
+
+  const context = { userId, newUser, paymentMethod: pm, couponSet };
+
+  for (const offer of offers) {
+    if (state.blocked) break;
+
+    const c = offer.conditions || {};
+
+    if (offer.exclusiveGroup) {
+      if (state.usedExclusiveGroups.has(String(offer.exclusiveGroup))) continue;
+    }
+
+    if (offer.couponCode) {
+      if (!couponSet.has(String(offer.couponCode).trim().toUpperCase())) continue;
+    }
+
+    if (c.newUserOnly && !newUser) continue;
+
+    if (Array.isArray(c.paymentMethods) && c.paymentMethods.length > 0) {
+      if (!c.paymentMethods.some((x) => String(x).trim() === pm)) continue;
+    }
+
+    const currentAfterItemDiscounts = clampMoney(state.subtotal - state.itemDiscountTotal);
+    if (c.minCartSubtotal !== undefined && c.minCartSubtotal !== null) {
+      if (currentAfterItemDiscounts < Number(c.minCartSubtotal || 0)) continue;
+    }
+
+    const applied = applyOfferToContext({ offer, context, state });
+    const perItemDiscounts = applied.perItemDiscounts;
+    const cartDiscount = clampMoney(applied.cartDiscount || 0);
+    const shippingDiscount = clampMoney(applied.shippingDiscount || 0);
+
+    let changed = false;
+    if (perItemDiscounts && perItemDiscounts.size > 0) {
+      for (const [idx, d] of perItemDiscounts.entries()) {
+        if (d <= 0) continue;
+        state.itemDiscounts[idx] = clampMoney((state.itemDiscounts[idx] || 0) + d);
+        changed = true;
+      }
+      state.itemDiscountTotal = clampMoney(state.itemDiscounts.reduce((s, x) => s + x, 0));
+    }
+
+    if (cartDiscount > 0) {
+      state.cartDiscount = clampMoney(state.cartDiscount + cartDiscount);
+      changed = true;
+    }
+
+    if (shippingDiscount > 0) {
+      state.shippingDiscount = clampMoney(Math.min(state.shipping, state.shippingDiscount + shippingDiscount));
+      changed = true;
+    }
+
+    if (!changed) continue;
+
+    state.appliedOffers.push({
+      offerId: offer._id,
+      title: offer.title,
+      scope: offer.benefit?.scope || "product",
+      type: offer.benefit?.type || (offer.offerPercentage ? "percent" : "flat"),
+    });
+
+    if (offer.exclusiveGroup) state.usedExclusiveGroups.add(String(offer.exclusiveGroup));
+    if (offer.stackable === false) state.blocked = true;
+  }
+
+  // Ensure cart discount doesn't exceed remaining amount (after item discounts)
+  const afterItems = clampMoney(state.subtotal - state.itemDiscountTotal);
+  state.cartDiscount = clampMoney(Math.min(afterItems, state.cartDiscount));
+
+  const afterCart = clampMoney(afterItems - state.cartDiscount);
+  const shippingAfter = clampMoney(state.shipping - state.shippingDiscount);
+  const total = clampMoney(afterCart + shippingAfter);
+
+  return {
+    currency: "INR",
+    subtotal: state.subtotal,
+    itemDiscountTotal: state.itemDiscountTotal,
+    cartDiscount: state.cartDiscount,
+    shipping: state.shipping,
+    shippingDiscount: state.shippingDiscount,
+    totalDiscount: clampMoney(state.itemDiscountTotal + state.cartDiscount + state.shippingDiscount),
+    total,
+    items: state.items.map((it, idx) => ({
+      ...it,
+      lineDiscount: clampMoney(state.itemDiscounts[idx] || 0),
+      lineTotal: clampMoney(it.lineSubtotal - (state.itemDiscounts[idx] || 0)),
+    })),
+    appliedOffers: state.appliedOffers,
+  };
+}
+
+module.exports = {
+  priceQuote,
+  computeBaseShipping,
+};
+

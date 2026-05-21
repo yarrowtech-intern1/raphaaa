@@ -117,6 +117,13 @@ const Checkout = () => {
   const [displayCount, setDisplayCount] = useState(4);
   const [addressesOpen, setAddressesOpen] = useState(false); // collapsible toggle
   const [featuredCollab, setFeaturedCollab] = useState(null);
+
+  // Phase 4: promos + wallet
+  const [couponCode, setCouponCode] = useState("");
+  const [couponCodes, setCouponCodes] = useState([]);
+  const [walletRedeem, setWalletRedeem] = useState(0);
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   // Step state derived only from existing flags (UI-only)
   const currentStep = razorpayOrderId ? 3 : 2; // 1 = Cart (previous page), 2 = Review, 3 = Payment
 
@@ -140,6 +147,9 @@ const Checkout = () => {
   const gst = Number((computedSubtotal * 0.00).toFixed(2)); // 5% GST as used earlier
   const computedTotal = Number((computedSubtotal + gst + shippingFee).toFixed(2));
 
+  const displaySubtotal = Number(quote?.subtotal ?? computedSubtotal);
+  const displayTotal = Number(quote?.totalAfterWallet ?? computedTotal);
+
 
   useEffect(() => {
     const fetchCollab = async () => {
@@ -161,6 +171,47 @@ const Checkout = () => {
       if (payBtn) payBtn.click();
     }
   }, [razorpayOrderId, paymentMethod]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("userToken");
+    if (!token) return;
+    if (!cart?.products || cart.products.length === 0) return;
+
+    const run = async () => {
+      setQuoteLoading(true);
+      try {
+        const pm = paymentMethod === "cash_on_delivery" ? "cash_on_delivery" : "Razorpay";
+        const { data } = await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL}/api/checkout/quote`,
+          {
+            checkoutItems: cart.products.map((p) => ({
+              productId: p.productId,
+              name: p.name,
+              image: p.image,
+              price: p.price,
+              quantity: p.quantity,
+              size: p.size,
+              color: p.color,
+              sku: p.sku,
+            })),
+            paymentMethod: pm,
+            couponCodes,
+            walletRedeem,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setQuote(data?.quote || null);
+      } catch (err) {
+        console.error("Quote failed:", err);
+        setQuote(null);
+      } finally {
+        setQuoteLoading(false);
+      }
+    };
+
+    const t = setTimeout(run, 250);
+    return () => clearTimeout(t);
+  }, [cart?.products, paymentMethod, couponCodes, walletRedeem]);
 
 
   // useEffect(() => {
@@ -340,7 +391,9 @@ const Checkout = () => {
         })),
         shippingAddress: shipping,
         paymentMethod,
-        totalPrice: cart.totalPrice,
+        totalPrice: displayTotal,
+        couponCodes,
+        walletRedeem,
         idempotencyKey: uuidv4(), // Add idempotency key
       };
 
@@ -368,7 +421,7 @@ const Checkout = () => {
         } else {
           const result = await dispatch(createRazorpayOrder(orderData));
           if (result.type === "checkout/createRazorpayOrder/fulfilled") {
-            if (result.payload.amount !== cart.totalPrice) {
+            if (Number(result.payload.amount) !== Number(displayTotal)) {
               alert(
                 `A pending order (${result.payload.orderId}) exists with a different amount (₹${result.payload.amount}). Please complete or cancel it.`
               );
@@ -697,7 +750,7 @@ const Checkout = () => {
                   {loading || orderProcessing ? (
                     <><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                   ) : paymentMethod === "razorpay" ? (
-                    <><FaLock className="text-sm" /> Pay ₹{computedTotal.toLocaleString("en-IN")} online</>
+                    <><FaLock className="text-sm" /> Pay ₹{displayTotal.toLocaleString("en-IN")} online</>
                   ) : (
                     <>📦 Place Order — Cash on Delivery</>
                   )}
@@ -768,10 +821,87 @@ const Checkout = () => {
                 ))}
               </div>
 
+              {/* Promos + Wallet */}
+              <div className="px-5 py-4 border-t border-gray-100 space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="Coupon code"
+                    className="flex-1 px-3 py-2.5 text-sm border border-gray-200 bg-gray-50 rounded-xl focus:bg-white focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = couponCode.trim().toUpperCase();
+                      if (!c) return;
+                      if (couponCodes.includes(c)) return;
+                      setCouponCodes((prev) => [...prev, c].slice(0, 5));
+                      setCouponCode("");
+                    }}
+                    className="px-4 rounded-xl text-sm font-bold border-2 border-sky-600 text-sky-700 hover:bg-sky-600 hover:text-white transition"
+                  >
+                    Apply
+                  </button>
+                </div>
+
+                {couponCodes.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {couponCodes.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCouponCodes((prev) => prev.filter((x) => x !== c))}
+                        className="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100"
+                        title="Remove"
+                      >
+                        {c} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {quote?.wallet?.balance !== undefined && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                      <span className="font-bold uppercase tracking-wide">Wallet</span>
+                      <span>Balance: ₹{Number(quote.wallet.balance || 0).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={walletRedeem}
+                        onChange={(e) => setWalletRedeem(Number(e.target.value || 0))}
+                        className="w-32 px-3 py-2 text-sm border border-gray-200 bg-white rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                      <div className="text-xs text-gray-500">
+                        Applied: <span className="font-semibold text-gray-800">₹{Number(quote.wallet.applied || 0).toLocaleString("en-IN")}</span>
+                      </div>
+                      {quoteLoading && <div className="ml-auto text-xs text-gray-400">Recalculating…</div>}
+                    </div>
+                  </div>
+                )}
+
+                {Array.isArray(quote?.appliedOffers) && quote.appliedOffers.length > 0 && (
+                  <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                    <div className="font-bold uppercase tracking-wide mb-1">Applied offers</div>
+                    <div className="flex flex-wrap gap-2">
+                      {quote.appliedOffers.map((o) => (
+                        <span key={o.offerId} className="px-2 py-0.5 rounded-full bg-white/70 border border-emerald-200">
+                          {o.title}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Price breakdown */}
               <div className="px-5 py-4 border-t border-gray-100 space-y-2.5">
                 {[
-                  { label: "Subtotal",  value: `₹${computedSubtotal.toLocaleString("en-IN")}`,  className: "text-gray-600" },
+                  { label: "Subtotal",  value: `₹${displaySubtotal.toLocaleString("en-IN")}`,  className: "text-gray-600" },
                   { label: "Shipping",  value: shippingFee === 0 ? "Free" : `₹${shippingFee}`, className: "text-emerald-600 font-semibold" },
                   ...(paymentMethod === "cash_on_delivery" ? [{ label: "COD Charges", value: "₹0", className: "text-gray-500" }] : []),
                 ].map(({ label, value, className }) => (
@@ -783,7 +913,7 @@ const Checkout = () => {
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <span className="text-base font-bold text-gray-900">Total</span>
                   <span className="text-lg font-extrabold text-sky-700">
-                    ₹{computedTotal.toLocaleString("en-IN")}
+                    ₹{displayTotal.toLocaleString("en-IN")}
                   </span>
                 </div>
               </div>

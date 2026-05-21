@@ -11,6 +11,7 @@ const Review = require("../models/Review");
 const Order = require("../models/Order");
 const User = require("../models/User");
 const { checkDeliveryServiceability } = require("../utils/shiprocket");
+const { triggerBackInStockForProduct, triggerPriceDropForProduct } = require("../services/alertService");
 
 const router = express.Router();
 
@@ -741,6 +742,8 @@ router.put("/:id", protect, admin, async (req, res) => {
     const product = await Product.findById(req.params.id);
 
     if (product) {
+      const prevPrice = Number(product.discountPrice || product.price || 0);
+      const prevStock = Number(product.countInStock || 0);
       const normalizedColorVariants = normalizeColorVariants(colorVariants);
       const normalizedVariants = normalizeVariants(variants);
 
@@ -792,6 +795,21 @@ router.put("/:id", protect, admin, async (req, res) => {
 
       const updatedProduct = await product.save();
       res.json(updatedProduct);
+
+      // Non-blocking triggers
+      try {
+        const nextPrice = Number(updatedProduct.discountPrice || updatedProduct.price || 0);
+        const nextStock = Number(updatedProduct.countInStock || 0);
+
+        if (prevStock <= 0 && nextStock > 0) {
+          await triggerBackInStockForProduct(updatedProduct._id);
+        }
+        if (nextPrice > 0 && nextPrice < prevPrice) {
+          await triggerPriceDropForProduct(updatedProduct._id);
+        }
+      } catch (triggerErr) {
+        console.error("Product alert trigger error:", triggerErr?.message || triggerErr);
+      }
     } else {
       res.status(404).json({ message: "Product not found" });
     }
