@@ -3,7 +3,7 @@ const Checkout = require("../models/Checkout");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
-const { protect } = require("../middleware/authMiddleware");
+const { protect, optionalAuth } = require("../middleware/authMiddleware");
 const { priceQuote } = require("../services/pricingService");
 const { getAvailableCredits, redeem } = require("../services/walletService");
 
@@ -180,6 +180,56 @@ router.post("/:id/finalize", protect, async(req, res) => {
         console.error("Error finalizing checkout session:", error);
         res.status(500).json({ message: "Internal server error" });
     }
+});
+
+// @route POST /api/checkout/guest-quote
+// @desc Price quote for guest users (no auth, no wallet/user offers)
+// @access Public
+router.post("/guest-quote", async (req, res) => {
+  try {
+    const { checkoutItems, paymentMethod } = req.body;
+    if (!Array.isArray(checkoutItems) || checkoutItems.length === 0) {
+      return res.status(400).json({ message: "no items in checkout" });
+    }
+    const quote = await priceQuote({ items: checkoutItems, paymentMethod });
+    res.json({ success: true, quote: { ...quote, totalAfterWallet: quote.total } });
+  } catch (error) {
+    console.error("guest quote error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// @route POST /api/checkout/guest-order
+// @desc Create a COD or Razorpay order for a guest (no login required)
+// @access Public
+router.post("/guest-order", async (req, res) => {
+  try {
+    const { orderItems, shippingAddress, paymentMethod, totalPrice, guestEmail, guestName } = req.body;
+
+    if (!Array.isArray(orderItems) || orderItems.length === 0)
+      return res.status(400).json({ message: "no items in order" });
+    if (!guestEmail || !/\S+@\S+\.\S+/.test(guestEmail))
+      return res.status(400).json({ message: "valid email is required for guest checkout" });
+    if (!shippingAddress?.address)
+      return res.status(400).json({ message: "shipping address is required" });
+
+    const order = await Order.create({
+      user: null,
+      guestEmail,
+      guestName: guestName || guestEmail,
+      orderItems,
+      shippingAddress,
+      paymentMethod,
+      totalPrice,
+      isPaid: paymentMethod === "cash_on_delivery" ? false : false,
+      paymentStatus: "Pending",
+    });
+
+    res.status(201).json({ success: true, order });
+  } catch (error) {
+    console.error("guest order error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 module.exports = router;

@@ -202,6 +202,9 @@ const productSchema = new mongoose.Schema({
         height: Number,
     },
     weight: Number,
+    // Delivery pricing overrides per product
+    freeShipping:        { type: Boolean, default: false },  // always free regardless of subtotal
+    extraShippingCharge: { type: Number,  default: 0, min: 0 }, // added on top of base shipping
 },
 {timestamps: true}
 );

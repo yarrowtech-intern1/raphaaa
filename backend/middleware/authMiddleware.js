@@ -128,8 +128,18 @@ const roleCheck = (...allowedRoles) => {
   };
 };
 
-module.exports = { protect, admin, adminOrMerchantise, roleCheck };
+// Middleware that attaches user if token is present, but does not block unauthenticated requests
+const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return next();
+  const token = authHeader.split(" ")[1];
+  if (!token || token.split(".").length !== 3) return next();
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded?.user?.id || decoded?.id;
+    if (userId) req.user = await User.findById(userId).select("-password");
+  } catch (_) { /* ignore invalid/expired token */ }
+  next();
+};
 
-
-
-module.exports = { protect, admin, adminOrMerchantise, roleCheck };
+module.exports = { protect, admin, adminOrMerchantise, roleCheck, optionalAuth };

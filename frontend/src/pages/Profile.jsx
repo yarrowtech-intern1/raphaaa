@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import MyOrders from "./MyOrdersPage";
 import {
   FaUserCircle, FaTrash, FaHeart, FaMapMarkerAlt,
-  FaBoxOpen, FaCheckCircle,
+  FaBoxOpen, FaCheckCircle, FaWallet, FaPlus,
 } from "react-icons/fa";
+import { HiX } from "react-icons/hi";
 import { AiOutlineLogout } from "react-icons/ai";
 import { HiOutlineExclamationCircle } from "react-icons/hi2";
 import { MdVerified } from "react-icons/md";
@@ -19,6 +20,7 @@ import ViewAddress from "../components/Cart/ViewAddress";
 const NAV_ITEMS = [
   { key: "orders",    label: "My Orders",   icon: FaBoxOpen },
   { key: "wishlist",  label: "Wishlist",    icon: FaHeart },
+  { key: "wallet",    label: "Wallet",      icon: FaWallet },
   { key: "address",   label: "Addresses",   icon: FaMapMarkerAlt },
   { key: "profile",   label: "Profile Info",icon: FaUserCircle },
   { key: "complaint", label: "Complaints",  icon: HiOutlineExclamationCircle },
@@ -37,6 +39,13 @@ export default function Profile() {
   const [complaints,      setComplaints]     = useState([]);
   const [verifying,       setVerifying]      = useState(false);
   const [selectedImages,  setSelectedImages] = useState([]);
+  const [walletBalance,   setWalletBalance]  = useState(null);
+  const [walletLedger,    setWalletLedger]   = useState([]);
+  const [walletLoading,   setWalletLoading]  = useState(false);
+  const [topupModal,      setTopupModal]     = useState(false);
+  const [topupAmount,     setTopupAmount]    = useState("");
+  const [topupLoading,    setTopupLoading]   = useState(false);
+  const [expandedTxn,     setExpandedTxn]   = useState(null);
 
   useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
 
@@ -54,6 +63,93 @@ export default function Profile() {
     });
     setWishlistItems((p) => p.filter((x) => x._id !== id));
     toast.success("Removed from wishlist");
+  };
+
+  /* ── wallet ── */
+  useEffect(() => {
+    if (activeTab !== "wallet") return;
+    setWalletLoading(true);
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/wallet`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+    })
+      .then(({ data }) => {
+        setWalletBalance(data.balance ?? 0);
+        setWalletLedger(data.ledger || []);
+      })
+      .catch(console.error)
+      .finally(() => setWalletLoading(false));
+  }, [activeTab]);
+
+  /* ── wallet top-up ── */
+  const handleTopup = async () => {
+    const amt = Number(topupAmount);
+    if (!amt || amt < 10) { toast.error("Minimum top-up is ₹10"); return; }
+    if (amt > 100000)     { toast.error("Maximum top-up is ₹1,00,000"); return; }
+
+    setTopupLoading(true);
+    try {
+      const token = localStorage.getItem("userToken");
+
+      // Step 1: Create Razorpay order
+      const { data: orderData } = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/wallet/topup/create-order`,
+        { amount: amt },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Step 2: Load Razorpay script if not already loaded
+      if (!window.Razorpay) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://checkout.razorpay.com/v1/checkout.js";
+          s.onload = resolve; s.onerror = reject;
+          document.body.appendChild(s);
+        });
+      }
+
+      // Step 3: Open Razorpay modal
+      const rzp = new window.Razorpay({
+        key: orderData.keyId,
+        amount: orderData.amount * 100,
+        currency: "INR",
+        name: "Raphaaa Wallet",
+        description: `Add ₹${amt.toLocaleString("en-IN")} to your wallet`,
+        order_id: orderData.orderId,
+        handler: async (response) => {
+          try {
+            // Step 4: Verify payment and credit wallet
+            const { data: verifyData } = await axios.post(
+              `${import.meta.env.VITE_BACKEND_URL}/api/wallet/topup/verify`,
+              {
+                razorpay_order_id:   response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature:  response.razorpay_signature,
+                amount: amt,
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setWalletBalance(verifyData.balance);
+            setWalletLedger((prev) => [verifyData.entry, ...prev]);
+            toast.success(`₹${amt.toLocaleString("en-IN")} added to your wallet!`);
+            setTopupModal(false);
+            setTopupAmount("");
+          } catch (err) {
+            toast.error(err.response?.data?.message || "Payment verified but wallet credit failed. Contact support.");
+          }
+        },
+        prefill:  { name: user?.name, email: user?.email },
+        theme:    { color: "#10b981" },
+        modal:    { ondismiss: () => setTopupLoading(false) },
+      });
+      rzp.on("payment.failed", () => {
+        toast.error("Payment failed. Please try again.");
+        setTopupLoading(false);
+      });
+      rzp.open();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to initiate payment");
+      setTopupLoading(false);
+    }
   };
 
   /* ── complaints ── */
@@ -348,6 +444,361 @@ export default function Profile() {
                       );
                     })}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── WALLET ─── */}
+            {activeTab === "wallet" && (
+              <div className="p-4 md:p-6">
+                {/* Header */}
+                <div className="flex items-center gap-2.5 pb-4 border-b border-gray-100 mb-6">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                    <FaWallet className="text-emerald-600 text-sm" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 leading-none">My Wallet</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Store credits earned from orders and promotions</p>
+                  </div>
+                </div>
+
+                {walletLoading ? (
+                  <div className="flex items-center justify-center py-16 gap-3 text-gray-400 text-sm">
+                    <span className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    Loading wallet…
+                  </div>
+                ) : (
+                  <>
+                    {/* Balance card */}
+                    <div className="bg-linear-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 mb-6 shadow-md shadow-emerald-100 text-white">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-widest text-emerald-100 mb-1">Available Balance</p>
+                          <p className="text-4xl font-extrabold tracking-tight">
+                            ₹{(walletBalance ?? 0).toLocaleString("en-IN")}
+                          </p>
+                          <p className="text-xs text-emerald-100 mt-3">
+                            Use this balance at checkout to get an instant discount.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setTopupModal(true)}
+                          className="shrink-0 flex items-center gap-2 bg-white/15 hover:bg-white/25 border border-white/30 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all"
+                        >
+                          <FaPlus className="text-xs" /> Add Money
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Top-up Modal */}
+                    {topupModal && (
+                      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+                        onClick={() => setTopupModal(false)}>
+                        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
+                          onClick={(e) => e.stopPropagation()}>
+
+                          {/* Modal header */}
+                          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <FaWallet className="text-emerald-600" />
+                              <h3 className="text-sm font-bold text-gray-800">Add Money to Wallet</h3>
+                            </div>
+                            <button onClick={() => setTopupModal(false)}
+                              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition">
+                              <HiX />
+                            </button>
+                          </div>
+
+                          <div className="p-5 space-y-4">
+                            {/* Current balance */}
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex items-center justify-between">
+                              <span className="text-xs text-emerald-600 font-semibold">Current Balance</span>
+                              <span className="text-sm font-extrabold text-emerald-700">
+                                ₹{(walletBalance ?? 0).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+
+                            {/* Quick amounts */}
+                            <div>
+                              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Select Amount</p>
+                              <div className="grid grid-cols-4 gap-2">
+                                {[100, 200, 500, 1000].map((preset) => (
+                                  <button
+                                    key={preset}
+                                    type="button"
+                                    onClick={() => setTopupAmount(String(preset))}
+                                    className={`py-2 rounded-xl text-sm font-bold border transition ${
+                                      topupAmount === String(preset)
+                                        ? "bg-emerald-600 border-emerald-600 text-white"
+                                        : "border-gray-200 text-gray-700 hover:border-emerald-400 hover:bg-emerald-50"
+                                    }`}
+                                  >
+                                    ₹{preset}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Custom amount */}
+                            <div>
+                              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Or Enter Custom Amount</p>
+                              <div className="relative">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">₹</span>
+                                <input
+                                  type="number"
+                                  min="10"
+                                  max="100000"
+                                  placeholder="Enter amount"
+                                  value={topupAmount}
+                                  onChange={(e) => setTopupAmount(e.target.value)}
+                                  className="w-full pl-8 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-gray-50 focus:bg-white transition"
+                                />
+                              </div>
+                              <p className="text-[10px] text-gray-400 mt-1">Min ₹10 · Max ₹1,00,000</p>
+                            </div>
+
+                            {/* Pay button */}
+                            <button
+                              onClick={handleTopup}
+                              disabled={topupLoading || !topupAmount || Number(topupAmount) < 10}
+                              className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition ${
+                                topupLoading || !topupAmount || Number(topupAmount) < 10
+                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                              }`}
+                            >
+                              {topupLoading ? (
+                                <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
+                              ) : (
+                                <>💳 Pay ₹{Number(topupAmount || 0).toLocaleString("en-IN")} via Razorpay</>
+                              )}
+                            </button>
+
+                            <p className="text-[10px] text-center text-gray-400">
+                              Secured by Razorpay · UPI · Cards · Net Banking
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* How it works */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                      {[
+                        { icon: "🎁", title: "Earn Credits", desc: "Get credits on orders, referrals & promotions" },
+                        { icon: "🛒", title: "Use at Checkout", desc: "Apply your balance when placing any order" },
+                        { icon: "⏳", title: "Expiry", desc: "Some credits may expire — use them before they do!" },
+                      ].map(({ icon, title, desc }) => (
+                        <div key={title} className="flex items-start gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3.5">
+                          <span className="text-xl leading-none mt-0.5">{icon}</span>
+                          <div>
+                            <p className="text-xs font-bold text-gray-700">{title}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Transaction history */}
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-700 mb-3">
+                        Transaction History
+                        {walletLedger.length > 0 && (
+                          <span className="ml-2 text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                            {walletLedger.length}
+                          </span>
+                        )}
+                      </h3>
+
+                      {walletLedger.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-14 border-2 border-dashed border-gray-100 rounded-2xl text-center">
+                          <div className="w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+                            <FaWallet className="text-2xl text-gray-200" />
+                          </div>
+                          <p className="text-sm font-semibold text-gray-500">No transactions yet</p>
+                          <p className="text-xs text-gray-400 mt-1">Credits earned and spent will appear here.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {walletLedger.map((entry) => {
+                            const isEarn   = entry.type === "earn" || entry.type === "adjust";
+                            const isExpire = entry.type === "expire";
+                            const isRedeem = entry.type === "redeem";
+                            const isOpen   = expandedTxn === entry._id;
+
+                            const typeConfig = isEarn
+                              ? { label: "Credited", color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100", sign: "+", badgeBg: "bg-emerald-100 text-emerald-700" }
+                              : isExpire
+                              ? { label: "Expired",  color: "text-gray-400",    bg: "bg-gray-50 border-gray-100",       sign: "-", badgeBg: "bg-gray-100 text-gray-500" }
+                              : { label: "Redeemed", color: "text-rose-600",    bg: "bg-rose-50 border-rose-100",       sign: "-", badgeBg: "bg-rose-100 text-rose-700" };
+
+                            // Human-readable source label
+                            const sourceLabel = {
+                              topup:        "Razorpay Top-up",
+                              order:        "Order Cashback",
+                              checkout:     "Order Checkout",
+                              admin_credit: "Admin Credit",
+                              manual:       "Manual Adjustment",
+                              referral:     "Referral Bonus",
+                              refund:       "Refund",
+                              wallet_credit:"Credit Expiry",
+                            }[entry.refType] || (entry.refType || "—");
+
+                            return (
+                              <div
+                                key={entry._id}
+                                className={`border rounded-xl overflow-hidden transition-all ${typeConfig.bg}`}
+                              >
+                                {/* ── Summary row (always visible, clickable) ── */}
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedTxn(isOpen ? null : entry._id)}
+                                  className="w-full flex items-center gap-4 px-4 py-3 text-left hover:brightness-95 transition"
+                                >
+                                  {/* Icon */}
+                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-base ${
+                                    isEarn ? "bg-emerald-100" : isExpire ? "bg-gray-100" : "bg-rose-100"
+                                  }`}>
+                                    {isEarn ? "💰" : isExpire ? "⏰" : "🛒"}
+                                  </div>
+
+                                  {/* Main info */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-gray-800 truncate">
+                                      {entry.note || typeConfig.label}
+                                    </p>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                      {new Date(entry.createdAt).toLocaleDateString("en-IN", {
+                                        day: "numeric", month: "short", year: "numeric",
+                                      })}
+                                      {" · "}
+                                      {new Date(entry.createdAt).toLocaleTimeString("en-IN", {
+                                        hour: "2-digit", minute: "2-digit",
+                                      })}
+                                    </p>
+                                  </div>
+
+                                  {/* Amount + chevron */}
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <p className={`text-sm font-extrabold ${typeConfig.color}`}>
+                                      {typeConfig.sign}₹{Number(entry.amount).toLocaleString("en-IN")}
+                                    </p>
+                                    <svg
+                                      className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                </button>
+
+                                {/* ── Expanded detail panel ── */}
+                                {isOpen && (
+                                  <div className="px-4 pb-4 border-t border-gray-100/80">
+                                    <div className="bg-white rounded-xl border border-gray-100 mt-3 divide-y divide-gray-50 overflow-hidden">
+
+                                      {/* Transaction / Payment ID */}
+                                      {entry.refId && (
+                                        <div className="flex items-start justify-between gap-3 px-4 py-3">
+                                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0 mt-0.5">
+                                            Transaction ID
+                                          </span>
+                                          <span className="text-xs font-mono font-semibold text-gray-700 text-right break-all select-all">
+                                            {entry.refId}
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      {/* Ledger Entry ID */}
+                                      <div className="flex items-start justify-between gap-3 px-4 py-3">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0 mt-0.5">
+                                          Ledger ID
+                                        </span>
+                                        <span className="text-xs font-mono text-gray-500 text-right break-all select-all">
+                                          {entry._id}
+                                        </span>
+                                      </div>
+
+                                      {/* Type */}
+                                      <div className="flex items-center justify-between px-4 py-3">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Type</span>
+                                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full capitalize ${typeConfig.badgeBg}`}>
+                                          {entry.type}
+                                        </span>
+                                      </div>
+
+                                      {/* Source */}
+                                      <div className="flex items-center justify-between px-4 py-3">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Source</span>
+                                        <span className="text-xs font-semibold text-gray-700">{sourceLabel}</span>
+                                      </div>
+
+                                      {/* Amount */}
+                                      <div className="flex items-center justify-between px-4 py-3">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Amount</span>
+                                        <span className={`text-sm font-extrabold ${typeConfig.color}`}>
+                                          {typeConfig.sign}₹{Number(entry.amount).toLocaleString("en-IN")}
+                                        </span>
+                                      </div>
+
+                                      {/* Date & Time */}
+                                      <div className="flex items-center justify-between px-4 py-3">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Date & Time</span>
+                                        <span className="text-xs text-gray-700 font-medium text-right">
+                                          {new Date(entry.createdAt).toLocaleString("en-IN", {
+                                            day: "numeric", month: "long", year: "numeric",
+                                            hour: "2-digit", minute: "2-digit", second: "2-digit",
+                                          })}
+                                        </span>
+                                      </div>
+
+                                      {/* Expiry (only for earn/adjust) */}
+                                      {isEarn && (
+                                        <div className="flex items-center justify-between px-4 py-3">
+                                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Expires</span>
+                                          <span className={`text-xs font-semibold ${entry.expiresAt ? "text-amber-600" : "text-emerald-600"}`}>
+                                            {entry.expiresAt
+                                              ? new Date(entry.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                                              : "Never"}
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      {/* Note */}
+                                      {entry.note && (
+                                        <div className="flex items-start justify-between gap-3 px-4 py-3">
+                                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0 mt-0.5">Note</span>
+                                          <span className="text-xs text-gray-600 text-right">{entry.note}</span>
+                                        </div>
+                                      )}
+
+                                      {/* Status */}
+                                      <div className="flex items-center justify-between px-4 py-3">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Status</span>
+                                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                                          isExpire ? "bg-gray-100 text-gray-500"
+                                          : isRedeem ? "bg-rose-100 text-rose-600"
+                                          : entry.expiresAt && new Date(entry.expiresAt) < new Date()
+                                          ? "bg-amber-100 text-amber-600"
+                                          : "bg-emerald-100 text-emerald-600"
+                                        }`}>
+                                          {isExpire ? "Expired"
+                                            : isRedeem ? "Used"
+                                            : entry.expiresAt && new Date(entry.expiresAt) < new Date()
+                                            ? "Expired"
+                                            : "Valid"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}

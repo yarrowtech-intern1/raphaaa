@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import RazorpayButton from "./RazorpayButton";
+import GuestCheckout from "./GuestCheckout";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -21,6 +22,7 @@ import AddressForm from "./AddressForm";
 import { FaPlus, FaLock, FaTruck, FaUndo, FaMapMarkerAlt } from "react-icons/fa";
 import { FaChevronDown, FaChevronRight } from "react-icons/fa";
 import { HiX } from "react-icons/hi";
+import { Verified } from "lucide-react";
 
 
 
@@ -84,6 +86,7 @@ const CheckoutProgress = ({ currentStep = 2 }) => {
 
 const Checkout = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [guestMode, setGuestMode] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const {
@@ -142,13 +145,16 @@ const Checkout = () => {
     }, 0).toFixed(2)
   );
 
-  // shipping rules — change if you have shipping logic
-  const shippingFee = 0; // if free shipping; otherwise compute
-  const gst = Number((computedSubtotal * 0.00).toFixed(2)); // 5% GST as used earlier
-  const computedTotal = Number((computedSubtotal + gst + shippingFee).toFixed(2));
-
-  const displaySubtotal = Number(quote?.subtotal ?? computedSubtotal);
-  const displayTotal = Number(quote?.totalAfterWallet ?? computedTotal);
+  // Use backend quote values as source of truth; fall back to local estimates
+  const displaySubtotal  = Number(quote?.subtotal    ?? computedSubtotal);
+  const freeThreshold    = Number(quote?.freeShippingThreshold ?? 999);
+  const displayShipping  = Number(quote?.shipping    ?? (computedSubtotal >= freeThreshold ? 0 : 99));
+  const shippingDiscount = Number(quote?.shippingDiscount ?? 0);
+  const netShipping      = Math.max(0, displayShipping - shippingDiscount);
+  const displayTotal     = Number(quote?.totalAfterWallet ?? (computedSubtotal + netShipping));
+  const isFirstOrder     = quote?.isNewUser === true;
+  const zoneCharge       = Number(quote?.zoneCharge ?? 0);
+  const zoneName         = quote?.zoneName || null;
 
 
   useEffect(() => {
@@ -197,6 +203,7 @@ const Checkout = () => {
             paymentMethod: pm,
             couponCodes,
             walletRedeem,
+            shippingAddress: shippingAddress.postalCode ? shippingAddress : undefined,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -593,6 +600,34 @@ const Checkout = () => {
     </div>
   );
 
+  /* ─────────────────── GUEST MODE GATE ─────────────────── */
+  if (!user && guestMode) return <GuestCheckout />;
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Ready to checkout?</h2>
+          <p className="text-gray-500 text-sm">Sign in for a faster experience, or continue as a guest.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+          <button
+            onClick={() => navigate("/login?redirect=%2Fcheckout")}
+            className="flex-1 px-6 py-3 bg-sky-600 text-white font-semibold rounded-xl hover:bg-sky-700 transition shadow-sm"
+          >
+            Sign In
+          </button>
+          {/* <button
+            onClick={() => setGuestMode(true)}
+            className="flex-1 px-6 py-3 border-2 border-sky-600 text-sky-700 font-semibold rounded-xl hover:bg-sky-50 transition"
+          >
+            Guest Checkout
+          </button> */}
+        </div>
+      </div>
+    );
+  }
+
   /* ─────────────────── RENDER ─────────────────── */
   const labelCls = "block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5";
 
@@ -617,7 +652,7 @@ const Checkout = () => {
                 <label className={labelCls}>Email</label>
                 <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
                   <span className="text-sm text-gray-500 truncate">{user?.email || "—"}</span>
-                  <span className="ml-auto text-[10px] font-bold bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">Verified</span>
+                  <span className="ml-auto text-[10px] font-bold bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full"> <Verified className="inline" size={15} /> Verified</span>
                 </div>
               </div>
             </div>
@@ -900,22 +935,69 @@ const Checkout = () => {
 
               {/* Price breakdown */}
               <div className="px-5 py-4 border-t border-gray-100 space-y-2.5">
-                {[
-                  { label: "Subtotal",  value: `₹${displaySubtotal.toLocaleString("en-IN")}`,  className: "text-gray-600" },
-                  { label: "Shipping",  value: shippingFee === 0 ? "Free" : `₹${shippingFee}`, className: "text-emerald-600 font-semibold" },
-                  ...(paymentMethod === "cash_on_delivery" ? [{ label: "COD Charges", value: "₹0", className: "text-gray-500" }] : []),
-                ].map(({ label, value, className }) => (
-                  <div key={label} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">{label}</span>
-                    <span className={className}>{value}</span>
+                {/* Subtotal */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Subtotal</span>
+                  <span className="text-gray-600">₹{displaySubtotal.toLocaleString("en-IN")}</span>
+                </div>
+
+                {/* Shipping */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    Shipping
+                    {isFirstOrder && netShipping === 0 && (
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full font-bold">
+                        🎉 First order
+                      </span>
+                    )}
+                    {netShipping > 0 && (
+                      <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full">
+                        Free above ₹999
+                      </span>
+                    )}
+                  </span>
+                  {netShipping === 0 ? (
+                    <span className="text-emerald-600 font-semibold">Free</span>
+                  ) : (
+                    <span className="text-gray-700 font-semibold">₹{netShipping.toLocaleString("en-IN")}</span>
+                  )}
+                </div>
+
+                {/* Zone charge */}
+                {zoneCharge > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500 flex items-center gap-1.5">
+                      {zoneName} delivery surcharge
+                      <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                        {zoneName}
+                      </span>
+                    </span>
+                    <span className="text-gray-600">₹{zoneCharge.toLocaleString("en-IN")}</span>
                   </div>
-                ))}
+                )}
+
+                {/* COD charges */}
+                {paymentMethod === "cash_on_delivery" && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">COD Charges</span>
+                    <span className="text-gray-500">₹0</span>
+                  </div>
+                )}
+
+                {/* Total */}
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <span className="text-base font-bold text-gray-900">Total</span>
                   <span className="text-lg font-extrabold text-sky-700">
                     ₹{displayTotal.toLocaleString("en-IN")}
                   </span>
                 </div>
+
+                {/* Free shipping nudge */}
+                {netShipping > 0 && (
+                  <p className="text-[11px] text-center text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    Add ₹{(999 - displaySubtotal).toLocaleString("en-IN")} more to get <strong>FREE shipping</strong>
+                  </p>
+                )}
               </div>
 
               {/* Deliver-to */}

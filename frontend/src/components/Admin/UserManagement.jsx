@@ -11,6 +11,7 @@ import * as XLSX from "xlsx";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { RiFileExcel2Line } from "react-icons/ri";
+import axios from "axios";
 
 const UserManagement = () => {
   const dispatch = useDispatch();
@@ -43,6 +44,33 @@ const UserManagement = () => {
     password: "",
     role: "customer",
   });
+
+  const [walletCreditModal, setWalletCreditModal] = useState(null); // { userId, userName }
+  const [walletCreditAmount, setWalletCreditAmount] = useState("");
+  const [walletCreditNote, setWalletCreditNote] = useState("");
+  const [walletCreditLoading, setWalletCreditLoading] = useState(false);
+
+  const handleAdminCredit = async () => {
+    const amt = Number(walletCreditAmount);
+    if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    setWalletCreditLoading(true);
+    try {
+      const token = localStorage.getItem("userToken");
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/wallet/admin-credit`,
+        { userId: walletCreditModal.userId, amount: amt, note: walletCreditNote || "Admin credit" },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(`₹${amt.toLocaleString("en-IN")} credited to ${walletCreditModal.userName}'s wallet`);
+      setWalletCreditModal(null);
+      setWalletCreditAmount("");
+      setWalletCreditNote("");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to credit wallet");
+    } finally {
+      setWalletCreditLoading(false);
+    }
+  };
 
   const [confirmModal, setConfirmModal] = useState({
     visible: false,
@@ -378,6 +406,14 @@ const UserManagement = () => {
                       >
                         View
                       </button>
+                      {user?.role === "admin" && u.role === "customer" && (
+                        <button
+                          onClick={() => setWalletCreditModal({ userId: u._id, userName: u.name })}
+                          className="bg-emerald-500 text-white px-3 py-1 rounded hover:bg-emerald-600 text-sm"
+                        >
+                          + Wallet
+                        </button>
+                      )}
                       {u._id !== user._id &&
                         (user?.role === "admin" ||
                           (user?.role === "merchantise" &&
@@ -555,6 +591,64 @@ const UserManagement = () => {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Admin Wallet Credit Modal ── */}
+      {walletCreditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+          onClick={() => setWalletCreditModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-emerald-50">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">Credit Wallet</h3>
+                <p className="text-xs text-gray-500 mt-0.5">User: <span className="font-semibold">{walletCreditModal.userName}</span></p>
+              </div>
+              <button onClick={() => setWalletCreditModal(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 hover:bg-gray-100 transition text-lg font-bold">
+                ×
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Amount (₹)</label>
+                <input
+                  type="number" min="1" placeholder="e.g. 200"
+                  value={walletCreditAmount}
+                  onChange={(e) => setWalletCreditAmount(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-gray-50 focus:bg-white transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Note (optional)</label>
+                <input
+                  type="text" placeholder="e.g. Birthday bonus, Refund adjustment…"
+                  value={walletCreditNote}
+                  onChange={(e) => setWalletCreditNote(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-gray-50 focus:bg-white transition"
+                />
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={handleAdminCredit}
+                  disabled={walletCreditLoading || !walletCreditAmount || Number(walletCreditAmount) <= 0}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition ${
+                    walletCreditLoading || !walletCreditAmount
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  }`}
+                >
+                  {walletCreditLoading ? "Crediting…" : "Credit Wallet"}
+                </button>
+                <button
+                  onClick={() => setWalletCreditModal(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

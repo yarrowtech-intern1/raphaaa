@@ -64,6 +64,7 @@ import Chatbot from "./components/Chatbot/Chatbot";
 import ResetPassword from "./pages/ResetPassword";
 import ResetPasswordUser from "./pages/ResetPasswordUser";
 import AdminSizeCharts from "./pages/AdminSizeCharts";
+import AdminShippingSettings from "./pages/AdminShippingSettings";
 // import AdminAboutSettings from "./pages/AdminAboutSettings";
 
 const App = () => {
@@ -416,6 +417,14 @@ const App = () => {
               element={
                 <ProtectedRoute role={["admin", "merchantise"]}>
                   <AdminSizeCharts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="shipping-settings"
+              element={
+                <ProtectedRoute role={["admin"]}>
+                  <AdminShippingSettings />
                 </ProtectedRoute>
               }
             />

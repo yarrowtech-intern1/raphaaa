@@ -112,8 +112,18 @@ const OrderConfirmationPage = () => {
             Order Placed Successfully! 🎉
           </h1>
           <p className="text-sm text-gray-500">
-            A confirmation email has been sent to your registered email address.
+            {state?.isGuest
+              ? `A confirmation will be sent to ${state?.order?.guestEmail || "your email"}.`
+              : "A confirmation email has been sent to your registered email address."}
           </p>
+          {state?.isGuest && (
+            <p className="text-xs text-sky-600 mt-1">
+              <button onClick={() => navigate("/register")} className="underline hover:text-sky-800">
+                Create an account
+              </button>{" "}
+              to track your orders and enjoy a faster checkout next time.
+            </p>
+          )}
         </div>
 
         {/* ── Loading ── */}

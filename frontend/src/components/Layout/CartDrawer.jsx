@@ -11,11 +11,7 @@ const CartDrawer = ({ drawerOpen, toggleCartDrawer }) => {
 
   const handleCheckout = () => {
     toggleCartDrawer();
-    if (!user) {
-      navigate("/login?redirect=checkout");
-    } else {
-      navigate("/checkout");
-    }
+    navigate("/checkout");
   };
 
   return (
@@ -45,33 +41,15 @@ const CartDrawer = ({ drawerOpen, toggleCartDrawer }) => {
           </button>
         </div>
 
-        {/* Cart Contents */}
+        {/* Cart Contents — always mounted so saved-for-later persists */}
         <div className="flex-grow p-4 overflow-y-auto">
-          <h2 className="text-xl font-semibold mb-4">Cart Summery</h2>
-          {cart && cart?.products?.length > 0 ? (
-            <CartContents cart={cart} userId={userId} guestId={guestId} />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-[70vh] text-center text-gray-600 space-y-4">
-              <img
-                src="https://cdn-icons-png.flaticon.com/512/2038/2038854.png"
-                alt="Empty Cart"
-                className="w-32 h-32 mx-auto opacity-80"
-              />
-              <h3 className="text-lg font-semibold">Your cart is empty</h3>
-              <p className="text-sm text-gray-500">
-                Looks like you haven’t added anything yet.
-              </p>
-              <button
-                onClick={() => {
-                  toggleCartDrawer();
-                  navigate("/collections/all");
-                }}
-                className="mt-2 px-5 py-2 bg-sky-600 text-white text-sm rounded-lg hover:bg-sky-700 transition"
-              >
-                Continue Shopping
-              </button>
-            </div>
-          )}
+          <h2 className="text-xl font-semibold mb-4">Cart Summary</h2>
+          <CartContents
+            cart={cart}
+            userId={userId}
+            guestId={guestId}
+            onContinueShopping={() => { toggleCartDrawer(); navigate("/collections/all"); }}
+          />
         </div>
 
         {/* Checkout Button */}
@@ -80,7 +58,7 @@ const CartDrawer = ({ drawerOpen, toggleCartDrawer }) => {
             <>
               <button
                 onClick={handleCheckout}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-sky-700"
+                className="w-full bg-linear-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:opacity-90 transition"
               >
                Proceed to Checkout
               </button>

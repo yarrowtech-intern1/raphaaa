@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 const useSmartLoader = (fetchFunction) => {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(undefined);
 
   useEffect(() => {
     const start = performance.now();

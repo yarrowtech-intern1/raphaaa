@@ -1,5 +1,7 @@
-const Offer = require("../models/offer");
-const Order = require("../models/Order");
+const Offer          = require("../models/offer");
+const Order          = require("../models/Order");
+const Product        = require("../models/Product");
+const ShippingConfig = require("../models/ShippingConfig");
 
 const clampMoney = (n) => Math.max(0, Math.round((Number(n) || 0) * 100) / 100);
 
@@ -31,11 +33,48 @@ const itemMatchesOffer = (offer, item) => {
   return true;
 };
 
-const computeBaseShipping = ({ subtotal }) => {
-  // Matches storefront messaging: free delivery above 999.
-  if (subtotal >= 999) return 0;
-  return 99;
-};
+// Singleton cache — refreshed every 5 minutes so config changes apply without restart
+let _shippingConfigCache = null;
+let _shippingConfigCachedAt = 0;
+
+async function getShippingConfig() {
+  const now = Date.now();
+  if (_shippingConfigCache && now - _shippingConfigCachedAt < 5 * 60 * 1000) {
+    return _shippingConfigCache;
+  }
+  let cfg = await ShippingConfig.findOne({ singleton: "global" }).lean();
+  if (!cfg) {
+    // Auto-create with defaults on first boot
+    cfg = await ShippingConfig.create({ singleton: "global" });
+    cfg = cfg.toObject();
+  }
+  _shippingConfigCache = cfg;
+  _shippingConfigCachedAt = now;
+  return cfg;
+}
+
+function computeZoneCharge(cfg, pincode) {
+  if (!pincode || !/^\d{6}$/.test(String(pincode))) return 0;
+  const prefix = String(pincode).slice(0, 2);
+  const zones = cfg.zoneRates || [];
+  for (const z of zones) {
+    if ((z.pinPrefixes || []).includes(prefix)) return Number(z.extraCharge || 0);
+  }
+  // Default to National zone charge if no match
+  const national = zones.find((z) => z.zone === "C");
+  return national ? Number(national.extraCharge || 0) : 0;
+}
+
+function getZoneName(cfg, pincode) {
+  if (!pincode || !/^\d{6}$/.test(String(pincode))) return null;
+  const prefix = String(pincode).slice(0, 2);
+  const zones = cfg.zoneRates || [];
+  for (const z of zones) {
+    if ((z.pinPrefixes || []).includes(prefix)) return z.label;
+  }
+  const national = zones.find((z) => z.zone === "C");
+  return national?.label || null;
+}
 
 async function userIsNew(userId) {
   if (!userId) return false;
@@ -137,12 +176,56 @@ async function priceQuote({
   const pm = normalizePaymentMethod(paymentMethod);
 
   const { items: normItems, subtotal } = buildLineTotals(items);
-  const shipping = computeBaseShipping({ subtotal, shippingAddress });
+
+  // Load admin-controlled shipping config from DB
+  const cfg = await getShippingConfig();
+  const newUser = await userIsNew(userId);
+
+  // --- Base shipping from admin config ---
+  let baseShipping = 0;
+  if (subtotal >= cfg.freeShippingThreshold) {
+    baseShipping = 0;
+  } else if (newUser && cfg.firstOrderFreeShipping) {
+    baseShipping = 0;
+  } else {
+    baseShipping = cfg.baseShippingFee;
+  }
+
+  // --- Product-level overrides ---
+  const productIds = normItems.map((it) => it.productId).filter(Boolean);
+  const productDocs = productIds.length
+    ? await Product.find({ _id: { $in: productIds } })
+        .select("freeShipping extraShippingCharge")
+        .lean()
+    : [];
+  const productMap = Object.fromEntries(productDocs.map((p) => [String(p._id), p]));
+
+  const productExtraShipping = normItems.reduce((sum, it) => {
+    const p = productMap[String(it.productId)];
+    return sum + (p?.extraShippingCharge || 0);
+  }, 0);
+
+  const allProductsFreeShipping = normItems.length > 0 && normItems.every((it) => {
+    const p = productMap[String(it.productId)];
+    return p?.freeShipping === true;
+  });
+
+  if (allProductsFreeShipping) baseShipping = 0;
+
+  // --- Zone charge from admin config ---
+  const pincode = shippingAddress?.postalCode || shippingAddress?.pincode;
+  const qualifiesForZone = pincode && baseShipping > 0;
+  const zoneCharge = qualifiesForZone ? computeZoneCharge(cfg, pincode) : 0;
+  const zoneName   = qualifiesForZone ? getZoneName(cfg, pincode) : null;
+
+  // --- COD surcharge ---
+  const codCharge = (pm === "cash_on_delivery" && cfg.codExtraCharge > 0) ? cfg.codExtraCharge : 0;
+
+  const shipping = clampMoney(baseShipping + productExtraShipping + zoneCharge + codCharge);
 
   const activeOffers = await Offer.find({ isActive: true }).lean();
   const filteredByWindow = activeOffers.filter((o) => isOfferInWindow(o, now));
 
-  const newUser = await userIsNew(userId);
   const couponSet = new Set((couponCodes || []).map((c) => String(c || "").trim().toUpperCase()).filter(Boolean));
 
   // Sort by priority (lower number = higher priority)
@@ -235,7 +318,13 @@ async function priceQuote({
 
   return {
     currency: "INR",
+    isNewUser: newUser,
+    freeShippingThreshold: cfg.freeShippingThreshold,
     subtotal: state.subtotal,
+    productExtraShipping: clampMoney(productExtraShipping),
+    zoneCharge: clampMoney(zoneCharge),
+    zoneName,
+    codCharge: clampMoney(codCharge),
     itemDiscountTotal: state.itemDiscountTotal,
     cartDiscount: state.cartDiscount,
     shipping: state.shipping,
@@ -253,6 +342,5 @@ async function priceQuote({
 
 module.exports = {
   priceQuote,
-  computeBaseShipping,
 };
 

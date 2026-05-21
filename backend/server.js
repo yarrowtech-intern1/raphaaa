@@ -77,22 +77,31 @@ cron.schedule("0 19 * * *", async () => {
   }
 });
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:3000",
+  "http://localhost:9000",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 const corsConfig = {
-    origin: "*",
-    Credential: true,
-    methods: ["GET", "POST", "PUT", "DELETE"] ,
+  origin: (origin, cb) => {
+    // allow requests with no origin (mobile apps, curl, Postman, same-origin)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  exposedHeaders: ["Content-Range", "X-Content-Range"],
 };
 
 const app = express();
-// app.use("/api/payment/webhook", webhookRoute);
 app.use(express.json());
 app.use(requestTracing);
-// app.use(cors({
-//   origin: "http://localhost:9000", // change to your frontend URL
-//   methods: ["GET", "POST", "PUT", "DELETE"],
-//   allowedHeaders: ["Content-Type", "Authorization"],
-// }));
-app.options("", cors(corsConfig));
+app.options(/(.*)/, cors(corsConfig)); // handle ALL preflight requests (Express 5 regex syntax)
 app.use(cors(corsConfig));
 
 const PORT = process.env.PORT || 3000;
@@ -151,6 +160,8 @@ app.use("/api/complaints", complaintRoutes);
 app.use("/api/size-charts", sizeChartRoutes);
 app.use("/api/returns", returnRequestRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
+app.use("/api/qa", require("./routes/productQARoutes"));
+app.use("/api/shipping-config", require("./routes/shippingConfigRoutes"));
 
 // Health check endpoint
 app.get('/healthz', (req, res) => {

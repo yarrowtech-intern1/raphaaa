@@ -61,6 +61,7 @@ const {
   getRevenueByPeriod,
 } = require("../controller/revenueController");
 const { sendMail } = require("../utils/sendMail");
+const sendWhatsApp = require("../utils/sendWhatsApp");
 const Collab = require("../models/Collab");
 const { buildInvoicePDF } = require("../utils/invoice");
 const { getJson, setJson } = require("../utils/redisCache");
@@ -364,6 +365,21 @@ router.post("/cod", protect, async (req, res) => {
         emailError.message
       );
     }
+
+    // WhatsApp order confirmation
+    try {
+      const phone = createdOrder.shippingAddress?.phone;
+      if (phone) {
+        const waMsg =
+          `✅ *Order Confirmed — Raphaaa*\n\n` +
+          `Hi ${req.user.name?.split(" ")[0] || "there"}! Your order has been placed.\n\n` +
+          `🆔 Order ID: *${createdOrder.orderId}*\n` +
+          `💰 Total: *₹${createdOrder.totalPrice.toLocaleString("en-IN")}*\n` +
+          `📦 Payment: Cash on Delivery\n\n` +
+          `We'll notify you when your order ships. Thank you for shopping with Raphaaa! 🛍️`;
+        await sendWhatsApp(`+91${String(phone).replace(/^\+91/, "")}`, waMsg);
+      }
+    } catch (_) {}
 
     // 🔻 Decrease stock for each ordered product
     for (const item of orderItems) {

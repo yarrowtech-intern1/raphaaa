@@ -328,8 +328,9 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const { protect } = require("../middleware/authMiddleware");
 const mongoose = require("mongoose");
-const { sendMail } = require("../utils/sendMail");        // +++
-const { buildInvoicePDF } = require("../utils/invoice");  // +++
+const { sendMail } = require("../utils/sendMail");
+const { buildInvoicePDF } = require("../utils/invoice");
+const sendWhatsApp = require("../utils/sendWhatsApp");
 
 const applyVariantStockDeduction = (product, item) => {
   const qty = Number(item?.quantity || 0);
@@ -898,6 +899,21 @@ router.post("/verify-payment", protect, async (req, res) => {
       } catch (emailErr) {
         console.error("Failed to send online payment invoice email:", emailErr.message);
       }
+
+      // WhatsApp payment confirmation
+      try {
+        const phone = populatedOrder.shippingAddress?.phone;
+        if (phone) {
+          const waMsg =
+            `✅ *Payment Confirmed — Raphaaa*\n\n` +
+            `Hi ${populatedOrder.user?.name?.split(" ")[0] || "there"}! We received your payment.\n\n` +
+            `🆔 Order ID: *${populatedOrder.orderId}*\n` +
+            `💰 Amount Paid: *₹${populatedOrder.totalPrice.toLocaleString("en-IN")}*\n` +
+            `💳 Payment: Online\n\n` +
+            `Your invoice has been sent to your email. We'll notify you when your order ships. Thank you! 🛍️`;
+          await sendWhatsApp(`+91${String(phone).replace(/^\+91/, "")}`, waMsg);
+        }
+      } catch (_) {}
 
       res.json({
         success: true,

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   FaBoxOpen, FaClipboardList, FaShoppingBag, FaSignOutAlt,
-  FaStore, FaUser, FaCog, FaLock, FaTasks, FaRupeeSign, FaUsers, FaRulerCombined,
+  FaStore, FaUser, FaCog, FaLock, FaTasks, FaRupeeSign, FaUsers, FaRulerCombined, FaTruck,
 } from "react-icons/fa";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { RiDashboardHorizontalFill } from "react-icons/ri";
@@ -307,6 +307,7 @@ const AdminSidebar = () => {
             <SubItem to="/admin/website-settings/about"          icon={FaUser}          label="About Section" />
             <SubItem to="/admin/website-settings/privacy&policy" icon={FaClipboardList} label="Privacy & Policy" />
             <SubItem to="/admin/website-settings/contact"        icon={FaStore}         label="Contact Details" />
+            <SubItem to="/admin/shipping-settings"               icon={FaTruck}         label="Shipping & Delivery" />
           </AccordionGroup>
         )}
 

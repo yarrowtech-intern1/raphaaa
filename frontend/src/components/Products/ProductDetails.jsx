@@ -1677,6 +1677,8 @@ import { FaCartShopping } from "react-icons/fa6";
 import { flyToCart } from "../../utils/flyToCart";
 import { FiShare2 } from "react-icons/fi";
 import { FiCopy } from "react-icons/fi";
+import ProductQA from "./ProductQA";
+import { Helmet } from "react-helmet-async";
 
 // Local CSS for the size-chart drawer animation (kept here to avoid global CSS churn)
 const _sizeChartDrawerAnim = `
@@ -1711,6 +1713,8 @@ const ProductDetails = ({ productId }) => {
 
   const productFetchId = selectedProduct?._id;
   const [sortOption, setSortOption] = useState("newest");
+  const [ratingFilter, setRatingFilter] = useState(null);
+  const [withPhotosFilter, setWithPhotosFilter] = useState(false);
   const [expandedReviews, setExpandedReviews] = useState({});
   const [showAllReviews, setShowAllReviews] = useState(false);
 
@@ -1735,6 +1739,7 @@ const ProductDetails = ({ productId }) => {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [fbtProducts, setFbtProducts] = useState([]);
+  const [ctlProducts, setCtlProducts] = useState([]);
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [sizeChartTab, setSizeChartTab] = useState("chart"); // "chart" | "measure"
 
@@ -2064,6 +2069,11 @@ const ProductDetails = ({ productId }) => {
       .get(`${import.meta.env.VITE_BACKEND_URL}/api/recommendations/fbt/${p._id}?limit=8`)
       .then((res) => setFbtProducts(Array.isArray(res.data) ? res.data : []))
       .catch(() => setFbtProducts([]));
+
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL}/api/recommendations/complete-the-look/${p._id}?limit=6`)
+      .then((res) => setCtlProducts(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setCtlProducts([]));
   }, [selectedProduct?._id]);
 
   useEffect(() => {
@@ -2313,16 +2323,13 @@ const ProductDetails = ({ productId }) => {
   }, [selectedProduct, hasColorVariants, hasLegacyVariants, sku]);
 
   const sortedReviews = useMemo(() => {
-    if (sortOption === "highest") {
-      return [...reviews].sort((a, b) => b.rating - a.rating);
-    } else if (sortOption === "lowest") {
-      return [...reviews].sort((a, b) => a.rating - b.rating);
-    } else {
-      return [...reviews].sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-      );
-    }
-  }, [sortOption, reviews]);
+    let filtered = [...reviews];
+    if (ratingFilter !== null) filtered = filtered.filter((r) => r.rating === ratingFilter);
+    if (withPhotosFilter) filtered = filtered.filter((r) => r.image && r.image.length > 0);
+    if (sortOption === "highest") return filtered.sort((a, b) => b.rating - a.rating);
+    if (sortOption === "lowest") return filtered.sort((a, b) => a.rating - b.rating);
+    return filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [sortOption, reviews, ratingFilter, withPhotosFilter]);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -2549,10 +2556,70 @@ const ProductDetails = ({ productId }) => {
     }
   };
 
+  // Build schema.org Product structured data for SEO
+  const productSchema = selectedProduct
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: selectedProduct.name,
+        description: selectedProduct.description || selectedProduct.name,
+        image:
+          selectedProduct.colorVariants?.[0]?.images?.map((img) => img.url) ||
+          selectedProduct.images?.map((img) => img.url) ||
+          [],
+        sku: selectedProduct.skuCode || selectedProduct.sku || selectedProduct._id,
+        brand: {
+          "@type": "Brand",
+          name: selectedProduct.brand || "Raphaaa",
+        },
+        offers: {
+          "@type": "Offer",
+          priceCurrency: "INR",
+          price: selectedProduct.discountPrice || selectedProduct.price,
+          availability:
+            selectedProduct.stock > 0
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+          url: typeof window !== "undefined" ? window.location.href : "",
+          seller: { "@type": "Organization", name: "Raphaaa" },
+        },
+        ...(selectedProduct.rating > 0 && {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: selectedProduct.rating.toFixed(1),
+            reviewCount: selectedProduct.numReviews || 0,
+            bestRating: "5",
+            worstRating: "1",
+          },
+        }),
+      }
+    : null;
+
   return (
     <div className="min-h-screen pb-20">
       {selectedProduct && (
         <>
+          <Helmet>
+            <title>{selectedProduct.name} — Raphaaa</title>
+            <meta name="description" content={selectedProduct.description?.slice(0, 160) || selectedProduct.name} />
+            <meta property="og:title" content={`${selectedProduct.name} — Raphaaa`} />
+            <meta property="og:type" content="product" />
+            <meta
+              property="og:image"
+              content={
+                selectedProduct.colorVariants?.[0]?.images?.[0]?.url ||
+                selectedProduct.images?.[0]?.url ||
+                ""
+              }
+            />
+            <meta property="og:url" content={typeof window !== "undefined" ? window.location.href : ""} />
+            <meta property="product:price:amount" content={String(selectedProduct.discountPrice || selectedProduct.price)} />
+            <meta property="product:price:currency" content="INR" />
+            {productSchema && (
+              <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
+            )}
+          </Helmet>
+
           {/* Breadcrumb */}
           <div className="bg-linear-to-r from-sky-200 to-sky-100">
             <div className="max-w-7xl mx-auto px-4 py-3 text-xs text-gray-400 font-medium flex items-center gap-1.5 flex-wrap">
@@ -3213,9 +3280,14 @@ const ProductDetails = ({ productId }) => {
               })()}
 
               <div className="lg:col-span-2">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <p className="font-semibold text-gray-700 text-sm">
                     {sortedReviews.length} Review{sortedReviews.length !== 1 ? "s" : ""}
+                    {(ratingFilter !== null || withPhotosFilter) && (
+                      <span className="ml-2 text-xs text-sky-600 font-normal">
+                        (filtered)
+                      </span>
+                    )}
                   </p>
                   <select
                     value={sortOption}
@@ -3226,6 +3298,43 @@ const ProductDetails = ({ productId }) => {
                     <option value="highest">Highest Rating</option>
                     <option value="lowest">Lowest Rating</option>
                   </select>
+                </div>
+                {/* Filter chips */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {[5, 4, 3, 2, 1].map((star) => {
+                    const count = reviews.filter((r) => r.rating === star).length;
+                    return (
+                      <button
+                        key={star}
+                        onClick={() => setRatingFilter(ratingFilter === star ? null : star)}
+                        className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border transition ${
+                          ratingFilter === star
+                            ? "bg-yellow-400 border-yellow-500 text-gray-900"
+                            : "bg-gray-50 border-gray-200 text-gray-600 hover:border-yellow-400"
+                        }`}
+                      >
+                        {star}★ <span className="text-gray-400">({count})</span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setWithPhotosFilter((v) => !v)}
+                    className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border transition ${
+                      withPhotosFilter
+                        ? "bg-sky-500 border-sky-600 text-white"
+                        : "bg-gray-50 border-gray-200 text-gray-600 hover:border-sky-400"
+                    }`}
+                  >
+                    📷 With Photos
+                  </button>
+                  {(ratingFilter !== null || withPhotosFilter) && (
+                    <button
+                      onClick={() => { setRatingFilter(null); setWithPhotosFilter(false); }}
+                      className="text-xs text-red-500 px-2 py-1 rounded-full border border-red-200 hover:bg-red-50 transition"
+                    >
+                      Clear filters
+                    </button>
+                  )}
                 </div>
                 {sortedReviews.length > 0 ? (
                   <>
@@ -3308,6 +3417,9 @@ const ProductDetails = ({ productId }) => {
             </div>
           </div>
 
+          {/* Product Q&A */}
+          {selectedProduct?._id && <ProductQA productId={selectedProduct._id} />}
+
           {/* Frequently Bought Together */}
           {Array.isArray(fbtProducts) && fbtProducts.length > 0 && (
             <div className="border-t border-gray-100 mt-8 pt-8 pb-4 max-w-7xl mx-auto px-4 md:px-6">
@@ -3336,6 +3448,66 @@ const ProductDetails = ({ productId }) => {
                     </div>
                     <p className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">{product.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{product.category}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Complete the Look */}
+          {Array.isArray(ctlProducts) && ctlProducts.length > 0 && (
+            <div className="border-t border-gray-100 mt-8 pt-8 pb-4 max-w-7xl mx-auto px-4 md:px-6">
+              <div className="flex items-center gap-3 mb-6">
+                <h3 className="text-[11px] font-bold tracking-[0.15em] text-gray-500 uppercase">
+                  Complete the Look
+                </h3>
+                <span className="text-[10px] font-semibold text-white bg-rose-500 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                  Style It
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
+                {ctlProducts.map((product) => (
+                  <div
+                    key={product._id}
+                    onClick={() =>
+                      navigate(
+                        `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
+                          product.skuCode || product.sku || product._id
+                        )}`
+                      )
+                    }
+                    className="cursor-pointer group"
+                  >
+                    <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2">
+                      <img
+                        src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      {product.offerPercentage > 0 && (
+                        <span className="absolute top-1.5 left-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                          -{product.offerPercentage}%
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-semibold text-gray-800 leading-snug line-clamp-2">{product.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 capitalize">{product.category}</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {product.discountPrice ? (
+                        <>
+                          <span className="text-xs font-bold text-gray-900">
+                            ₹{Math.floor(product.discountPrice).toLocaleString("en-IN")}
+                          </span>
+                          <span className="text-[10px] line-through text-gray-400">
+                            ₹{Math.floor(product.price).toLocaleString("en-IN")}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs font-bold text-gray-900">
+                          ₹{Math.floor(product.price).toLocaleString("en-IN")}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
