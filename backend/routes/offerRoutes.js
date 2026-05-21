@@ -7,6 +7,7 @@ const { sendMail } = require("../utils/sendMail"); // Assuming you already have 
 const Subscriber = require("../models/Subscriber");
 const Order = require("../models/Order");
 const User = require("../models/User");
+const { enqueueJob } = require("../services/jobQueue");
 
 // Create offer
 router.post("/", protect, admin, async (req, res) => {
@@ -61,7 +62,7 @@ const sendInitialOfferEmails = async (offer) => {
   `;
 
   for (const email of uniqueEmails) {
-    await sendMail({ to: email, subject, message });
+    await enqueueJob("send_email", { to: email, subject, message }, { maxAttempts: 6 });
   }
 };
 await sendInitialOfferEmails(offer);

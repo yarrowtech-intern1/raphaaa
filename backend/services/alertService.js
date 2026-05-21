@@ -1,6 +1,6 @@
 const ProductAlert = require("../models/ProductAlert");
 const Product = require("../models/Product");
-const { sendMail } = require("../utils/sendMail");
+const { enqueueJob } = require("../services/jobQueue");
 
 const clampMoney = (n) => Math.max(0, Math.round((Number(n) || 0) * 100) / 100);
 
@@ -59,7 +59,7 @@ async function triggerBackInStockForProduct(productId) {
       <p><a href="${link}">View product</a></p>
     `;
     try {
-      await sendMail({ to: a.email, subject, message: msg });
+      await enqueueJob("send_email", { to: a.email, subject, message: msg });
       await ProductAlert.updateOne({ _id: a._id }, { $set: { triggeredAt: new Date(), isActive: false } });
       triggered += 1;
     } catch (err) {
@@ -97,7 +97,7 @@ async function triggerPriceDropForProduct(productId) {
       <p><a href="${link}">View product</a></p>
     `;
     try {
-      await sendMail({ to: a.email, subject, message: msg });
+      await enqueueJob("send_email", { to: a.email, subject, message: msg });
       await ProductAlert.updateOne({ _id: a._id }, { $set: { triggeredAt: new Date(), isActive: false } });
       triggered += 1;
     } catch (err) {
@@ -131,4 +131,3 @@ module.exports = {
   triggerPriceDropForProduct,
   scanAndTriggerAlerts,
 };
-

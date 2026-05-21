@@ -23,6 +23,7 @@ const salesRoutes = require("./routes/salesRoutes");
 const Task = require("./models/taskModel");
 const cron = require("node-cron");
 const moment = require("moment-timezone");
+const requestTracing = require("./middleware/requestTracing");
 const reviewRoutes = require("./routes/reviewRoutes");
 const contactRoutes = require("./routes/contactRoutes");
 const heroRoutes = require("./routes/heroRoutes");
@@ -49,6 +50,8 @@ const returnRequestRoutes = require("./routes/returnRequestRoutes");
 const { syncShiprocketStatusesForOpenOrders } = require("./utils/shiprocket");
 const { expireDueCredits } = require("./services/walletService");
 const { scanAndTriggerAlerts } = require("./services/alertService");
+const { startJobWorker } = require("./workers/jobWorker");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 // Run every day at 7:00 PM IST
 cron.schedule("0 19 * * *", async () => {
@@ -83,6 +86,7 @@ const corsConfig = {
 const app = express();
 // app.use("/api/payment/webhook", webhookRoute);
 app.use(express.json());
+app.use(requestTracing);
 // app.use(cors({
 //   origin: "http://localhost:9000", // change to your frontend URL
 //   methods: ["GET", "POST", "PUT", "DELETE"],
@@ -146,6 +150,7 @@ app.use("/api/meta-options", metaOptionRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/size-charts", sizeChartRoutes);
 app.use("/api/returns", returnRequestRoutes);
+app.use("/api/admin/analytics", analyticsRoutes);
 
 // Health check endpoint
 app.get('/healthz', (req, res) => {
@@ -155,6 +160,12 @@ app.get('/healthz', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server is running on https://localhost:${PORT}`);
+});
+
+// Background worker for queued jobs (emails/webhooks/retries)
+startJobWorker({
+  intervalMs: Number(process.env.JOB_WORKER_INTERVAL_MS || 500),
+  concurrency: Number(process.env.JOB_WORKER_CONCURRENCY || 1),
 });
 
 // Self-ping every 1 minute to prevent sleeping (Render free tier)

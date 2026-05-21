@@ -12,6 +12,7 @@ const Order = require("../models/Order");
 const User = require("../models/User");
 const { checkDeliveryServiceability } = require("../utils/shiprocket");
 const { triggerBackInStockForProduct, triggerPriceDropForProduct } = require("../services/alertService");
+const { getJson, setJson } = require("../utils/redisCache");
 
 const router = express.Router();
 
@@ -312,6 +313,13 @@ router.get("/", async (req, res) => {
       includeUnpublished,
     } = req.query;
 
+    const shouldCache = String(includeUnpublished) !== "true";
+    const cacheKey = shouldCache ? `list:${req.originalUrl}` : null;
+    if (shouldCache && cacheKey) {
+      const cached = await getJson("products", cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     let query = {};
 
     // Storefront should show only published products by default
@@ -386,7 +394,8 @@ router.get("/", async (req, res) => {
 
     // Fetch products
     const projection = shouldSortByTextScore ? { score: { $meta: "textScore" } } : undefined;
-    let products = await Product.find(query, projection).sort(sort).limit(Number(limit) || 0);
+    const safeLimit = Math.max(0, Math.min(50, Number(limit) || 0));
+    let products = await Product.find(query, projection).sort(sort).limit(safeLimit);
 
     // Fallback: basic typo tolerance via regex if text search returns nothing.
     // This is intentionally limited to name/brand/category to avoid very wide scans.
@@ -398,7 +407,9 @@ router.get("/", async (req, res) => {
         { brand: { $regex: trimmedSearch, $options: "i" } },
         { category: { $regex: trimmedSearch, $options: "i" } },
       ];
-      products = await Product.find(fallbackQuery).sort(sortBy ? sort : { createdAt: -1 }).limit(Number(limit) || 0);
+      products = await Product.find(fallbackQuery)
+        .sort(sortBy ? sort : { createdAt: -1 })
+        .limit(safeLimit);
     }
 
     // If user has a valid coupon, apply discount
@@ -423,6 +434,9 @@ router.get("/", async (req, res) => {
       }
     }
 
+    if (shouldCache && cacheKey) {
+      await setJson("products", cacheKey, products, 45);
+    }
     res.json(products);
   } catch (error) {
     console.error(error);
@@ -486,6 +500,13 @@ router.get("/facets", async (req, res) => {
       match.$text = { $search: trimmedSearch };
     }
 
+    const shouldCache = String(includeUnpublished) !== "true";
+    const cacheKey = shouldCache ? `facets:${req.originalUrl}` : null;
+    if (shouldCache && cacheKey) {
+      const cached = await getJson("products", cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     const [result] = await Product.aggregate([
       { $match: match },
       {
@@ -529,7 +550,7 @@ router.get("/facets", async (req, res) => {
     const total = result?.total?.[0]?.count || 0;
     const price = result?.price?.[0] || { min: null, max: null };
 
-    res.json({
+    const payload = {
       success: true,
       total,
       price: { min: price.min ?? null, max: price.max ?? null },
@@ -537,7 +558,12 @@ router.get("/facets", async (req, res) => {
       categories: result?.categories || [],
       sizes: result?.sizes || [],
       colors: result?.colors || [],
-    });
+    };
+
+    if (shouldCache && cacheKey) {
+      await setJson("products", cacheKey, payload, 60);
+    }
+    res.json(payload);
   } catch (err) {
     console.error("Facet error:", err);
     res.status(500).json({ success: false, message: "Failed to fetch facets" });
