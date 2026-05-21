@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { key: "orders",    label: "My Orders",   icon: FaBoxOpen },
   { key: "wishlist",  label: "Wishlist",    icon: FaHeart },
   { key: "wallet",    label: "Wallet",      icon: FaWallet },
-  { key: "refer",     label: "Refer & Earn",icon: FaGift },
+  // { key: "refer",     label: "Refer & Earn",icon: FaGift },
   { key: "address",   label: "Addresses",   icon: FaMapMarkerAlt },
   { key: "profile",   label: "Profile Info",icon: FaUserCircle },
   { key: "complaint", label: "Complaints",  icon: HiOutlineExclamationCircle },
