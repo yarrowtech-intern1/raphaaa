@@ -55,6 +55,18 @@ const userSchema = new mongoose.Schema(
     otpExpires: { type: Date },
     resetToken: String,
 resetTokenExpire: Date,
+
+    // Personalization (Phase 3): store per-user recently viewed products.
+    recentlyViewed: [
+      {
+        product: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        viewedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

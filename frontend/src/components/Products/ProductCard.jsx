@@ -3,18 +3,31 @@ import { IoFlash } from "react-icons/io5";
 import demoImg from "../../assets/login.jpg";
 
 const ProductCard = ({ product, badge }) => {
+  const imageUrl =
+    product?.colorVariants?.[0]?.images?.[0]?.url ||
+    product?.images?.[0]?.url ||
+    (typeof product?.image === "string" ? product.image : null) ||
+    demoImg;
+  const imageAlt =
+    product?.colorVariants?.[0]?.images?.[0]?.altText ||
+    product?.images?.[0]?.altText ||
+    product?.name ||
+    "Product";
+
   return (
     <Link
-      to={`/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
-        product.skuCode || product.sku || product._id
+      to={`/product/${String(product?.name || "")
+        .toLowerCase()
+        .replace(/\s+/g, "-")}/p/${encodeURIComponent(
+        product?.skuCode || product?.sku || product?._id
       )}`}
       className="block group transition-transform transform hover:-translate-y-1"
     >
       <div className="bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 border border-sky-200">
         <div className="w-full h-[220px] md:h-[300px] lg:h-[300px] mb-3 relative overflow-hidden rounded-lg">
           <img
-            src={product.image || demoImg}
-            alt={product.image[0].altText || product.name}
+            src={imageUrl}
+            alt={imageAlt}
             className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />

@@ -13,7 +13,7 @@ import BestSellersSection from "../components/Products/BestSeller";
 import CategorySection from "../components/Products/CategorySection";
 import Collab from "../components/Products/Collab";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import FAQ from "../components/Common/FAQ";
 import PreviouslyViewed from "./PreviouslyViewed";
 
@@ -488,7 +488,7 @@ const Home = () => {
 
         {/* Feature collections */}
         <FeaturedCollection />
-        { /* <PreviouslyViewed /> */}
+        <PreviouslyViewed />
 
         {activeOffer && showAlert && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">

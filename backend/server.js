@@ -35,6 +35,7 @@ const userAddressRoutes = require("./routes/userAddressRoutes");
 const policyRoutes = require("./routes/policyRoutes");
 const offerRoutes = require("./routes/offerRoutes");
 const wishlistRoutes = require("./routes/wishlistRoutes");
+const recommendationRoutes = require("./routes/recommendationRoutes");
 // require("./emailScheduler");
 const { sendScheduledEmails } = require("./offerScheduler");
 sendScheduledEmails(); // Run once on startup
@@ -127,6 +128,7 @@ app.use("/api/user/addresses", userAddressRoutes);
 app.use("/api/settings/policy", policyRoutes);
 app.use("/api/offers", offerRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/campaigns", campaignsRoutes);
 
 // Admin routes

@@ -1729,6 +1729,7 @@ const ProductDetails = ({ productId }) => {
   const [copied, setCopied] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
+  const [fbtProducts, setFbtProducts] = useState([]);
 
   const cart = useSelector((state) => state.cart);
 
@@ -1996,6 +1997,53 @@ const ProductDetails = ({ productId }) => {
       )
       .slice(0, 12);
   }, [similarProducts, selectedProduct, catalogProducts]);
+
+  const buildMarketplaceUrl = (provider, productName) => {
+    const q = encodeURIComponent(String(productName || "").trim());
+    switch (provider) {
+      case "Amazon":
+        return `https://www.amazon.in/s?k=${q}`;
+      case "Flipkart":
+        return `https://www.flipkart.com/search?q=${q}`;
+      case "Meesho":
+        return `https://www.meesho.com/search?q=${q}`;
+      default:
+        return "";
+    }
+  };
+
+  // Phase 3 personalization/reco: record recently viewed + fetch frequently-bought-together.
+  useEffect(() => {
+    const p = selectedProduct;
+    if (!p?._id) return;
+
+    try {
+      const key = "recentlyViewedProductIds";
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const ids = Array.isArray(parsed) ? parsed : [];
+      const next = [String(p._id), ...ids.filter((x) => String(x) !== String(p._id))].slice(0, 30);
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch (_) {
+      // ignore
+    }
+
+    const token = localStorage.getItem("userToken");
+    if (token) {
+      axios
+        .post(
+          `${import.meta.env.VITE_BACKEND_URL}/api/recommendations/recently-viewed/${p._id}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        .catch(() => {});
+    }
+
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL}/api/recommendations/fbt/${p._id}?limit=8`)
+      .then((res) => setFbtProducts(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setFbtProducts([]));
+  }, [selectedProduct?._id]);
 
   const handleBuyNow = async () => {
     if (isOutOfStock) {
@@ -2688,11 +2736,23 @@ const ProductDetails = ({ productId }) => {
 
                 {/* Offers strip */}
                 <div className="flex flex-wrap gap-3 py-3">
-                  {[
-                    { icon: "🚚", label: "Free delivery above ₹999" },
-                    { icon: "↩", label: "7-day returns" },
-                    { icon: "✔", label: "Authentic product" },
-                  ].map(({ icon, label }) => (
+                  {(() => {
+                    const rp = selectedProduct?.returnPolicy;
+                    const returnLabel =
+                      rp && rp.eligible === false
+                        ? "No returns"
+                        : `${Number(rp?.days || 7)}-day returns`;
+                    const defaults = [
+                      { icon: "🚚", label: "Free delivery above ₹999" },
+                      { icon: "↩", label: returnLabel },
+                      { icon: "✔", label: "Authentic product" },
+                    ];
+                    const badges = Array.isArray(selectedProduct?.trustBadges)
+                      ? selectedProduct.trustBadges.filter(Boolean).slice(0, 6)
+                      : [];
+                    if (badges.length === 0) return defaults;
+                    return badges.map((b) => ({ icon: "✔", label: b }));
+                  })().map(({ icon, label }) => (
                     <span key={label} className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
                       <span className="text-gray-700">{icon}</span> {label}
                     </span>
@@ -2954,10 +3014,58 @@ const ProductDetails = ({ productId }) => {
                       )}
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
-                    <span>✅ Free delivery above ₹999</span>
-                    <span>🔄 7-day easy returns</span>
-                    <span>🔒 Secure checkout</span>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
+                    {selectedProduct?.deliveryPromise?.text && (
+                      <div className="p-2 rounded-lg bg-gray-50 border border-gray-200">
+                        <span className="font-semibold text-gray-800">Delivery promise:</span>{" "}
+                        {selectedProduct.deliveryPromise.text}
+                      </div>
+                    )}
+                    {(() => {
+                      const rp = selectedProduct?.returnPolicy;
+                      if (!rp) return null;
+                      const label =
+                        rp.eligible === false ? "Not eligible for return" : `${Number(rp.days || 7)}-day returns`;
+                      const text = String(rp.text || "").trim();
+                      return (
+                        <div className="p-2 rounded-lg bg-gray-50 border border-gray-200">
+                          <span className="font-semibold text-gray-800">Return policy:</span> {label}
+                          {text ? <span className="text-gray-500"> · {text}</span> : null}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+                    <p className="text-[11px] font-bold tracking-[0.12em] text-gray-500 uppercase mb-2">Compare Offers</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(() => {
+                        const offers = Array.isArray(selectedProduct?.externalOffers)
+                          ? selectedProduct.externalOffers.filter((o) => o?.url)
+                          : [];
+                        const fallbacks = [
+                          { provider: "Amazon", label: "Amazon" },
+                          { provider: "Flipkart", label: "Flipkart" },
+                          { provider: "Meesho", label: "Meesho" },
+                        ].map((x) => ({ ...x, url: buildMarketplaceUrl(x.provider, selectedProduct?.name) }));
+                        const list = offers.length > 0 ? offers : fallbacks;
+                        return list
+                          .filter((o) => o?.url)
+                          .slice(0, 6)
+                          .map((o) => (
+                            <a
+                              key={`${o.provider}-${o.url}`}
+                              href={o.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-800"
+                            >
+                              {o.label || o.provider}
+                            </a>
+                          ));
+                      })()}
+                    </div>
+                    <p className="mt-2 text-[11px] text-gray-400">External links may have different prices and policies.</p>
                   </div>
                 </div>
 
@@ -3169,6 +3277,40 @@ const ProductDetails = ({ productId }) => {
               </div>
             </div>
           </div>
+
+          {/* Frequently Bought Together */}
+          {Array.isArray(fbtProducts) && fbtProducts.length > 0 && (
+            <div className="border-t border-gray-100 mt-8 pt-8 pb-4 max-w-7xl mx-auto px-4 md:px-6">
+              <h3 className="text-[11px] font-bold tracking-[0.15em] text-gray-500 uppercase mb-6">
+                Frequently Bought Together
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
+                {fbtProducts.slice(0, 8).map((product) => (
+                  <div
+                    key={product._id}
+                    onClick={() =>
+                      navigate(
+                        `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
+                          product.skuCode || product.sku || product._id
+                        )}`
+                      )
+                    }
+                    className="cursor-pointer group"
+                  >
+                    <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2.5">
+                      <img
+                        src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">{product.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{product.category}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Similar Products */}
           {resolvedSimilarProducts.length > 0 && (

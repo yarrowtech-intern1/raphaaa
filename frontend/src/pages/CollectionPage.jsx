@@ -8,7 +8,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProductsByFilters } from "../redux/slices/productsSlice";
 import axios from "axios";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 
 const SORT_OPTIONS = [
   { value: "",           label: "Featured"         },

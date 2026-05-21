@@ -1,5 +1,6 @@
 const express = require("express");
 const axios = require("axios");
+const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const {
   protect,
@@ -352,11 +353,10 @@ router.get("/", async (req, res) => {
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
+    const trimmedSearch = String(search || "").trim();
+    if (trimmedSearch) {
+      // Primary: weighted text index (better relevance).
+      query.$text = { $search: trimmedSearch };
     }
 
     // Sorting
@@ -377,10 +377,28 @@ router.get("/", async (req, res) => {
       }
     }
 
+    // If we're searching and user didn't force a sort, sort by text relevance.
+    const shouldSortByTextScore = !!trimmedSearch && (!sortBy || Object.keys(sort).length === 0);
+    if (shouldSortByTextScore) {
+      sort = { score: { $meta: "textScore" } };
+    }
+
     // Fetch products
-    let products = await Product.find(query)
-      .sort(sort)
-      .limit(Number(limit) || 0);
+    const projection = shouldSortByTextScore ? { score: { $meta: "textScore" } } : undefined;
+    let products = await Product.find(query, projection).sort(sort).limit(Number(limit) || 0);
+
+    // Fallback: basic typo tolerance via regex if text search returns nothing.
+    // This is intentionally limited to name/brand/category to avoid very wide scans.
+    if (trimmedSearch && products.length === 0) {
+      const fallbackQuery = { ...query };
+      delete fallbackQuery.$text;
+      fallbackQuery.$or = [
+        { name: { $regex: trimmedSearch, $options: "i" } },
+        { brand: { $regex: trimmedSearch, $options: "i" } },
+        { category: { $regex: trimmedSearch, $options: "i" } },
+      ];
+      products = await Product.find(fallbackQuery).sort(sortBy ? sort : { createdAt: -1 }).limit(Number(limit) || 0);
+    }
 
     // If user has a valid coupon, apply discount
     if (userId) {
@@ -411,6 +429,120 @@ router.get("/", async (req, res) => {
   }
 });
 
+// @route GET /api/products/facets
+// @desc Facet counts for filters (brand/category/price/size/color) under current query
+// @access Public
+router.get("/facets", async (req, res) => {
+  try {
+    const {
+      collection,
+      size,
+      color,
+      gender,
+      minPrice,
+      maxPrice,
+      search,
+      category,
+      material,
+      brand,
+      includeUnpublished,
+    } = req.query;
+
+    const match = {};
+    if (String(includeUnpublished) !== "true") {
+      match.isPublished = true;
+    }
+
+    if (collection && String(collection).toLowerCase() !== "all") {
+      match.collections = collection;
+    }
+    if (category && String(category).toLowerCase() !== "all") {
+      match.category = category;
+    }
+    if (material) {
+      match.material = { $in: String(material).split(",") };
+    }
+    if (brand) {
+      match.brand = { $in: String(brand).split(",") };
+    }
+    if (size) {
+      match.sizes = { $in: String(size).split(",") };
+    }
+    if (color) {
+      match.colors = { $in: [String(color)] };
+    }
+    if (gender) {
+      match.gender = gender;
+    }
+    if (minPrice || maxPrice) {
+      match.price = {};
+      if (minPrice) match.price.$gte = Number(minPrice);
+      if (maxPrice) match.price.$lte = Number(maxPrice);
+    }
+
+    const trimmedSearch = String(search || "").trim();
+    if (trimmedSearch) {
+      match.$text = { $search: trimmedSearch };
+    }
+
+    const [result] = await Product.aggregate([
+      { $match: match },
+      {
+        $facet: {
+          total: [{ $count: "count" }],
+          price: [
+            {
+              $group: {
+                _id: null,
+                min: { $min: "$price" },
+                max: { $max: "$price" },
+              },
+            },
+          ],
+          brands: [
+            { $match: { brand: { $exists: true, $ne: "" } } },
+            { $sortByCount: "$brand" },
+            { $limit: 100 },
+          ],
+          categories: [
+            { $match: { category: { $exists: true, $ne: "" } } },
+            { $sortByCount: "$category" },
+            { $limit: 100 },
+          ],
+          sizes: [
+            { $unwind: "$sizes" },
+            { $match: { sizes: { $exists: true, $ne: "" } } },
+            { $sortByCount: "$sizes" },
+            { $limit: 100 },
+          ],
+          colors: [
+            { $unwind: "$colors" },
+            { $match: { colors: { $exists: true, $ne: "" } } },
+            { $sortByCount: "$colors" },
+            { $limit: 100 },
+          ],
+        },
+      },
+    ]);
+
+    const total = result?.total?.[0]?.count || 0;
+    const price = result?.price?.[0] || { min: null, max: null };
+
+    res.json({
+      success: true,
+      total,
+      price: { min: price.min ?? null, max: price.max ?? null },
+      brands: result?.brands || [],
+      categories: result?.categories || [],
+      sizes: result?.sizes || [],
+      colors: result?.colors || [],
+    });
+  } catch (err) {
+    console.error("Facet error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch facets" });
+  }
+});
+
 // GET /api/products/inventory - Admin & Merchandise only
 router.get("/inventory", protect, admin, async (req, res) => {
   try {
@@ -425,6 +557,41 @@ router.get("/inventory", protect, admin, async (req, res) => {
     res.json(products);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch inventory" });
+  }
+});
+
+// @route GET /api/products/by-ids?ids=comma,separated,ids
+// @desc Fetch products by IDs (keeps input order). Useful for recently-viewed guest lists.
+// @access Public
+router.get("/by-ids", async (req, res) => {
+  try {
+    const ids = String(req.query.ids || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 30);
+
+    if (ids.length === 0) return res.json([]);
+
+    const objectIds = ids
+      .map((id) => {
+        try {
+          return new mongoose.Types.ObjectId(id);
+        } catch (_) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    if (objectIds.length === 0) return res.json([]);
+
+    const docs = await Product.find({ _id: { $in: objectIds }, isPublished: true });
+    const byId = new Map(docs.map((d) => [String(d._id), d]));
+    const ordered = ids.map((id) => byId.get(String(id))).filter(Boolean);
+    res.json(ordered);
+  } catch (err) {
+    console.error("by-ids error:", err);
+    res.status(500).json({ message: "Failed to fetch products" });
   }
 });
 

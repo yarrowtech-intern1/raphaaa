@@ -157,6 +157,31 @@ const productSchema = new mongoose.Schema({
         default: 0,
     },
     tags: [String],
+    // External marketplaces / affiliates to compare offers on PDP.
+    externalOffers: [
+        {
+            provider: {
+                type: String,
+                enum: ["Amazon", "Flipkart", "Meesho", "Other"],
+                default: "Other",
+            },
+            url: { type: String, trim: true, default: "" },
+            label: { type: String, trim: true, default: "" },
+        },
+    ],
+    // Item-level delivery & return/replace policy info shown on PDP.
+    deliveryPromise: {
+        text: { type: String, trim: true, default: "" },
+        shipsInDaysMin: { type: Number, min: 0 },
+        shipsInDaysMax: { type: Number, min: 0 },
+    },
+    returnPolicy: {
+        eligible: { type: Boolean, default: true },
+        days: { type: Number, default: 7, min: 0 },
+        text: { type: String, trim: true, default: "" },
+    },
+    // Trust indicators for conversion blocks (rendered as small badges/icons).
+    trustBadges: [{ type: String, trim: true }],
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -180,5 +205,36 @@ const productSchema = new mongoose.Schema({
 },
 {timestamps: true}
 );
+
+// Weighted text index for better catalog search relevance.
+productSchema.index(
+    {
+        name: "text",
+        description: "text",
+        brand: "text",
+        category: "text",
+        collections: "text",
+        material: "text",
+        tags: "text",
+    },
+    {
+        name: "ProductTextIndex",
+        weights: {
+            name: 10,
+            brand: 6,
+            category: 6,
+            tags: 4,
+            collections: 2,
+            material: 2,
+            description: 1,
+        },
+    }
+);
+
+// Basic filter/facet indexes
+productSchema.index({ isPublished: 1, category: 1 });
+productSchema.index({ isPublished: 1, brand: 1 });
+productSchema.index({ isPublished: 1, price: 1 });
+productSchema.index({ isPublished: 1, gender: 1 });
 
 module.exports = mongoose.model("Product", productSchema);

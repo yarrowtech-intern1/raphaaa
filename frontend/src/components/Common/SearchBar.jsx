@@ -17,6 +17,7 @@ const SearchBar = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [facets, setFacets] = useState({ brands: [], categories: [] });
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [history, setHistory] = useState([]);
   const dispatch = useDispatch();
@@ -111,15 +112,22 @@ const SearchBar = () => {
     const fetchSuggestions = async () => {
       if (searchTerm.trim().length === 0) {
         setSuggestions([]);
+        setFacets({ brands: [], categories: [] });
         return;
       }
       try {
-        const { data } = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/suggestions?search=${searchTerm}`
-        );
-        setSuggestions(data || []);
+        const term = searchTerm.trim();
+        const [sugRes, facetRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/suggestions?search=${term}`),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/products/facets?search=${term}`),
+        ]);
+
+        setSuggestions(sugRes.data || []);
+        const f = facetRes.data || {};
+        setFacets({
+          brands: Array.isArray(f.brands) ? f.brands.slice(0, 6) : [],
+          categories: Array.isArray(f.categories) ? f.categories.slice(0, 6) : [],
+        });
         setShowSuggestions(true);
       } catch (error) {
         console.error("Error fetching suggestions:", error);
@@ -128,6 +136,26 @@ const SearchBar = () => {
     const delay = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(delay);
   }, [searchTerm]);
+
+  const handleFacetClick = (type, value) => {
+    const term = searchTerm.trim();
+    setIsOpen(false);
+    setSuggestions([]);
+    setShowSuggestions(false);
+
+    const next = { search: term };
+    if (type === "brand") next.brand = value;
+    if (type === "category") next.category = value;
+
+    dispatch(setFilters(next));
+    dispatch(fetchProductsByFilters(next));
+
+    const qp = new URLSearchParams();
+    if (term) qp.set("search", term);
+    if (type === "brand") qp.set("brand", value);
+    if (type === "category") qp.set("category", value);
+    navigate(`/collections/all?${qp.toString()}`);
+  };
 
   return (
     <div
@@ -214,6 +242,36 @@ const SearchBar = () => {
                       </button>
                     </li>
                   ))
+                )}
+
+                {searchTerm.trim() && (facets.brands.length > 0 || facets.categories.length > 0) && (
+                  <li className="px-4 py-3 border-t border-gray-200">
+                    <div className="text-xs text-gray-500 mb-2">Top matches</div>
+                    <div className="flex flex-wrap gap-2">
+                      {facets.categories.map((c) => (
+                        <button
+                          key={`cat-${c._id}`}
+                          type="button"
+                          onClick={() => handleFacetClick("category", c._id)}
+                          className="text-xs px-2 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+                          title={`Category (${c.count})`}
+                        >
+                          {c._id} ({c.count})
+                        </button>
+                      ))}
+                      {facets.brands.map((b) => (
+                        <button
+                          key={`brand-${b._id}`}
+                          type="button"
+                          onClick={() => handleFacetClick("brand", b._id)}
+                          className="text-xs px-2 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+                          title={`Brand (${b.count})`}
+                        >
+                          {b._id} ({b.count})
+                        </button>
+                      ))}
+                    </div>
+                  </li>
                 )}
 
                 {searchTerm.trim() === "" && history.length > 0 && (
