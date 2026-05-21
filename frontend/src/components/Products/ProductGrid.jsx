@@ -115,7 +115,7 @@ const ProductGrid = ({ products = [], loading, error }) => {
           const lowStock   = !outOfStock && product.countInStock < 5;
 
           return (
-            <div key={product._id} className="group relative">
+            <div key={product._id} className="group relative bg-white rounded-md overflow-hidden shadow-sm flex flex-col items-center justify-between p-2">
 
               {/* ── Wishlist button (above link) ── */}
               <button

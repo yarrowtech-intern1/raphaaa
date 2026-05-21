@@ -246,10 +246,12 @@ const AdminSidebar = () => {
               <SubItem to="/admin/products"    icon={FaShoppingBag} label="All Products" />
               <SubItem to="/admin/size-charts" icon={FaRulerCombined} label="Size Charts" />
             </AccordionGroup>
-            <AccordionGroup icon={BiSolidOffer} label="Offers">
-              <SubItem to="/admin/create-offers" icon={HiPlusCircle} label="Create Offer" />
-              <SubItem to="/admin/offers"        icon={BiSolidOffer} label="View Offers" />
-            </AccordionGroup>
+            {(isAdmin) && (
+              <AccordionGroup icon={BiSolidOffer} label="Offers">
+                <SubItem to="/admin/create-offers" icon={HiPlusCircle} label="Create Offer" />
+                <SubItem to="/admin/offers"        icon={BiSolidOffer} label="View Offers" />
+              </AccordionGroup>
+            )}
           </>
         )}
 
@@ -262,7 +264,7 @@ const AdminSidebar = () => {
         )}
 
         {/* PEOPLE */}
-        {(isAdmin || isMerchandise) && (
+        {(isAdmin) && (
           <>
             <SectionLabel>People</SectionLabel>
             <AccordionGroup icon={FaUsers} label="Users">
@@ -273,7 +275,7 @@ const AdminSidebar = () => {
         )}
 
         {/* MARKETING */}
-        {(isAdmin || isMerchandise || isMarketing) && (
+        {(isAdmin || isMarketing) && (
           <>
             <SectionLabel>Marketing</SectionLabel>
             <AccordionGroup icon={FaPeopleCarryBox} label="Collab">
