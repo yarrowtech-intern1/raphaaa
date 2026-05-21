@@ -1,257 +1,345 @@
 import React, { useState, useEffect } from "react";
-import { IoCall, IoLogoInstagram } from "react-icons/io5";
-import { RiTwitterXLine } from "react-icons/ri";
-import { TbBrandMeta, TbFilePhone } from "react-icons/tb";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { toast } from "sonner"; // or use "sonner"
+import { toast } from "sonner";
 import Logo from "../../assets/logo1.png";
 import visa from "../../assets/visa.png";
 import mastercard from "../../assets/mastercard.png";
 import upi from "../../assets/upi.png";
-import cod from "../../assets/cod.png";
-import free_shipping from "../../assets/free_shipping.png";
-import easy_return from "../../assets/easy return.png";
-import { FaChevronUp } from "react-icons/fa";
-import { FaFacebook } from "react-icons/fa";
+import {
+  FaFacebook, FaInstagram, FaTwitter,
+  FaTruck, FaUndo, FaLock, FaHeadset,
+  FaWhatsapp, FaPhone, FaEnvelope,
+} from "react-icons/fa";
+import { HiArrowRight } from "react-icons/hi";
 
 const Footer = () => {
-  const [subscribe, setSubscribe] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [subscribe,   setSubscribe]   = useState("");
+  const [loading,     setLoading]     = useState(false);
   const [contactInfo, setContactInfo] = useState(null);
   const startYear = 2025;
   const year = new Date().getFullYear();
 
+  useEffect(() => {
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL}/api/settings/contact`)
+      .then(({ data }) => setContactInfo(data))
+      .catch(() => {});
+  }, []);
+
   const handleSubscribe = async (e) => {
     e.preventDefault();
-    if (!subscribe.trim()) {
-      return toast.error("Please enter a valid email address");
-    }
-
+    if (!subscribe.trim()) return toast.error("Please enter a valid email");
     setLoading(true);
     try {
-      const response = await axios.post(
+      const { data } = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/subscribe`,
         { email: subscribe },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        { headers: { "Content-Type": "application/json" } }
       );
-
-      toast.success(response.data.message || "Subscribed successfully!");
-      await subscribeToPush(subscribe); // 🔔 call push registration
+      toast.success(data.message || "Subscribed successfully!");
       setSubscribe("");
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Subscription failed. Try again later"
-      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Subscription failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const subscribeToPush = async (email) => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      console.warn("Push messaging is not supported");
-      return;
-    }
-
-    try {
-      const registration = await navigator.serviceWorker.ready;
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: BIfPA4HUUcJVRPAqn4NEAcE8Bzg9cYmLTVNqGYCY5SqJvPKjp6JPva2C2aTyXKcKoUrwbwjrj7puKNPHWIgdvls
-      });
-
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/subscribe/push`, {
-        email,
-        subscription,
-      });
-
-      console.log("Push subscription saved!");
-    } catch (error) {
-      console.error("Push subscription failed:", error);
-    }
-  };
-
-
-  useEffect(() => {
-    const fetchContactInfo = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/settings/contact`
-        );
-        setContactInfo(res.data);
-      } catch (err) {
-        console.error("Failed to load contact settings", err);
-      }
-    };
-    fetchContactInfo();
-  }, []);
   return (
-    <div className="relative">
-      {/* SVG WAVE TOP */}
-      <div className="absolute top-[-1px] left-0 w-full overflow-hidden leading-[0] rotate-180 z-[-1]">
-        <svg
-          className="relative block w-full h-[60px]"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 1440 320"
-          preserveAspectRatio="none"
-        >
-          <path
-            fill="#ffffff" // same as your page background
-            d="M0,96L48,112C96,128,192,160,288,165.3C384,171,480,149,576,154.7C672,160,768,192,864,186.7C960,181,1056,139,1152,117.3C1248,96,1344,96,1392,96L1440,96L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"
-          ></path>
-        </svg>
+    <footer className="bg-gray-950 text-gray-300">
+
+      {/* ── Trust Strip ── */}
+      <div className="border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: <FaTruck className="text-sky-400 text-xl" />,     title: "Free Shipping",      sub: "On orders above ₹999" },
+              { icon: <FaUndo className="text-emerald-400 text-xl" />,  title: "Easy 15-Day Returns",sub: "Hassle-free returns" },
+              { icon: <FaLock className="text-violet-400 text-xl" />,   title: "Secure Payments",    sub: "100% safe & encrypted" },
+              { icon: <FaHeadset className="text-amber-400 text-xl" />, title: "24/7 Support",       sub: "We're always here" },
+            ].map(({ icon, title, sub }) => (
+              <div key={title} className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center shrink-0">
+                  {icon}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white leading-tight">{title}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <footer className="bg-white border-t border-gray-200 pt-12">
-        <div className="container mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
-          {/* Logo & Newsletter */}
-          <div>
-            <Link to="/" className="flex items-center mb-4">
-              <img src={Logo} alt="Raphaaa Logo" className="w-28 md:w-40 mb-4" />
+
+      {/* ── Main Footer Grid ── */}
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+
+          {/* Col 1 — Brand + Newsletter */}
+          <div className="lg:col-span-1">
+            <Link to="/">
+              <img src={Logo} alt="Raphaaa" className="h-10 w-auto mb-4 brightness-0 invert" />
             </Link>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Subscribe</h3>
-            <p className="text-sm text-gray-600 mb-1">
-              Get 10% off your first order
+            <p className="text-sm text-gray-400 leading-relaxed mb-5">
+              Discover premium fashion crafted for every occasion. Style that speaks for itself.
             </p>
-            <form className="flex mt-3" onSubmit={handleSubscribe}>
+
+            {/* Social icons */}
+            <div className="flex items-center gap-3 mb-6">
+              {contactInfo?.showFacebook && contactInfo.facebookUrl && (
+                <a href={contactInfo.facebookUrl} target="_blank" rel="noreferrer"
+                  className="w-9 h-9 rounded-full bg-gray-800 hover:bg-blue-600 flex items-center justify-center transition-colors">
+                  <FaFacebook className="text-sm" />
+                </a>
+              )}
+              {contactInfo?.showInstagram && contactInfo.instagramUrl && (
+                <a href={contactInfo.instagramUrl} target="_blank" rel="noreferrer"
+                  className="w-9 h-9 rounded-full bg-gray-800 hover:bg-linear-to-br hover:from-purple-500 hover:to-pink-500 flex items-center justify-center transition-colors">
+                  <FaInstagram className="text-sm" />
+                </a>
+              )}
+              {contactInfo?.showTwitter && contactInfo.twitterUrl && (
+                <a href={contactInfo.twitterUrl} target="_blank" rel="noreferrer"
+                  className="w-9 h-9 rounded-full bg-gray-800 hover:bg-sky-500 flex items-center justify-center transition-colors">
+                  <FaTwitter className="text-sm" />
+                </a>
+              )}
+              {contactInfo?.whatsappNumber && (
+                <a href={`https://wa.me/${contactInfo.whatsappNumber}`} target="_blank" rel="noreferrer"
+                  className="w-9 h-9 rounded-full bg-gray-800 hover:bg-emerald-500 flex items-center justify-center transition-colors">
+                  <FaWhatsapp className="text-sm" />
+                </a>
+              )}
+            </div>
+
+            {/* Newsletter */}
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Newsletter</p>
+            <p className="text-xs text-gray-500 mb-3">Get 10% off your first order</p>
+            <form onSubmit={handleSubscribe} className="flex">
               <input
                 type="email"
-                placeholder="Your email"
+                placeholder="Enter your email"
                 value={subscribe}
                 onChange={(e) => setSubscribe(e.target.value)}
                 disabled={loading}
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2.5 text-sm bg-gray-800 border border-gray-700 rounded-l-xl focus:outline-none focus:border-sky-500 text-white placeholder:text-gray-500"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-r-md hover:bg-blue-700 transition"
+                className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-sm font-bold rounded-r-xl transition-colors"
               >
-                {loading ? "Subscribing..." : "Subscribe"}
+                {loading ? "…" : <HiArrowRight />}
               </button>
             </form>
           </div>
 
-          {/* Shop */}
+          {/* Col 2 — Shop */}
           <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">Shop</h3>
-            <ul className="text-sm text-gray-700 space-y-2">
-              <li><Link to="/collections/all?category=Top+Wear&gender=Men" className="hover:text-blue-600">Men's Top Wear</Link></li>
-              <li><Link to="/collections/all?category=Top+Wear&gender=Women" className="hover:text-blue-600">Women's Top Wear</Link></li>
-              <li><Link to="/collections/all?category=Bottom+Wear&gender=Men" className="hover:text-blue-600">Men's Bottom Wear</Link></li>
-              <li><Link to="/collections/all?category=Bottom+Wear&gender=Women" className="hover:text-blue-600">Women's Bottom Wear</Link></li>
+            <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-5">Shop</h4>
+            <ul className="space-y-3">
+              {[
+                { to: "/collections/all?category=Top+Wear&gender=Men",    label: "Men's Top Wear" },
+                { to: "/collections/all?category=Bottom+Wear&gender=Men", label: "Men's Bottom Wear" },
+                { to: "/collections/all?category=Top+Wear&gender=Women",  label: "Women's Top Wear" },
+                { to: "/collections/all?category=Bottom+Wear&gender=Women",label:"Women's Bottom Wear" },
+                { to: "/collections/all",                                  label: "All Collections" },
+                { to: "/collections/all?sort=newest",                      label: "New Arrivals" },
+                { to: "/collections/all?sort=bestseller",                  label: "Best Sellers" },
+              ].map(({ to, label }) => (
+                <li key={label}>
+                  <Link to={to}
+                    className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 group">
+                    <span className="w-0 group-hover:w-3 overflow-hidden transition-all duration-200">
+                      <HiArrowRight className="text-sky-400 text-xs shrink-0" />
+                    </span>
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Support */}
+          {/* Col 3 — Help */}
           <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">Support</h3>
-            <ul className="text-sm text-gray-700 space-y-2">
-              <li><Link to="/collections/all"      className="hover:text-blue-600">All Collections</Link></li>
-              <li><Link to="/about"                 className="hover:text-blue-600">About Us</Link></li>
-              <li><Link to="/contact-us"            className="hover:text-blue-600">Contact Us</Link></li>
-              <li><Link to="/privacy-policy"        className="hover:text-blue-600">Privacy Policy</Link></li>
-              <li><Link to="/terms"                 className="hover:text-blue-600">Terms &amp; Conditions</Link></li>
-              <li><Link to="/shipping-policy"       className="hover:text-blue-600">Shipping Policy</Link></li>
-              <li><Link to="/return-policy"         className="hover:text-blue-600">Return &amp; Refund Policy</Link></li>
-              <li><Link to="/cancellation-policy"   className="hover:text-blue-600">Cancellation Policy</Link></li>
-              <li><Link to="/refer"                 className="hover:text-blue-600 font-semibold text-emerald-700">🎁 Refer &amp; Earn</Link></li>
+            <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-5">Help & Policies</h4>
+            <ul className="space-y-3">
+              {[
+                { to: "/about",               label: "About Us" },
+                { to: "/contact-us",          label: "Contact Us" },
+                { to: "/privacy-policy",      label: "Privacy Policy" },
+                { to: "/terms",               label: "Terms & Conditions" },
+                { to: "/shipping-policy",     label: "Shipping Policy" },
+                { to: "/return-policy",       label: "Return & Refund Policy" },
+                { to: "/cancellation-policy", label: "Cancellation Policy" },
+                // { to: "/refer",               label: "🎁 Refer & Earn" },
+              ].map(({ to, label }) => (
+                <li key={label}>
+                  <Link to={to}
+                    className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 group">
+                    <span className="w-0 group-hover:w-3 overflow-hidden transition-all duration-200">
+                      <HiArrowRight className="text-sky-400 text-xs shrink-0" />
+                    </span>
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Follow & Contact */}
+          {/* Col 4 — Contact */}
           <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">Follow Us</h3>
-            <div className="flex items-center space-x-4 mb-4 text-gray-600">
-              {contactInfo?.showFacebook && (
-                <a href={contactInfo.facebookUrl} target="_blank" rel="noreferrer" className="hover:text-blue-700"><FaFacebook size={20} /></a>
+            <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-5">Contact Us</h4>
+            <ul className="space-y-4">
+              {contactInfo?.showPhone && contactInfo.phone && (
+                <li className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <FaPhone className="text-sky-400 text-xs" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-0.5">Phone</p>
+                    <a href={`tel:${contactInfo.phone}`} className="text-sm text-gray-300 hover:text-white transition-colors">
+                      {contactInfo.phone}
+                    </a>
+                  </div>
+                </li>
               )}
-              {contactInfo?.showInstagram && (
-                <a href={contactInfo.instagramUrl} target="_blank" rel="noreferrer" className="hover:text-pink-500"><IoLogoInstagram size={20} /></a>
+              {contactInfo?.showGmail && contactInfo.gmail && (
+                <li className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <FaEnvelope className="text-sky-400 text-xs" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-0.5">Email</p>
+                    <a href={`mailto:${contactInfo.gmail}`} className="text-sm text-gray-300 hover:text-white transition-colors break-all">
+                      {contactInfo.gmail}
+                    </a>
+                  </div>
+                </li>
               )}
-            </div>
-            <p className="text-sm text-gray-700 mb-1 font-medium">Call Us</p>
-            {contactInfo?.showPhone && (
-              <p className="text-sm text-gray-800 flex items-center gap-2">
-                <IoCall /> {contactInfo.phone}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-12 border-t border-gray-200 pt-6">
-          {/* Payments & Trust */}
-          <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-4 text-gray-500 text-sm">
-              <span className="uppercase tracking-wide">We Accept</span>
-              <img src={visa} alt="Visa" className="h-5" />
-              <img src={mastercard} alt="MasterCard" className="h-5" />
-              <img src={upi} alt="UPI" className="h-5" />
-            </div>
-            <p className="text-gray-400 text-sm text-center md:text-left">Trusted & Secure Payment | 100% Original Products</p>
-          </div>
-
-          {/* Perks Section */}
-          <div className="container mx-auto mt-6 px-4 flex flex-wrap justify-center md:justify-between gap-6 text-gray-700 text-sm">
-            <span className="flex items-center gap-2">
-              <img src={cod} alt="COD" className="h-8" /> COD Available
-            </span>
-            <span className="flex items-center gap-2">
-              <img src={free_shipping} alt="Free Shipping" className="h-8" /> Free Shipping
-            </span>
-            <span className="flex items-center gap-2">
-              <img src={easy_return} alt="Easy Returns" className="h-8" /> Easy 15-Day Returns
-            </span>
-          </div>
-        </div>
-
-        {/* Legal entity info — Consumer Protection (E-Commerce) Rules 2020 */}
-        <div className="container mx-auto mt-6 px-4 border-t border-gray-200 pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-gray-500 mb-4">
-            <div>
-              <p className="font-semibold text-gray-700 mb-1">Legal Entity</p>
-              <p>{contactInfo?.businessName || "Raphaaa by Citimart"}</p>
-              {contactInfo?.registeredAddress && (
-                <p>Registered Address: {contactInfo.registeredAddress}</p>
-              )}
-              {contactInfo?.gstin && (
-                <p>GSTIN: <span className="font-mono">{contactInfo.gstin}</span></p>
-              )}
-              {contactInfo?.cin && (
-                <p>CIN: <span className="font-mono">{contactInfo.cin}</span></p>
-              )}
-            </div>
-            {(contactInfo?.grievanceOfficerName || contactInfo?.grievanceOfficerEmail) && (
-              <div>
-                <p className="font-semibold text-gray-700 mb-1">Consumer Grievance Officer</p>
-                {contactInfo.grievanceOfficerName && <p>{contactInfo.grievanceOfficerName}</p>}
-                {contactInfo.grievanceOfficerEmail && (
-                  <p>
-                    Email:{" "}
-                    <a href={`mailto:${contactInfo.grievanceOfficerEmail}`} className="hover:text-blue-600">
+              {contactInfo?.grievanceOfficerEmail && (
+                <li className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <FaHeadset className="text-amber-400 text-xs" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-0.5">Grievance Officer</p>
+                    <p className="text-sm text-gray-300">{contactInfo.grievanceOfficerName}</p>
+                    <a href={`mailto:${contactInfo.grievanceOfficerEmail}`} className="text-xs text-gray-400 hover:text-white transition-colors break-all">
                       {contactInfo.grievanceOfficerEmail}
                     </a>
-                  </p>
-                )}
-                <p>Response time: Within {contactInfo.grievanceResponseTime || "48 hours"}</p>
-                <p className="mt-1 text-[11px] text-gray-400">
-                  As required under Consumer Protection (E-Commerce) Rules, 2020
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+                  </div>
+                </li>
+              )}
+            </ul>
 
-        <div className="container mx-auto text-center text-gray-500 text-sm mt-4 pb-6 px-4">
-          &copy; {startYear === year ? startYear : `${startYear}–${year}`} <span className="font-semibold text-gray-800">Raphaaa</span>. All rights reserved.
+            {/* App download placeholder */}
+            {/* <div className="mt-6">
+              <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Download App</p>
+              <div className="flex flex-col gap-2">
+                {[
+                  { label: "Google Play", icon: "▶" },
+                  { label: "App Store",   icon: "🍎" },
+                ].map(({ label, icon }) => (
+                  <div key={label}
+                    className="flex items-center gap-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl px-3 py-2 cursor-pointer transition-colors">
+                    <span className="text-base">{icon}</span>
+                    <div>
+                      <p className="text-[10px] text-gray-500 leading-none">Available on</p>
+                      <p className="text-xs font-bold text-white">{label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div> */}
+          </div>
+
         </div>
-      </footer>
-    </div>
+      </div>
+
+      {/* ── Payment & Legal Bottom Bar ── */}
+      <div className="border-t border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+
+          {/* Payment methods */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              <span className="text-[11px] text-gray-500 uppercase tracking-widest">We Accept</span>
+              <div className="flex items-center gap-2">
+                {[
+                  { src: visa,       alt: "Visa",       bg: "bg-white" },
+                  { src: mastercard, alt: "Mastercard", bg: "bg-white" },
+                  { src: upi,        alt: "UPI",        bg: "bg-white" },
+                ].map(({ src, alt, bg }) => (
+                  <div key={alt} className={`${bg} rounded-md px-2 py-1 flex items-center justify-center`}>
+                    <img src={src} alt={alt} className="h-4 object-contain" />
+                  </div>
+                ))}
+                <div className="bg-gray-800 border border-gray-700 rounded-md px-2.5 py-1">
+                  <span className="text-[10px] font-bold text-gray-300">COD</span>
+                </div>
+                <div className="bg-gray-800 border border-gray-700 rounded-md px-2.5 py-1">
+                  <span className="text-[10px] font-bold text-gray-300">EMI</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 text-center">🔒 256-bit SSL Encrypted · 100% Authentic Products</p>
+          </div>
+
+          {/* Legal entity info */}
+          {(contactInfo?.gstin || contactInfo?.registeredAddress || contactInfo?.businessName) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-800/60 text-[11px] text-gray-600">
+              <div className="space-y-0.5">
+                <p className="text-gray-500 font-semibold">{contactInfo?.businessName || "Raphaaa by Citimart"}</p>
+                {contactInfo?.registeredAddress && <p>{contactInfo.registeredAddress}</p>}
+                {contactInfo?.gstin && (
+                  <p>GSTIN: <span className="font-mono text-gray-500">{contactInfo.gstin}</span></p>
+                )}
+                {contactInfo?.cin && (
+                  <p>CIN: <span className="font-mono text-gray-500">{contactInfo.cin}</span></p>
+                )}
+              </div>
+              {(contactInfo?.grievanceOfficerName || contactInfo?.grievanceOfficerEmail) && (
+                <div className="space-y-0.5">
+                  <p className="text-gray-500 font-semibold">Consumer Grievance Officer</p>
+                  {contactInfo.grievanceOfficerName && <p>{contactInfo.grievanceOfficerName}</p>}
+                  {contactInfo.grievanceOfficerEmail && (
+                    <p>
+                      <a href={`mailto:${contactInfo.grievanceOfficerEmail}`} className="hover:text-gray-400 transition-colors">
+                        {contactInfo.grievanceOfficerEmail}
+                      </a>
+                    </p>
+                  )}
+                  <p>Response: within {contactInfo.grievanceResponseTime || "48 hours"}</p>
+                  <p className="text-gray-700 mt-1">As per Consumer Protection (E-Commerce) Rules, 2020</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Copyright + links */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-800/60">
+            <p className="text-xs text-gray-600">
+              &copy; {startYear === year ? startYear : `${startYear}–${year}`}{" "}
+              <span className="text-gray-400 font-semibold">Raphaaa</span>. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4 text-xs text-gray-600">
+              <Link to="/privacy-policy"  className="hover:text-gray-400 transition-colors">Privacy</Link>
+              <span>·</span>
+              <Link to="/terms"           className="hover:text-gray-400 transition-colors">Terms</Link>
+              <span>·</span>
+              <Link to="/return-policy"   className="hover:text-gray-400 transition-colors">Returns</Link>
+              <span>·</span>
+              <Link to="/sitemap.xml"     className="hover:text-gray-400 transition-colors">Sitemap</Link>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </footer>
   );
 };
 
