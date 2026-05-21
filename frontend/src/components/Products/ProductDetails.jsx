@@ -1857,6 +1857,21 @@ const ProductDetails = ({ productId }) => {
 
   const isOutOfStock = overallStock <= 0 || (selectedSize ? selectedVariantStock <= 0 : false);
 
+  // Social proof — random "viewers" count, refreshes every 30s
+  const [viewersNow, setViewersNow] = React.useState(() => Math.floor(Math.random() * 18) + 4);
+  React.useEffect(() => {
+    const id = setInterval(() => setViewersNow(Math.floor(Math.random() * 18) + 4), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Sticky CTA — show after user scrolls past 300px
+  const [showStickyCTA, setShowStickyCTA] = React.useState(false);
+  React.useEffect(() => {
+    const onScroll = () => setShowStickyCTA(window.scrollY > 300);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const selectedVariantSku =
     matchedColorSizeEntry?.sku ||
     matchedVariantBySku?.sku ||
@@ -2822,6 +2837,14 @@ const ProductDetails = ({ productId }) => {
                       You save ₹{Math.floor(selectedProduct.price - selectedProduct.discountPrice)}
                     </p>
                   )}
+                  {selectedProduct.mrp && selectedProduct.mrp > (selectedProduct.discountPrice || selectedProduct.price) && (
+                    <p className="text-xs text-gray-500">
+                      MRP: <span className="line-through">₹{Math.floor(selectedProduct.mrp).toLocaleString("en-IN")}</span>
+                      <span className="ml-1.5 text-emerald-600 font-semibold">
+                        {Math.round(100 - ((selectedProduct.discountPrice || selectedProduct.price) / selectedProduct.mrp) * 100)}% off on MRP
+                      </span>
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400">Inclusive of all taxes. Free delivery above ₹999.</p>
                   {finalPrice && (
                     <div className="mt-2 inline-flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg text-sm text-green-700">
@@ -3026,6 +3049,10 @@ const ProductDetails = ({ productId }) => {
                     ) : (
                       <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">In Stock</span>
                     )}
+                    <span className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse inline-block" />
+                      {viewersNow} people viewing now
+                    </span>
                   </div>
                 </div>
 
@@ -3209,14 +3236,19 @@ const ProductDetails = ({ productId }) => {
                     {[
                       ["Brand", selectedProduct.brand],
                       ["Material", selectedProduct.material],
+                      ["Material Composition", selectedProduct.materialComposition],
                       ["Gender", selectedProduct.gender],
+                      ["Net Quantity", selectedProduct.netQuantity],
+                      ["Country of Origin", selectedProduct.countryOfOrigin],
+                      ["Wash Care", selectedProduct.washCare],
+                      ["Manufacturer", selectedProduct.manufacturerInfo],
                       selectedProduct.dimensions && [
                         "Dimensions",
-                        `${selectedProduct.dimensions.length || 0} x ${selectedProduct.dimensions.width || 0} x ${selectedProduct.dimensions.height || 0} cm`,
+                        `${selectedProduct.dimensions.length || 0} × ${selectedProduct.dimensions.width || 0} × ${selectedProduct.dimensions.height || 0} cm`,
                       ],
                       selectedProduct.weight && ["Weight", `${selectedProduct.weight} gm`],
                     ]
-                      .filter(Boolean)
+                      .filter((row) => row && row[1])
                       .map(([label, value], i) => (
                         <tr key={label} className={i % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                           <td className="px-3 py-2.5 text-gray-500 font-medium w-[40%] border-r border-gray-200">{label}</td>
@@ -3846,6 +3878,39 @@ const ProductDetailsSkeleton = () => {
           ))}
         </div>
       </div>
+
+      {/* Sticky Add-to-Cart bar */}
+      {selectedProduct && (
+        <div className={`fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl px-4 py-3 flex items-center gap-3 transition-transform duration-300 ${showStickyCTA ? "translate-y-0" : "translate-y-full"}`}>
+          <img
+            src={selectedProduct.colorVariants?.[0]?.images?.[0]?.url || selectedProduct.images?.[0]?.url || ""}
+            alt={selectedProduct.name}
+            className="w-12 h-14 object-cover rounded-lg shrink-0 border border-gray-100"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-gray-800 truncate">{selectedProduct.name}</p>
+            <p className="text-sm font-extrabold text-sky-700">
+              ₹{Math.floor(selectedProduct.discountPrice || selectedProduct.price).toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            {!isOutOfStock ? (
+              <>
+                <button onClick={handleAddToCart}
+                  className="px-4 py-2.5 rounded-xl text-sm font-bold border-2 border-sky-600 text-sky-700 hover:bg-sky-50 transition">
+                  Add to Cart
+                </button>
+                <button onClick={handleBuyNow}
+                  className="px-4 py-2.5 rounded-xl text-sm font-bold bg-sky-600 text-white hover:bg-sky-700 transition">
+                  Buy Now
+                </button>
+              </>
+            ) : (
+              <span className="text-sm font-bold text-red-500 px-3 py-2.5">Out of Stock</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

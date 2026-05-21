@@ -78,6 +78,8 @@ const AddProduct = () => {
     isFeatured: false, isPublished: false, tags: "",
     dimensions: { length: "", width: "", height: "" },
     weight: "",
+    mrp: "", countryOfOrigin: "India", materialComposition: "",
+    washCare: "", netQuantity: "1 Piece", manufacturerInfo: "",
   });
 
   const [metaOptions, setMetaOptions] = useState({ category: [], collection: [], gender: [], material: [] });
@@ -259,6 +261,12 @@ const AddProduct = () => {
       variants: [],
       images: normalizedColorVariants[0]?.images || [],
       weight: productData.weight ? Number(productData.weight) : undefined,
+      mrp: productData.mrp ? Number(productData.mrp) : undefined,
+      countryOfOrigin:     productData.countryOfOrigin   || "India",
+      materialComposition: productData.materialComposition || undefined,
+      washCare:            productData.washCare            || undefined,
+      netQuantity:         productData.netQuantity         || undefined,
+      manufacturerInfo:    productData.manufacturerInfo    || undefined,
       tags: productData.tags
         ? productData.tags.split(",").map((t) => t.trim()).filter(Boolean)
         : [],
@@ -422,6 +430,37 @@ const AddProduct = () => {
                   min="0" step="0.1" placeholder="0" className={inputCls} />
               </Field>
             ))}
+          </div>
+        </SectionCard>
+
+        {/* Legal & Compliance */}
+        <SectionCard title="Legal & Compliance" subtitle="Required by Indian law for textile/apparel products">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="MRP (₹)">
+              <input type="number" name="mrp" value={productData.mrp}
+                onChange={handleProductChange} min="0" step="0.01"
+                placeholder="e.g. 999" className={inputCls} />
+            </Field>
+            <Field label="Country of Origin">
+              <input type="text" name="countryOfOrigin" value={productData.countryOfOrigin}
+                onChange={handleProductChange} placeholder="India" className={inputCls} />
+            </Field>
+            <Field label="Net Quantity">
+              <input type="text" name="netQuantity" value={productData.netQuantity}
+                onChange={handleProductChange} placeholder="1 Piece" className={inputCls} />
+            </Field>
+            <Field label="Material Composition">
+              <input type="text" name="materialComposition" value={productData.materialComposition}
+                onChange={handleProductChange} placeholder="60% Cotton, 40% Polyester" className={inputCls} />
+            </Field>
+            <Field label="Wash Care Instructions">
+              <input type="text" name="washCare" value={productData.washCare}
+                onChange={handleProductChange} placeholder="Machine wash cold, Do not bleach" className={inputCls} />
+            </Field>
+            <Field label="Manufacturer Info">
+              <input type="text" name="manufacturerInfo" value={productData.manufacturerInfo}
+                onChange={handleProductChange} placeholder="Manufacturer name & address" className={inputCls} />
+            </Field>
           </div>
         </SectionCard>
 

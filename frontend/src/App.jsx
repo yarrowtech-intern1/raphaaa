@@ -27,6 +27,7 @@ import AddProduct from "./components/Admin/AddProduct";
 import About from "./components/Common/About";
 import Contact from "./components/Common/Contact";
 import PrivacyPolicy from "./components/Common/PrivacyPolicy";
+import LegalPage from "./components/Common/LegalPage";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import SubmitReview from "./pages/SubmitReview";
@@ -65,6 +66,8 @@ import ResetPassword from "./pages/ResetPassword";
 import ResetPasswordUser from "./pages/ResetPasswordUser";
 import AdminSizeCharts from "./pages/AdminSizeCharts";
 import AdminShippingSettings from "./pages/AdminShippingSettings";
+import AdminLegalSettings from "./pages/AdminLegalSettings";
+import ReferAndEarn from "./pages/ReferAndEarn";
 // import AdminAboutSettings from "./pages/AdminAboutSettings";
 
 const App = () => {
@@ -131,7 +134,12 @@ const App = () => {
             } />
             <Route path="/about" element={<About />} />
             <Route path="/contact-us" element={<Contact />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/refer"               element={<ReferAndEarn />} />
+            <Route path="/privacy-policy"      element={<PrivacyPolicy />} />
+            <Route path="/terms"               element={<LegalPage type="terms" />} />
+            <Route path="/shipping-policy"     element={<LegalPage type="shipping-policy" />} />
+            <Route path="/return-policy"       element={<LegalPage type="return-policy" />} />
+            <Route path="/cancellation-policy" element={<LegalPage type="cancellation-policy" />} />
             <Route path="/review" element={<ReviewForm />} />
             <Route path="/review/:productId" element={<ReviewForm />} />
             <Route
@@ -425,6 +433,14 @@ const App = () => {
               element={
                 <ProtectedRoute role={["admin"]}>
                   <AdminShippingSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="legal-settings"
+              element={
+                <ProtectedRoute role={["admin"]}>
+                  <AdminLegalSettings />
                 </ProtectedRoute>
               }
             />

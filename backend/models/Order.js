@@ -48,6 +48,7 @@ const orderSchema = new mongoose.Schema(
     },
     guestEmail: { type: String, default: null },
     guestName: { type: String, default: null },
+    orderNote: { type: String, default: "" },
     orderItems: [orderItemSchema],
     shippingAddress: {
       address: { type: String, required: true },

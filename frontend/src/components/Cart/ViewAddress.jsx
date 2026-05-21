@@ -206,6 +206,7 @@ const ViewAddress = () => {
   };
 
   const handleDeleteAddress = async (index) => {
+    if (!window.confirm("Delete this address?")) return;
     try {
       const { data } = await axios.delete(
         `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${index}`,
@@ -215,6 +216,29 @@ const ViewAddress = () => {
       toast.success("Address deleted");
     } catch (err) {
       toast.error("Failed to delete address");
+    }
+  };
+
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [editForm, setEditForm] = useState({});
+
+  const startEdit = (idx) => {
+    setEditingIdx(idx);
+    setEditForm({ ...addresses[idx] });
+  };
+
+  const handleEditSave = async () => {
+    try {
+      const { data } = await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${editingIdx}`,
+        editForm,
+        { headers: authHeaders() }
+      );
+      setAddresses(data.addresses || data.user?.addresses || addresses);
+      setEditingIdx(null);
+      toast.success("Address updated");
+    } catch (err) {
+      toast.error("Failed to update address");
     }
   };
 
@@ -420,14 +444,49 @@ const ViewAddress = () => {
                 key={idx}
                 className="relative bg-gradient-to-br from-white via-blue-50 to-sky-100 border border-blue-100 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
               >
-                {/* Delete Button */}
-                <button
-                  onClick={() => handleDeleteAddress(idx)}
-                  className="absolute top-3 right-3 text-red-500 hover:text-red-600 hover:scale-110 transition-transform"
-                  title="Delete address"
-                >
-                  <FaTrash size={16} />
-                </button>
+                {/* Action buttons */}
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <button
+                    onClick={() => startEdit(idx)}
+                    className="text-sky-500 hover:text-sky-700 transition"
+                    title="Edit address"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAddress(idx)}
+                    className="text-red-400 hover:text-red-600 transition"
+                    title="Delete address"
+                  >
+                    <FaTrash size={14} />
+                  </button>
+                </div>
+
+                {/* Inline edit form */}
+                {editingIdx === idx && (
+                  <div className="mb-4 space-y-2">
+                    {["address", "city", "postalCode", "country", "phone"].map((field) => (
+                      <input
+                        key={field}
+                        type="text"
+                        placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                        value={editForm[field] || ""}
+                        onChange={(e) => setEditForm((p) => ({ ...p, [field]: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-300 bg-white"
+                      />
+                    ))}
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={handleEditSave}
+                        className="flex-1 py-2 text-xs font-bold bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition">
+                        Save
+                      </button>
+                      <button onClick={() => setEditingIdx(null)}
+                        className="flex-1 py-2 text-xs font-bold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Address Details */}
                 <div className="space-y-2 text-sm text-gray-800">

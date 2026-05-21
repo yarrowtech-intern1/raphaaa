@@ -205,6 +205,13 @@ const productSchema = new mongoose.Schema({
     // Delivery pricing overrides per product
     freeShipping:        { type: Boolean, default: false },  // always free regardless of subtotal
     extraShippingCharge: { type: Number,  default: 0, min: 0 }, // added on top of base shipping
+    // Legal / compliance fields (India)
+    mrp:                 { type: Number,  default: null },
+    countryOfOrigin:     { type: String,  default: "India" },
+    materialComposition: { type: String,  default: "" },
+    washCare:            { type: String,  default: "" },
+    netQuantity:         { type: String,  default: "" },
+    manufacturerInfo:    { type: String,  default: "" },
 },
 {timestamps: true}
 );

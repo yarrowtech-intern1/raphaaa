@@ -152,10 +152,15 @@ const Footer = () => {
           <div>
             <h3 className="text-xl font-bold text-gray-900 mb-3">Support</h3>
             <ul className="text-sm text-gray-700 space-y-2">
-              <li><Link to="/collections/all" className="hover:text-blue-600">All Collections</Link></li>
-              <li><Link to="/about" className="hover:text-blue-600">About Us</Link></li>
-              <li><Link to="/contact-us" className="hover:text-blue-600">Contact Us</Link></li>
-              <li><Link to="/privacy-policy" className="hover:text-blue-600">Privacy & Policy</Link></li>
+              <li><Link to="/collections/all"      className="hover:text-blue-600">All Collections</Link></li>
+              <li><Link to="/about"                 className="hover:text-blue-600">About Us</Link></li>
+              <li><Link to="/contact-us"            className="hover:text-blue-600">Contact Us</Link></li>
+              <li><Link to="/privacy-policy"        className="hover:text-blue-600">Privacy Policy</Link></li>
+              <li><Link to="/terms"                 className="hover:text-blue-600">Terms &amp; Conditions</Link></li>
+              <li><Link to="/shipping-policy"       className="hover:text-blue-600">Shipping Policy</Link></li>
+              <li><Link to="/return-policy"         className="hover:text-blue-600">Return &amp; Refund Policy</Link></li>
+              <li><Link to="/cancellation-policy"   className="hover:text-blue-600">Cancellation Policy</Link></li>
+              <li><Link to="/refer"                 className="hover:text-blue-600 font-semibold text-emerald-700">🎁 Refer &amp; Earn</Link></li>
             </ul>
           </div>
 
@@ -205,7 +210,44 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="container mx-auto text-center text-gray-500 text-sm mt-8 pb-6 px-4">
+        {/* Legal entity info — Consumer Protection (E-Commerce) Rules 2020 */}
+        <div className="container mx-auto mt-6 px-4 border-t border-gray-200 pt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-gray-500 mb-4">
+            <div>
+              <p className="font-semibold text-gray-700 mb-1">Legal Entity</p>
+              <p>{contactInfo?.businessName || "Raphaaa by Citimart"}</p>
+              {contactInfo?.registeredAddress && (
+                <p>Registered Address: {contactInfo.registeredAddress}</p>
+              )}
+              {contactInfo?.gstin && (
+                <p>GSTIN: <span className="font-mono">{contactInfo.gstin}</span></p>
+              )}
+              {contactInfo?.cin && (
+                <p>CIN: <span className="font-mono">{contactInfo.cin}</span></p>
+              )}
+            </div>
+            {(contactInfo?.grievanceOfficerName || contactInfo?.grievanceOfficerEmail) && (
+              <div>
+                <p className="font-semibold text-gray-700 mb-1">Consumer Grievance Officer</p>
+                {contactInfo.grievanceOfficerName && <p>{contactInfo.grievanceOfficerName}</p>}
+                {contactInfo.grievanceOfficerEmail && (
+                  <p>
+                    Email:{" "}
+                    <a href={`mailto:${contactInfo.grievanceOfficerEmail}`} className="hover:text-blue-600">
+                      {contactInfo.grievanceOfficerEmail}
+                    </a>
+                  </p>
+                )}
+                <p>Response time: Within {contactInfo.grievanceResponseTime || "48 hours"}</p>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  As required under Consumer Protection (E-Commerce) Rules, 2020
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="container mx-auto text-center text-gray-500 text-sm mt-4 pb-6 px-4">
           &copy; {startYear === year ? startYear : `${startYear}–${year}`} <span className="font-semibold text-gray-800">Raphaaa</span>. All rights reserved.
         </div>
       </footer>

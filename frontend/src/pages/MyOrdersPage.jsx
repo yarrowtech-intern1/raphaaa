@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { createReturnRequest, fetchMyReturnRequests, fetchUserOrders } from "../redux/slices/orderSlice";
 import axios from "axios";
 import { toast } from "sonner";
+import { DownloadCloud, DownloadIcon } from "lucide-react";
 
 const MyOrders = () => {
   const navigate = useNavigate();
@@ -275,38 +276,68 @@ const MyOrders = () => {
                         </span>
                       </div>
 
-                      {/* Action buttons for delivered orders */}
-                      {order.status === "Delivered" && (
-                        <div className="flex flex-wrap gap-1.5 mt-2.5">
-                          {order.orderItems.map((item) => {
-                            const rawId = item.productId?._id || item.productId || item.product?._id || item.product;
-                            const productId = rawId?.toString();
-                            const isReviewed = reviewedProducts.has(productId);
-                            return isReviewed ? (
-                              <span key={productId}
-                                className="text-[10px] font-medium px-2.5 py-0.5 rounded-full border border-gray-200 text-gray-400 bg-gray-50">
-                                ✓ Reviewed
-                              </span>
-                            ) : (
-                              <button key={productId}
-                                onClick={(e) => { e.stopPropagation(); navigate(`/review/${productId}`); }}
-                                className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-sky-200 text-sky-600 bg-sky-50 hover:bg-sky-100 transition">
-                                ✍ Review
-                              </button>
-                            );
-                          })}
+                      {/* Action buttons */}
+                      <div className="flex flex-wrap gap-1.5 mt-2.5">
+                        {/* Track — for active orders */}
+                        {!["Delivered", "Cancelled", "RTO Initiated", "RTO Delivered"].includes(order.status) && (
                           <button
-                            onClick={(e) => handleReturnReplace(e, order, "return")}
-                            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition">
-                            Return
+                            onClick={(e) => { e.stopPropagation(); navigate(`/order/${order._id}`); }}
+                            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-sky-200 text-sky-700 bg-sky-50 hover:bg-sky-100 transition">
+                            📦 Track Order
                           </button>
+                        )}
+
+                        {/* Invoice download — opens OrderDetailsPage where PDF is generated */}
+                        {order.isPaid && (
                           <button
-                            onClick={(e) => handleReturnReplace(e, order, "replace")}
-                            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition">
-                            Replace
+                            onClick={(e) => { e.stopPropagation(); navigate(`/order/${order._id}#invoice`); }}
+                            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-gray-200 text-gray-600 bg-gray-50 hover:bg-gray-100 transition">
+                            <DownloadIcon className="inline" size={12} /> Invoice
                           </button>
-                        </div>
-                      )}
+                        )}
+
+                        {/* Cancel — only for cancellable statuses */}
+                        {order.cancellationEligibility?.canCancel && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/order/${order._id}`); }}
+                            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 transition">
+                            ✕ Cancel
+                          </button>
+                        )}
+
+                        {/* Review + Return + Replace — for delivered */}
+                        {order.status === "Delivered" && (
+                          <>
+                            {order.orderItems.map((item) => {
+                              const rawId = item.productId?._id || item.productId || item.product?._id || item.product;
+                              const productId = rawId?.toString();
+                              const isReviewed = reviewedProducts.has(productId);
+                              return isReviewed ? (
+                                <span key={productId}
+                                  className="text-[10px] font-medium px-2.5 py-0.5 rounded-full border border-gray-200 text-gray-400 bg-gray-50">
+                                  ✓ Reviewed
+                                </span>
+                              ) : (
+                                <button key={productId}
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/review/${productId}`); }}
+                                  className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-sky-200 text-sky-600 bg-sky-50 hover:bg-sky-100 transition">
+                                  ✍ Review
+                                </button>
+                              );
+                            })}
+                            <button
+                              onClick={(e) => handleReturnReplace(e, order, "return")}
+                              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition">
+                              Return
+                            </button>
+                            <button
+                              onClick={(e) => handleReturnReplace(e, order, "replace")}
+                              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition">
+                              Exchange
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {/* Arrow */}

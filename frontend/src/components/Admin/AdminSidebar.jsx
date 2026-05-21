@@ -308,6 +308,7 @@ const AdminSidebar = () => {
             <SubItem to="/admin/website-settings/privacy&policy" icon={FaClipboardList} label="Privacy & Policy" />
             <SubItem to="/admin/website-settings/contact"        icon={FaStore}         label="Contact Details" />
             <SubItem to="/admin/shipping-settings"               icon={FaTruck}         label="Shipping & Delivery" />
+            <SubItem to="/admin/legal-settings"                  icon={FaClipboardList} label="Legal Pages" />
           </AccordionGroup>
         )}
 

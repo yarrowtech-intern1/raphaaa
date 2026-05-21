@@ -66,7 +66,10 @@ const Collab = require("../models/Collab");
 const { buildInvoicePDF } = require("../utils/invoice");
 const { getJson, setJson } = require("../utils/redisCache");
 const { priceQuote } = require("../services/pricingService");
-const { getAvailableCredits, redeem } = require("../services/walletService");
+const { getAvailableCredits, redeem, earnCredit } = require("../services/walletService");
+
+const CASHBACK_PERCENT = 1; // 1% cashback on every order
+const { creditReferrerOnFirstOrder } = require("./referralRoutes");
 
 const USER_CANCELLABLE_STATUSES = new Set(["Processing", "Packed", "Transfer"]);
 const USER_CANCEL_WINDOW_HOURS = Number(process.env.USER_CANCEL_WINDOW_HOURS || 24);
@@ -173,7 +176,7 @@ const applyStockDeduction = (product, item) => {
 // @access  Private
 router.post("/cod", protect, async (req, res) => {
   try {
-    const { orderItems, shippingAddress, couponCodes, walletRedeem, idempotencyKey } = req.body;
+    const { orderItems, shippingAddress, couponCodes, walletRedeem, idempotencyKey, orderNote } = req.body;
 
     if (idempotencyKey) {
       const existingOrder = await Order.findOne({
@@ -264,6 +267,7 @@ router.post("/cod", protect, async (req, res) => {
       paymentStatus: "pending",
       status: "Processing",
       idempotencyKey: idempotencyKey || undefined,
+      orderNote: orderNote?.trim() || "",
     });
 
     // Server-side pricing (promos + wallet)
@@ -291,6 +295,23 @@ router.post("/cod", protect, async (req, res) => {
         note: `Redeemed for COD order ${createdOrder.orderId}`,
       });
     }
+
+    // Cashback: earn wallet credits on COD order
+    try {
+      const cashback = Math.floor((createdOrder.totalPrice * CASHBACK_PERCENT) / 100);
+      if (cashback >= 1) {
+        await earnCredit({
+          userId: req.user._id,
+          amount: cashback,
+          refType: "order",
+          refId: String(createdOrder._id),
+          note: `${CASHBACK_PERCENT}% cashback on order ${createdOrder.orderId}`,
+        });
+      }
+    } catch (_) {}
+
+    // Referrer reward on first purchase
+    await creditReferrerOnFirstOrder(req.user._id, createdOrder.totalPrice);
 
     // 🔹 Check if there's an active collab and if any product matches
     let gifHtml = "";

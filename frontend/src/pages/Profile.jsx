@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import MyOrders from "./MyOrdersPage";
 import {
   FaUserCircle, FaTrash, FaHeart, FaMapMarkerAlt,
-  FaBoxOpen, FaCheckCircle, FaWallet, FaPlus,
+  FaBoxOpen, FaCheckCircle, FaWallet, FaPlus, FaGift,
 } from "react-icons/fa";
 import { HiX } from "react-icons/hi";
 import { AiOutlineLogout } from "react-icons/ai";
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { key: "orders",    label: "My Orders",   icon: FaBoxOpen },
   { key: "wishlist",  label: "Wishlist",    icon: FaHeart },
   { key: "wallet",    label: "Wallet",      icon: FaWallet },
+  { key: "refer",     label: "Refer & Earn",icon: FaGift },
   { key: "address",   label: "Addresses",   icon: FaMapMarkerAlt },
   { key: "profile",   label: "Profile Info",icon: FaUserCircle },
   { key: "complaint", label: "Complaints",  icon: HiOutlineExclamationCircle },
@@ -253,7 +254,7 @@ export default function Profile() {
                   return (
                     <button
                       key={key}
-                      onClick={() => setActiveTab(key)}
+                      onClick={() => key === "refer" ? navigate("/refer") : setActiveTab(key)}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all mb-0.5
                         ${active
                           ? "bg-sky-50 text-sky-700 font-semibold"

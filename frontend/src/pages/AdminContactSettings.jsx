@@ -18,6 +18,20 @@ const AdminContactSettings = () => {
     phone: "",
     showTopText: false,
     topText: "",
+    // Legal & business
+    businessName:          "Raphaaa by Citimart",
+    registeredAddress:     "",
+    gstin:                 "",
+    cin:                   "",
+    grievanceOfficerName:  "",
+    grievanceOfficerEmail: "",
+    grievanceResponseTime: "48 hours",
+    // WhatsApp
+    whatsappNumber:        "",
+    // Exit-intent popup
+    exitIntentEnabled:  true,
+    exitIntentCoupon:   "WELCOME10",
+    exitIntentDiscount: "10%",
   });
 
   const [loading, setLoading] = useState(false);
@@ -224,6 +238,102 @@ const AdminContactSettings = () => {
             onChange={handleChange}
             className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
           />
+        </div>
+
+        {/* ── Legal & Business Info ── */}
+        <div className="md:col-span-2 border-t border-gray-100 pt-6">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest mb-4">
+            🏛️ Legal &amp; Business Info
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { name: "businessName",         label: "Business / Brand Name",          placeholder: "Raphaaa by Citimart" },
+              { name: "gstin",                label: "GSTIN",                           placeholder: "27XXXXX (15-digit GST number)" },
+              { name: "cin",                  label: "CIN (optional)",                  placeholder: "Company Identification Number" },
+              { name: "registeredAddress",    label: "Registered Address",              placeholder: "Full registered address" },
+              { name: "grievanceOfficerName", label: "Consumer Grievance Officer Name", placeholder: "Full name" },
+              { name: "grievanceOfficerEmail",label: "Grievance Officer Email",         placeholder: "grievance@raphaaa.com" },
+              { name: "grievanceResponseTime",label: "Response Time",                   placeholder: "e.g. 48 hours" },
+            ].map(({ name, label, placeholder }) => (
+              <div key={name}>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{label}</label>
+                <input
+                  name={name}
+                  type="text"
+                  placeholder={placeholder}
+                  value={form[name] || ""}
+                  onChange={handleChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── WhatsApp Support ── */}
+        <div className="md:col-span-2 border-t border-gray-100 pt-6">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest mb-4">
+            💬 WhatsApp Support Widget
+          </h2>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+              WhatsApp Number <span className="font-normal normal-case text-gray-400">(with country code, digits only)</span>
+            </label>
+            <input
+              name="whatsappNumber"
+              type="text"
+              placeholder="e.g. 919876543210 (no + or spaces)"
+              value={form.whatsappNumber || ""}
+              onChange={handleChange}
+              className="w-full md:w-1/2 p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm"
+            />
+            <p className="text-xs text-gray-400 mt-1">Leave empty to hide the WhatsApp chat widget on the site.</p>
+          </div>
+        </div>
+
+        {/* ── Exit-Intent Popup ── */}
+        <div className="md:col-span-2 border-t border-gray-100 pt-6">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest mb-4">
+            🎯 Exit-Intent Popup
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-3 flex items-center gap-3 mb-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div
+                  onClick={() => setForm((p) => ({ ...p, exitIntentEnabled: !p.exitIntentEnabled }))}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${form.exitIntentEnabled ? "bg-emerald-500" : "bg-gray-300"}`}
+                >
+                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.exitIntentEnabled ? "left-6" : "left-1"}`} />
+                </div>
+                <span className={`text-sm font-semibold ${form.exitIntentEnabled ? "text-emerald-600" : "text-gray-400"}`}>
+                  {form.exitIntentEnabled ? "Enabled" : "Disabled"}
+                </span>
+              </label>
+              <p className="text-xs text-gray-400">Shows a coupon popup when visitor tries to leave the site</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Coupon Code</label>
+              <input
+                name="exitIntentCoupon"
+                type="text"
+                placeholder="e.g. STAY10"
+                value={form.exitIntentCoupon || ""}
+                onChange={handleChange}
+                className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm uppercase"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Discount Text</label>
+              <input
+                name="exitIntentDiscount"
+                type="text"
+                placeholder="e.g. 10% or ₹100"
+                value={form.exitIntentDiscount || ""}
+                onChange={handleChange}
+                className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Submit */}

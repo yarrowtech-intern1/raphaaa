@@ -125,6 +125,7 @@ const Checkout = () => {
   const [couponCode, setCouponCode] = useState("");
   const [couponCodes, setCouponCodes] = useState([]);
   const [walletRedeem, setWalletRedeem] = useState(0);
+  const [orderNote, setOrderNote] = useState("");
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   // Step state derived only from existing flags (UI-only)
@@ -401,7 +402,8 @@ const Checkout = () => {
         totalPrice: displayTotal,
         couponCodes,
         walletRedeem,
-        idempotencyKey: uuidv4(), // Add idempotency key
+        orderNote: orderNote.trim() || undefined,
+        idempotencyKey: uuidv4(),
       };
 
       try {
@@ -735,6 +737,24 @@ const Checkout = () => {
               </div>
             </div>
 
+            {/* Order Note */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50">
+                <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Order Note <span className="text-gray-400 font-normal normal-case text-xs">(optional)</span></h3>
+              </div>
+              <div className="p-5">
+                <textarea
+                  rows={2}
+                  placeholder="E.g. Please leave at the door, gift wrap requested, call before delivery…"
+                  value={orderNote}
+                  onChange={(e) => setOrderNote(e.target.value)}
+                  maxLength={300}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 bg-gray-50 focus:bg-white rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 resize-none transition"
+                />
+                <p className="text-[10px] text-gray-400 mt-1 text-right">{orderNote.length}/300</p>
+              </div>
+            </div>
+
             {/* Payment Method */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-50">
@@ -1016,6 +1036,20 @@ const Checkout = () => {
                     {shippingAddress.phone && (
                       <p className="text-xs text-gray-500 mt-0.5">📞 {shippingAddress.phone}</p>
                     )}
+                    {/* Estimated delivery */}
+                    <div className="mt-2.5 pt-2.5 border-t border-gray-200">
+                      <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                        🚚 Est. Delivery:{" "}
+                        {(() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + (paymentMethod === "cash_on_delivery" ? 5 : 4));
+                          const d2 = new Date(d);
+                          d2.setDate(d2.getDate() + 2);
+                          const fmt = (dt) => dt.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                          return `${fmt(d)} – ${fmt(d2)}`;
+                        })()}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

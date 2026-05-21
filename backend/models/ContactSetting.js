@@ -11,8 +11,21 @@ const contactSettingSchema = new mongoose.Schema({
   gmail: { type: String, default: "" },
   showPhone: { type: Boolean, default: false },
   phone: { type: String, default: "" },
-  showTopText: {type: Boolean, default: false},
-  topText: { type: String, default: "" },
+  showTopText: { type: Boolean, default: false },
+  topText:     { type: String,  default: "" },
+  // Legal & business info (editable from admin panel)
+  gstin:                  { type: String, default: "" },
+  cin:                    { type: String, default: "" },
+  businessName:           { type: String, default: "Raphaaa by Citimart" },
+  registeredAddress:      { type: String, default: "" },
+  grievanceOfficerName:   { type: String, default: "" },
+  grievanceOfficerEmail:  { type: String, default: "" },
+  grievanceResponseTime:  { type: String, default: "48 hours" },
+  whatsappNumber:         { type: String, default: "" },
+  // Exit-intent coupon
+  exitIntentCoupon:       { type: String, default: "WELCOME10" },
+  exitIntentDiscount:     { type: String, default: "10%" },
+  exitIntentEnabled:      { type: Boolean, default: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model("ContactSetting", contactSettingSchema);
