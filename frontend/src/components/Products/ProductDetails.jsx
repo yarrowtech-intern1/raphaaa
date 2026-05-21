@@ -2611,7 +2611,7 @@ const ProductDetails = ({ productId }) => {
     : null;
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className={`min-h-screen transition-[padding] duration-300 ${showStickyCTA ? "pb-24" : "pb-20"}`}>
       {selectedProduct && (
         <>
           <Helmet>
@@ -3049,10 +3049,10 @@ const ProductDetails = ({ productId }) => {
                     ) : (
                       <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">In Stock</span>
                     )}
-                    <span className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                    {/* <span className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse inline-block" />
                       {viewersNow} people viewing now
-                    </span>
+                    </span> */}
                   </div>
                 </div>
 
@@ -3831,6 +3831,92 @@ const ProductDetails = ({ productId }) => {
           </div>
         </div>
       )}
+
+      {/* ── Sticky Add-to-Cart bar ── */}
+      {selectedProduct && (
+        <div
+          className={`fixed bottom-0 left-0 right-0 z-[70] bg-white border-t border-gray-200 shadow-2xl transition-transform duration-300 ${
+            showStickyCTA ? "translate-y-0" : "translate-y-full"
+          }`}
+        >
+          {/* ── MOBILE layout (< sm): info row + full-width buttons row ── */}
+          <div className="sm:hidden px-4 pt-2.5 pb-3 space-y-2">
+            {/* Info row */}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-gray-800 truncate flex-1">{selectedProduct.name}</p>
+              <span className="text-sm font-extrabold text-sky-700 shrink-0">
+                ₹{Math.floor(selectedProduct.discountPrice || selectedProduct.price).toLocaleString("en-IN")}
+              </span>
+            </div>
+            {/* Full-width buttons */}
+            {!isOutOfStock ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddToCart}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold border-2 border-sky-600 text-sky-700 active:scale-95 transition-all"
+                >
+                  Add to Cart
+                </button>
+                <button
+                  onClick={handleBuyNow}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-sky-600 text-white active:scale-95 transition-all shadow-sm"
+                >
+                  Buy Now
+                </button>
+              </div>
+            ) : (
+              <div className="w-full py-2.5 rounded-xl text-sm font-bold text-center text-white bg-red-400">
+                Out of Stock
+              </div>
+            )}
+          </div>
+
+          {/* ── TABLET / DESKTOP layout (sm+): single row ── */}
+          <div className="hidden sm:flex max-w-7xl mx-auto px-6 py-3 items-center gap-4">
+            {/* Image */}
+            <img
+              src={selectedProduct.colorVariants?.[0]?.images?.[0]?.url || selectedProduct.images?.[0]?.url || ""}
+              alt={selectedProduct.name}
+              className="w-12 h-14 object-cover rounded-lg shrink-0 border border-gray-100"
+            />
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-800 truncate">{selectedProduct.name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-base font-extrabold text-sky-700">
+                  ₹{Math.floor(selectedProduct.discountPrice || selectedProduct.price).toLocaleString("en-IN")}
+                </span>
+                {selectedProduct.discountPrice && selectedProduct.price > selectedProduct.discountPrice && (
+                  <span className="text-xs text-gray-400 line-through">
+                    ₹{Math.floor(selectedProduct.price).toLocaleString("en-IN")}
+                  </span>
+                )}
+              </div>
+            </div>
+            {/* Buttons */}
+            {!isOutOfStock ? (
+              <div className="flex gap-3 shrink-0">
+                <button
+                  onClick={handleAddToCart}
+                  className="px-6 py-2.5 rounded-xl text-sm font-bold border-2 border-sky-600 text-sky-700 hover:bg-sky-50 active:scale-95 transition-all"
+                >
+                  Add to Cart
+                </button>
+                <button
+                  onClick={handleBuyNow}
+                  className="px-8 py-2.5 rounded-xl text-sm font-bold bg-sky-600 text-white hover:bg-sky-700 active:scale-95 transition-all shadow-sm"
+                >
+                  Buy Now
+                </button>
+              </div>
+            ) : (
+              <div className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-red-400 cursor-not-allowed">
+                Out of Stock
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -3879,38 +3965,6 @@ const ProductDetailsSkeleton = () => {
         </div>
       </div>
 
-      {/* Sticky Add-to-Cart bar */}
-      {selectedProduct && (
-        <div className={`fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl px-4 py-3 flex items-center gap-3 transition-transform duration-300 ${showStickyCTA ? "translate-y-0" : "translate-y-full"}`}>
-          <img
-            src={selectedProduct.colorVariants?.[0]?.images?.[0]?.url || selectedProduct.images?.[0]?.url || ""}
-            alt={selectedProduct.name}
-            className="w-12 h-14 object-cover rounded-lg shrink-0 border border-gray-100"
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-800 truncate">{selectedProduct.name}</p>
-            <p className="text-sm font-extrabold text-sky-700">
-              ₹{Math.floor(selectedProduct.discountPrice || selectedProduct.price).toLocaleString("en-IN")}
-            </p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            {!isOutOfStock ? (
-              <>
-                <button onClick={handleAddToCart}
-                  className="px-4 py-2.5 rounded-xl text-sm font-bold border-2 border-sky-600 text-sky-700 hover:bg-sky-50 transition">
-                  Add to Cart
-                </button>
-                <button onClick={handleBuyNow}
-                  className="px-4 py-2.5 rounded-xl text-sm font-bold bg-sky-600 text-white hover:bg-sky-700 transition">
-                  Buy Now
-                </button>
-              </>
-            ) : (
-              <span className="text-sm font-bold text-red-500 px-3 py-2.5">Out of Stock</span>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
