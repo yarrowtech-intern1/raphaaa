@@ -11,7 +11,8 @@ const UserLayout = () => {
   const location = useLocation()
   const hideMobileFooterMenu =
     location.pathname === "/checkout" || location.pathname === "/cart"
-  const hideTopbarOnMobile = location.pathname === "/profile"
+  const isHomePage = location.pathname === "/"
+  const hideTopbarOnMobile = !isHomePage
 
   return (
     <>
