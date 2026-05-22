@@ -578,6 +578,15 @@ router.post("/create-order", protect, async (req, res) => {
         paymentMethod: "RazorPay",
         totalPrice: calculatedTotal,
         walletApplied,
+        couponSnapshot: {
+          codes: Array.isArray(couponCodes) ? couponCodes : [],
+          appliedOffers: Array.isArray(quote?.appliedOffers)
+            ? quote.appliedOffers.map((o) => o.title).filter(Boolean)
+            : [],
+          personalCouponApplied: Boolean(quote?.personalCouponApplied),
+          personalCouponCode: String(quote?.personalCouponCode || ""),
+          totalDiscount: Number(quote?.totalDiscount || 0),
+        },
         isPaid: false,
         paymentStatus: "pending",
         status: "Processing",

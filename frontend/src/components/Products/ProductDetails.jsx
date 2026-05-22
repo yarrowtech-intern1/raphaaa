@@ -2483,12 +2483,21 @@ const ProductDetails = ({ productId }) => {
 
     setIsButtonDisabled(true);
     setIsAddingToCart(true);
+    const selectedColorLabel =
+      hasColorVariants
+        ? (selectedProduct?.colorVariants?.find(
+            (cv) =>
+              String(cv?.color || "").toLowerCase() ===
+              String(selectedColor || "").toLowerCase()
+          )?.colorName || selectedColor)
+        : selectedColor;
+
     dispatch(
       addToCart({
         productId: productFetchId,
         quantity,
         size: selectedSize,
-        color: selectedColor,
+        color: selectedColorLabel,
         sku: selectedVariantSku,
         guestId,
         userId: user?._id,

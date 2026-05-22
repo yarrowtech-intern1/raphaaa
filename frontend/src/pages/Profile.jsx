@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { key: "orders",    label: "My Orders",   icon: FaBoxOpen },
   { key: "wishlist",  label: "Wishlist",    icon: FaHeart },
   { key: "wallet",    label: "Wallet",      icon: FaWallet },
+  { key: "coupons",   label: "Coupons",     icon: FaGift },
   // { key: "refer",     label: "Refer & Earn",icon: FaGift },
   { key: "address",   label: "Addresses",   icon: FaMapMarkerAlt },
   { key: "profile",   label: "Profile Info",icon: FaUserCircle },
@@ -48,19 +49,23 @@ export default function Profile() {
   const [topupLoading,    setTopupLoading]   = useState(false);
   const [expandedTxn,     setExpandedTxn]   = useState(null);
   const [myCoupon,        setMyCoupon]      = useState(null);
+  const [myCoupons,       setMyCoupons]     = useState([]);
   const [couponLoading,   setCouponLoading] = useState(false);
 
   useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
 
   useEffect(() => {
-    if (activeTab !== "profile") return;
+    if (activeTab !== "profile" && activeTab !== "coupons") return;
     setCouponLoading(true);
-    axios
-      .get(`${import.meta.env.VITE_BACKEND_URL}/api/users/my-coupon`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+    const tokenHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` } };
+    Promise.all([
+      axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/users/my-coupon`, tokenHeaders).catch(() => ({ data: null })),
+      axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/users/my-coupons`, tokenHeaders).catch(() => ({ data: { coupons: [] } })),
+    ])
+      .then(([single, list]) => {
+        setMyCoupon(single?.data || null);
+        setMyCoupons(Array.isArray(list?.data?.coupons) ? list.data.coupons : []);
       })
-      .then(({ data }) => setMyCoupon(data || null))
-      .catch(() => setMyCoupon(null))
       .finally(() => setCouponLoading(false));
   }, [activeTab]);
 
@@ -965,6 +970,87 @@ export default function Profile() {
                     )}
                   </div>
                 </div>
+
+                <div className="mt-4 rounded-2xl border border-gray-100 overflow-hidden bg-white">
+                  <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <FaGift className="text-sky-600 text-sm" />
+                    <h3 className="text-sm font-bold text-gray-800">All Coupons</h3>
+                  </div>
+                  <div className="p-4">
+                    {couponLoading ? (
+                      <p className="text-sm text-gray-500">Loading coupons…</p>
+                    ) : myCoupons.length === 0 ? (
+                      <p className="text-sm text-gray-500">No coupons found.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {myCoupons.map((c) => (
+                          <div key={c.code} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2.5">
+                            <div>
+                              <p className="text-sm font-bold text-gray-800 tracking-wide">{c.code}</p>
+                              <p className="text-xs text-gray-500">
+                                {c.discount ? `${c.discount}% OFF` : "Discount as per offer"}
+                                {c.expiresAt ? ` · Expires ${new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                              </p>
+                            </div>
+                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                              c.status === "used"
+                                ? "bg-rose-100 text-rose-700"
+                                : c.status === "expired"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                            }`}>
+                              {c.status === "used" ? "Used" : c.status === "expired" ? "Expired" : "Active"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── COUPONS ─── */}
+            {activeTab === "coupons" && (
+              <div className="p-4 md:p-6">
+                <div className="flex items-center gap-2.5 pb-4 border-b border-gray-100 mb-6">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                    <FaGift className="text-amber-600 text-sm" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 leading-none">My Coupons</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Active, used and expired coupons</p>
+                  </div>
+                </div>
+
+                {couponLoading ? (
+                  <p className="text-sm text-gray-500">Loading coupons…</p>
+                ) : myCoupons.length === 0 ? (
+                  <p className="text-sm text-gray-500">No coupons found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {myCoupons.map((c) => (
+                      <div key={c.code} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2.5 bg-white">
+                        <div>
+                          <p className="text-sm font-bold text-gray-800 tracking-wide">{c.code}</p>
+                          <p className="text-xs text-gray-500">
+                            {c.discount ? `${c.discount}% OFF` : "Discount as per offer"}
+                            {c.expiresAt ? ` · Expires ${new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                          </p>
+                        </div>
+                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                          c.status === "used"
+                            ? "bg-rose-100 text-rose-700"
+                            : c.status === "expired"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-emerald-100 text-emerald-700"
+                        }`}>
+                          {c.status === "used" ? "Used" : c.status === "expired" ? "Expired" : "Active"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

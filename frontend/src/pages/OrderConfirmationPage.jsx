@@ -20,6 +20,10 @@ const OrderConfirmationPage = () => {
     order?.razorpayPaymentId ||
     state?.transactionId ||
     "N/A";
+  const appliedCouponCodes = Array.isArray(order?.couponSnapshot?.codes)
+    ? order.couponSnapshot.codes
+    : [];
+  const appliedCouponDiscount = Number(order?.couponSnapshot?.totalDiscount || 0);
   // useEffect(() => {
   //   if (checkout && checkout._id) {
   //     dispatch(clearCart());
@@ -195,14 +199,34 @@ const OrderConfirmationPage = () => {
                 </div>
               )}
               {/* Total row */}
-              {order.totalPrice && (
-                <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Order Total</span>
-                  <span className="text-base font-extrabold text-sky-700">
-                    ₹{order.totalPrice.toLocaleString("en-IN")}
-                  </span>
-                </div>
-              )}
+              <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 space-y-2">
+                {appliedCouponCodes.length > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">
+                      Coupon Applied
+                    </span>
+                    <span className="text-xs font-bold text-emerald-700">
+                      {appliedCouponCodes.join(", ")}
+                    </span>
+                  </div>
+                )}
+                {appliedCouponDiscount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Coupon Discount</span>
+                    <span className="text-xs font-bold text-emerald-600">
+                      − ₹{appliedCouponDiscount.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                )}
+                {order.totalPrice && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Order Total</span>
+                    <span className="text-base font-extrabold text-sky-700">
+                      ₹{order.totalPrice.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ── Payment + Shipping ── */}

@@ -85,6 +85,11 @@ const CheckoutProgress = ({ currentStep = 2 }) => {
 
 
 const Checkout = () => {
+  const formatColor = (value) => {
+    const c = String(value || "").trim();
+    if (!c) return "";
+    return /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(c) ? "Selected Color" : c;
+  };
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [guestMode, setGuestMode] = useState(false);
   const navigate = useNavigate();
@@ -891,7 +896,7 @@ const Checkout = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800 line-clamp-2">{product.name}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {product.color && <span>{product.color} · </span>}
+                        {product.color && <span>Colour: {formatColor(product.color)} · </span>}
                         {product.size && <span>Size {product.size}</span>}
                       </p>
                     </div>

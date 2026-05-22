@@ -281,6 +281,15 @@ router.post("/cod", protect, async (req, res) => {
     const walletApplied = Math.min(walletBalance, requested, quote.total);
     order.totalPrice = Math.max(0, Number(quote.total) - walletApplied);
     order.walletApplied = walletApplied;
+    order.couponSnapshot = {
+      codes: Array.isArray(couponCodes) ? couponCodes : [],
+      appliedOffers: Array.isArray(quote?.appliedOffers)
+        ? quote.appliedOffers.map((o) => o.title).filter(Boolean)
+        : [],
+      personalCouponApplied: Boolean(quote?.personalCouponApplied),
+      personalCouponCode: String(quote?.personalCouponCode || ""),
+      totalDiscount: Number(quote?.totalDiscount || 0),
+    };
 
     const createdOrder = await order.save();
 

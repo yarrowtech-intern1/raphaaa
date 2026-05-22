@@ -70,6 +70,13 @@ const orderSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    couponSnapshot: {
+      codes: [{ type: String, trim: true }],
+      appliedOffers: [{ type: String, trim: true }],
+      personalCouponApplied: { type: Boolean, default: false },
+      personalCouponCode: { type: String, trim: true, default: "" },
+      totalDiscount: { type: Number, default: 0, min: 0 },
+    },
     isPaid: {
       type: Boolean,
       default: false,

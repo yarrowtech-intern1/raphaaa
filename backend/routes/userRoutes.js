@@ -491,16 +491,92 @@ router.get("/my-coupon", protect, async (req, res) => {
       return res.status(404).json({ message: "No coupon found" });
     }
 
-    const hasAnyOrder = (await require("../models/Order").countDocuments({ user: req.user._id }).limit(1)) > 0;
+    const Order = require("../models/Order");
+    const hasAnyOrder = (await Order.countDocuments({ user: req.user._id }).limit(1)) > 0;
+    const ordersWithSnapshot = await Order.find({ user: req.user._id })
+      .select("couponSnapshot")
+      .lean();
+    const couponCode = String(user?.coupon?.code || "").trim().toUpperCase();
+    const usedFromSnapshot = ordersWithSnapshot.some((o) => {
+      const codes = Array.isArray(o?.couponSnapshot?.codes) ? o.couponSnapshot.codes : [];
+      const personal = String(o?.couponSnapshot?.personalCouponCode || "").trim().toUpperCase();
+      return (
+        codes.some((c) => String(c || "").trim().toUpperCase() === couponCode) ||
+        personal === couponCode
+      );
+    });
+    // Legacy fallback: old orders may not have couponSnapshot, but welcome coupon is one-time.
+    const usedLegacyWelcome = couponCode.startsWith("WELCOME") && hasAnyOrder;
+    const used = usedFromSnapshot || usedLegacyWelcome;
     const isExpired = user?.coupon?.expiresAt ? new Date(user.coupon.expiresAt) <= new Date() : true;
     res.json({
       ...user.coupon.toObject?.() || user.coupon,
-      used: hasAnyOrder,
-      status: hasAnyOrder ? "used" : isExpired ? "expired" : "unused",
+      used,
+      status: used ? "used" : isExpired ? "expired" : "unused",
     });
   } catch (error) {
     console.error("Coupon fetch failed:", error);
     res.status(500).json({ message: "Server error while fetching coupon" });
+  }
+});
+
+// @route GET /api/users/my-coupons
+// @desc Get all coupons for logged-in user with status
+// @access Private
+router.get("/my-coupons", protect, async (req, res) => {
+  try {
+    const Order = require("../models/Order");
+    const user = await User.findById(req.user._id).select("coupon");
+    const orders = await Order.find({ user: req.user._id }).select("orderId createdAt couponSnapshot").lean();
+
+    const usedCodes = new Set();
+    for (const o of orders) {
+      const snapCodes = Array.isArray(o?.couponSnapshot?.codes) ? o.couponSnapshot.codes : [];
+      snapCodes.forEach((c) => {
+        const up = String(c || "").trim().toUpperCase();
+        if (up) usedCodes.add(up);
+      });
+      const personal = String(o?.couponSnapshot?.personalCouponCode || "").trim().toUpperCase();
+      if (personal) usedCodes.add(personal);
+    }
+
+    const list = [];
+    if (user?.coupon?.code) {
+      const code = String(user.coupon.code).trim().toUpperCase();
+      const isExpired = user?.coupon?.expiresAt ? new Date(user.coupon.expiresAt) <= new Date() : true;
+      const hasAnyOrder = orders.length > 0;
+      const isUsed = usedCodes.has(code) || (code.startsWith("WELCOME") && hasAnyOrder);
+      list.push({
+        code,
+        discount: Number(user?.coupon?.discount || 0),
+        expiresAt: user?.coupon?.expiresAt || null,
+        status: isUsed ? "used" : isExpired ? "expired" : "unused",
+        source: "welcome",
+      });
+    }
+
+    // Add any non-welcome coupon codes that were used in orders
+    for (const code of usedCodes) {
+      if (list.some((c) => c.code === code)) continue;
+      const firstUsed = orders.find((o) =>
+        (o?.couponSnapshot?.codes || []).some((x) => String(x || "").trim().toUpperCase() === code) ||
+        String(o?.couponSnapshot?.personalCouponCode || "").trim().toUpperCase() === code
+      );
+      list.push({
+        code,
+        discount: null,
+        expiresAt: null,
+        status: "used",
+        source: "order",
+        usedAt: firstUsed?.createdAt || null,
+        usedInOrderId: firstUsed?.orderId || null,
+      });
+    }
+
+    res.json({ coupons: list });
+  } catch (error) {
+    console.error("Coupon list fetch failed:", error);
+    res.status(500).json({ message: "Server error while fetching coupons" });
   }
 });
 

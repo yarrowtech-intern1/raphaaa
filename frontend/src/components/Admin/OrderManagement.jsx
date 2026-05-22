@@ -610,6 +610,7 @@ const OrderManagement = () => {
                 <th className="px-4 py-3 text-left">Order ID</th>
                 <th className="px-4 py-3 text-left">Customer</th>
                 <th className="px-4 py-3 text-left">Amount</th>
+                <th className="px-4 py-3 text-left">Coupon</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Date</th>
                 <th className="px-4 py-3 text-left">Actions</th>
@@ -618,7 +619,7 @@ const OrderManagement = () => {
             <tbody className="divide-y divide-gray-50">
               {paginatedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-16 text-center">
+                  <td colSpan={7} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <FaClipboardList className="text-3xl text-gray-200" />
                       <p className="text-sm font-semibold text-gray-400">No orders found</p>
@@ -659,6 +660,21 @@ const OrderManagement = () => {
                     {/* Amount */}
                     <td className="px-4 py-3 font-bold text-gray-900">
                       ₹{order.totalPrice?.toLocaleString("en-IN") || "0"}
+                    </td>
+
+                    {/* Coupon */}
+                    <td className="px-4 py-3">
+                      {Array.isArray(order?.couponSnapshot?.codes) && order.couponSnapshot.codes.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {order.couponSnapshot.codes.slice(0, 2).map((c) => (
+                            <span key={c} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
 
                     {/* Status dropdown */}
@@ -772,6 +788,18 @@ const OrderManagement = () => {
                     { label: "Email",      value: selectedOrder.user?.email || "N/A" },
                     { label: "Payment",    value: selectedOrder.paymentMethod },
                     { label: "Ordered On", value: new Date(selectedOrder.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) },
+                    {
+                      label: "Coupon",
+                      value:
+                        Array.isArray(selectedOrder?.couponSnapshot?.codes) &&
+                        selectedOrder.couponSnapshot.codes.length > 0
+                          ? selectedOrder.couponSnapshot.codes.join(", ")
+                          : "N/A",
+                    },
+                    {
+                      label: "Discount",
+                      value: `₹${Number(selectedOrder?.couponSnapshot?.totalDiscount || 0).toLocaleString("en-IN")}`,
+                    },
                     { label: "Total",      value: `₹${selectedOrder.totalPrice?.toLocaleString("en-IN")}`, bold: true },
                   ].map(({ label, value, bold }) => (
                     <div key={label} className="flex items-start justify-between gap-3">

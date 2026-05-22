@@ -10,6 +10,12 @@ const loadSaved = () => {
   try { return JSON.parse(localStorage.getItem(SFL_KEY) || "[]"); } catch { return []; }
 };
 const persistSaved = (items) => localStorage.setItem(SFL_KEY, JSON.stringify(items));
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
+const formatColor = (value) => {
+  const c = String(value || "").trim();
+  if (!c) return "";
+  return HEX_COLOR_RE.test(c) ? "Selected Color" : c;
+};
 
 const CartContents = ({ cart, userId, guestId, onContinueShopping }) => {
   const dispatch = useDispatch();
@@ -123,7 +129,7 @@ const CartContents = ({ cart, userId, guestId, onContinueShopping }) => {
                 )}
                 {product.color && (
                   <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                    {product.color}
+                    {formatColor(product.color)}
                   </span>
                 )}
               </div>
@@ -314,7 +320,7 @@ const CartContents = ({ cart, userId, guestId, onContinueShopping }) => {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-gray-800 line-clamp-1">{item.name}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {item.color && <span>{item.color} · </span>}
+                    {item.color && <span>{formatColor(item.color)} · </span>}
                     {item.size && <span>Size {item.size}</span>}
                   </p>
                   <p className="text-xs font-bold text-gray-900 mt-1">
