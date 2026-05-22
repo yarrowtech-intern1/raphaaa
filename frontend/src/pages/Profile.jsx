@@ -820,7 +820,7 @@ export default function Profile() {
       {/* ══════════════════════════════════════════
           MOBILE / TABLET  (< lg)
       ══════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen bg-gray-100 pb-20">
+      <div className="lg:hidden min-h-screen bg-gradient-to-b from-sky-100 via-sky-50 to-white pb-20">
 
         {mobileShowMenu ? (
           /* ── Profile Home / Menu list ── */
@@ -849,7 +849,7 @@ export default function Profile() {
 
             {/* Quick actions card — overlaps header */}
             <div className="mx-4 -mt-6">
-              <div className="bg-white rounded-2xl shadow-md border border-gray-100 grid grid-cols-3 divide-x divide-gray-100 overflow-hidden">
+              <div className="bg-white/95 rounded-2xl shadow-[0_10px_24px_rgba(2,132,199,0.12)] border border-white/80 grid grid-cols-3 divide-x divide-sky-100/60 overflow-hidden backdrop-blur">
                 {[
                   { icon: FaBoxOpen,              label: "Your orders", tab: "orders",    iconColor: "text-sky-600",   bg: "bg-sky-50" },
                   { icon: FaWallet,               label: "My Wallet",   tab: "wallet",    iconColor: "text-emerald-600", bg: "bg-emerald-50" },
@@ -874,7 +874,7 @@ export default function Profile() {
             <div className="mt-4 space-y-0">
 
               {/* Divider */}
-              <div className="h-2 bg-gray-100" />
+              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
 
               {/* Your Information */}
               <MenuSection title="Your information">
@@ -884,7 +884,7 @@ export default function Profile() {
                 <MenuRow icon={FaUserCircle}  label="Profile Info" onClick={() => handleMobileNav("profile")}   iconBg="bg-gray-100"   iconColor="text-gray-600" />
               </MenuSection>
 
-              <div className="h-2 bg-gray-100" />
+              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
 
               {/* Payment & Coupons */}
               <MenuSection title="Payment and coupons">
@@ -892,7 +892,7 @@ export default function Profile() {
                 <MenuRow icon={FaGift}      label="My Coupons"   onClick={() => handleMobileNav("coupons")} iconBg="bg-amber-50"   iconColor="text-amber-600" />
               </MenuSection>
 
-              <div className="h-2 bg-gray-100" />
+              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
 
               {/* Other information */}
               <MenuSection title="Other information">
@@ -904,7 +904,7 @@ export default function Profile() {
                 <MenuRow icon={HiOutlineExclamationCircle} label="Complaints" onClick={() => handleMobileNav("complaint")} iconBg="bg-orange-50"  iconColor="text-orange-600" />
               </MenuSection>
 
-              <div className="h-2 bg-gray-100" />
+              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
 
               {/* Logout */}
               <div className="bg-white">
@@ -920,7 +920,7 @@ export default function Profile() {
                 </button>
               </div>
 
-              <div className="h-2 bg-gray-100" />
+              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
 
               {/* Brand footer */}
               <div className="bg-white py-6 flex flex-col items-center gap-1">

@@ -11,10 +11,11 @@ const UserLayout = () => {
   const location = useLocation()
   const hideMobileFooterMenu =
     location.pathname === "/checkout" || location.pathname === "/cart"
+  const hideTopbarOnMobile = location.pathname === "/profile"
 
   return (
     <>
-      <Header/>
+      <Header hideTopbarOnMobile={hideTopbarOnMobile} />
       <main className="pb-20 lg:pb-0">
         <Outlet/>
       </main>
