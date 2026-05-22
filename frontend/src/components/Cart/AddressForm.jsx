@@ -28,7 +28,7 @@ const EMPTY_ADDRESS = {
 const inputCls = "w-full px-3.5 py-2.5 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 transition placeholder-gray-400";
 const labelCls = "block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5";
 
-const AddressForm = () => {
+const AddressForm = ({ showSavedList = true, initialEditIndex = null, initialEditAddress = null }) => {
   const { user } = useSelector((s) => s.auth);
   const navigate  = useNavigate();
   const location = useLocation();
@@ -43,6 +43,19 @@ const AddressForm = () => {
   const [saving,    setSaving]      = useState(false);
   const [pincodeLoading, setPincodeLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+
+  const mapAddressToForm = (addr) => ({
+    firstName: addr?.firstName || "",
+    lastName: addr?.lastName || "",
+    phone: String(addr?.phone || ""),
+    address: addr?.address || "",
+    landmark: addr?.landmark || "",
+    city: addr?.city || "",
+    state: addr?.state || "",
+    postalCode: addr?.postalCode || "",
+    country: addr?.country || "India",
+    addressType: addr?.addressType || "Home",
+  });
 
   useEffect(() => {
     if (!user) {
@@ -60,6 +73,13 @@ const AddressForm = () => {
       .then(({ data }) => setAddresses(data))
       .catch(console.error);
   }, [user]);
+
+  useEffect(() => {
+    if (initialEditIndex === null || !initialEditAddress) return;
+    setForm(mapAddressToForm(initialEditAddress));
+    setEditingIndex(initialEditIndex);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [initialEditIndex, initialEditAddress]);
 
   const upd = (field, val) => setForm((p) => ({ ...p, [field]: val }));
 
@@ -164,18 +184,7 @@ const AddressForm = () => {
   const handleEdit = (index) => {
     const addr = addresses[index];
     if (!addr) return;
-    setForm({
-      firstName: addr.firstName || "",
-      lastName: addr.lastName || "",
-      phone: String(addr.phone || ""),
-      address: addr.address || "",
-      landmark: addr.landmark || "",
-      city: addr.city || "",
-      state: addr.state || "",
-      postalCode: addr.postalCode || "",
-      country: addr.country || "India",
-      addressType: addr.addressType || "Home",
-    });
+    setForm(mapAddressToForm(addr));
     setEditingIndex(index);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -337,7 +346,7 @@ const AddressForm = () => {
       </form>
 
       {/* ── Saved addresses ── */}
-      {addresses.length > 0 && (
+      {showSavedList && addresses.length > 0 && (
         <div>
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Saved Addresses</p>
           <div className="space-y-3">

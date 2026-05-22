@@ -5,6 +5,7 @@ import {
   FaBoxOpen, FaCheckCircle, FaWallet, FaPlus, FaGift,
   FaArrowLeft, FaChevronRight, FaPhone, FaInfoCircle,
   FaShieldAlt, FaFileAlt, FaShareAlt, FaEnvelope,
+  FaHome, FaBriefcase,
 } from "react-icons/fa";
 import { HiX } from "react-icons/hi";
 import { AiOutlineLogout } from "react-icons/ai";
@@ -18,6 +19,7 @@ import { clearCart } from "../redux/slices/cartSlice";
 import axios from "axios";
 import AddressForm from "../components/Cart/AddressForm";
 import ViewAddress from "../components/Cart/ViewAddress";
+import { PenIcon, PenToolIcon } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: "orders",    label: "My Orders",    icon: FaBoxOpen },
@@ -131,11 +133,13 @@ function MenuRow({ icon: Icon, label, onClick, iconBg = "bg-gray-100", iconColor
 /* ─── Mobile section block ─── */
 function MenuSection({ title, children }) {
   return (
-    <div className="bg-white">
+    <div className="p-4">
+      <div className="bg-white rounded-2xl">
       {title && (
         <p className="text-[15px] font-bold text-gray-900 px-4 pt-5 pb-0.5">{title}</p>
       )}
       <div className="divide-y divide-gray-100">{children}</div>
+    </div>
     </div>
   );
 }
@@ -166,6 +170,13 @@ export default function Profile() {
   const [myCoupons,       setMyCoupons]     = useState([]);
   const [couponLoading,   setCouponLoading] = useState(false);
 
+  // Address management (mobile)
+  const [profileAddresses, setProfileAddresses] = useState([]);
+  const [showAddressForm,  setShowAddressForm]  = useState(false);
+  const [addrLoading,      setAddrLoading]      = useState(false);
+  const [expandedAddrIdx,  setExpandedAddrIdx]  = useState(null);
+  const [mobileEditAddress, setMobileEditAddress] = useState(null);
+
   useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
 
   useEffect(() => {
@@ -177,6 +188,46 @@ export default function Profile() {
       window.dispatchEvent(new CustomEvent("profile-mobile-submenu", { detail: { hide: false } }));
     };
   }, [mobileShowMenu, location.pathname]);
+
+  // Fetch addresses for mobile address list
+  useEffect(() => {
+    if (activeTab !== "address") return;
+    setShowAddressForm(false);
+    setExpandedAddrIdx(null);
+    setMobileEditAddress(null);
+    setAddrLoading(true);
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/addresses`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+    })
+      .then(({ data }) => setProfileAddresses(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setAddrLoading(false));
+  }, [activeTab]);
+
+  // Sync address list when AddressForm dispatches updates
+  useEffect(() => {
+    const onAddrUpdate = (e) => {
+      const next = Array.isArray(e.detail) ? e.detail : e.detail?.addresses;
+      if (Array.isArray(next)) {
+        setProfileAddresses(next);
+        setShowAddressForm(false);
+      }
+    };
+    window.addEventListener("address:list-updated", onAddrUpdate);
+    return () => window.removeEventListener("address:list-updated", onAddrUpdate);
+  }, []);
+
+  const handleDeleteAddr = async (idx) => {
+    if (!window.confirm("Delete this address?")) return;
+    try {
+      const { data } = await axios.delete(
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/addresses/${idx}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` } }
+      );
+      setProfileAddresses(data.addresses || []);
+      toast.success("Address removed");
+    } catch { toast.error("Failed to delete address"); }
+  };
 
   useEffect(() => {
     if (activeTab !== "profile" && activeTab !== "coupons") return;
@@ -670,7 +721,7 @@ export default function Profile() {
               </div>
             ))}
           </div>
-          <Link to="/profile/update" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 transition shadow-sm">
+          <Link to="/update-profile" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
             Edit Profile
           </Link>
@@ -831,36 +882,36 @@ export default function Profile() {
       {/* ══════════════════════════════════════════
           MOBILE / TABLET  (< lg)
       ══════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen bg-gradient-to-b from-sky-100 via-sky-50 to-white pb-20">
+      <div className="lg:hidden min-h-screen bg-gradient-to-b from-sky-300 via-sky-100 to-sky-30 pb-20">
 
         {mobileShowMenu ? (
           /* ── Profile Home / Menu list ── */
           <>
-            {/* Profile header */}
-            <div className="bg-linear-to-br from-sky-600 to-blue-700 px-5 pt-8 pb-12">
+            {/* Profile header — transparent so outer gradient shows through */}
+            <div className="px-5 pt-10 pb-14">
               <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 rounded-full bg-white/20 border-[3px] border-white/50 flex items-center justify-center text-white text-2xl font-extrabold overflow-hidden mb-3 shadow-lg">
+                <div className="w-20 h-20 rounded-full bg-blue-500 border-[3px] border-white/50 flex items-center justify-center text-white text-2xl font-extrabold overflow-hidden mb-3 shadow-lg">
                   {user?.photo
                     ? <img src={user.photo} alt="" className="w-full h-full object-cover" />
                     : <span>{initials}</span>}
                 </div>
-                <h2 className="text-white text-[19px] font-bold leading-tight">{user?.name}</h2>
+                <h2 className="text-slate-800 text-[19px] font-bold leading-tight">{user?.name}</h2>
                 <div className="flex items-center gap-3 mt-1.5 flex-wrap justify-center">
                   {user?.mobile && (
                     <span className="flex items-center gap-1 text-sky-200 text-sm">
-                      <FaPhone className="text-xs text-sky-300" />{user.mobile}
+                      <FaPhone className="text-xs text-slate-800" />{user.mobile}
                     </span>
                   )}
-                  <span className="flex items-center gap-1 text-sky-200 text-sm">
-                    <FaEnvelope className="text-xs text-sky-300" />{user?.email}
+                  <span className="flex items-center gap-1 text-slate-800 text-sm">
+                    <FaEnvelope className="text-xs text-slate-800" />{user?.email}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Quick actions card — overlaps header */}
-            <div className="mx-4 -mt-6">
-              <div className="bg-white/95 rounded-2xl shadow-[0_10px_24px_rgba(2,132,199,0.12)] border border-white/80 grid grid-cols-3 divide-x divide-sky-100/60 overflow-hidden backdrop-blur">
+            <div className="mx-4 -mt-8">
+              <div className="bg-white rounded-2xl shadow-[0_8px_32px_rgba(7,89,133,0.22)] border border-white/60 grid grid-cols-3 divide-x divide-gray-100 overflow-hidden">
                 {[
                   { icon: FaBoxOpen,              label: "Your orders", tab: "orders",    iconColor: "text-sky-600",   bg: "bg-sky-50" },
                   { icon: FaWallet,               label: "My Wallet",   tab: "wallet",    iconColor: "text-emerald-600", bg: "bg-emerald-50" },
@@ -882,43 +933,43 @@ export default function Profile() {
             </div>
 
             {/* Sections */}
-            <div className="mt-4 space-y-0">
+            <div className="mt-5 space-y-0">
 
-              {/* Divider */}
-              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
+              {/* transparent gap — gradient visible */}
+              <div className="h-3" />
 
               {/* Your Information */}
               <MenuSection title="Your information">
-                <MenuRow icon={FaBoxOpen}     label="My Orders"    onClick={() => handleMobileNav("orders")}    iconBg="bg-sky-50"     iconColor="text-sky-600" />
-                <MenuRow icon={FaHeart}       label="My Wishlist"  onClick={() => handleMobileNav("wishlist")}  iconBg="bg-red-50"     iconColor="text-red-500" />
-                <MenuRow icon={FaMapMarkerAlt} label="Address Book" onClick={() => handleMobileNav("address")}   iconBg="bg-blue-50"    iconColor="text-blue-600" />
-                <MenuRow icon={FaUserCircle}  label="Profile Info" onClick={() => handleMobileNav("profile")}   iconBg="bg-gray-100"   iconColor="text-gray-600" />
+                <MenuRow icon={FaBoxOpen}      label="My Orders"    onClick={() => handleMobileNav("orders")}    iconBg="bg-sky-50"     iconColor="text-sky-600" />
+                <MenuRow icon={FaHeart}        label="My Wishlist"  onClick={() => handleMobileNav("wishlist")}  iconBg="bg-red-50"     iconColor="text-red-500" />
+                <MenuRow icon={FaMapMarkerAlt} label="My Address"   onClick={() => handleMobileNav("address")}   iconBg="bg-blue-50"    iconColor="text-blue-600" />
+                <MenuRow icon={FaUserCircle}   label="Profile Info" onClick={() => handleMobileNav("profile")}   iconBg="bg-gray-100"   iconColor="text-gray-600" />
               </MenuSection>
 
-              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
+              <div className="h-3" />
 
               {/* Payment & Coupons */}
               <MenuSection title="Payment and coupons">
-                <MenuRow icon={FaWallet}    label="My Wallet"    onClick={() => handleMobileNav("wallet")}  iconBg="bg-emerald-50" iconColor="text-emerald-600" />
-                <MenuRow icon={FaGift}      label="My Coupons"   onClick={() => handleMobileNav("coupons")} iconBg="bg-amber-50"   iconColor="text-amber-600" />
+                <MenuRow icon={FaWallet} label="My Wallet"  onClick={() => handleMobileNav("wallet")}  iconBg="bg-emerald-50" iconColor="text-emerald-600" />
+                <MenuRow icon={FaGift}   label="My Coupons" onClick={() => handleMobileNav("coupons")} iconBg="bg-amber-50"   iconColor="text-amber-600" />
               </MenuSection>
 
-              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
+              <div className="h-3" />
 
               {/* Other information */}
               <MenuSection title="Other information">
-                <MenuRow icon={FaShareAlt}   label="Refer &amp; Earn"      onClick={() => navigate("/refer")}             iconBg="bg-violet-50"  iconColor="text-violet-600" />
-                <MenuRow icon={FaInfoCircle} label="About Us"              onClick={() => navigate("/about")}             iconBg="bg-sky-50"     iconColor="text-sky-600" />
-                <MenuRow icon={FaPhone}      label="Contact Us"            onClick={() => navigate("/contact-us")}        iconBg="bg-teal-50"    iconColor="text-teal-600" />
-                <MenuRow icon={FaShieldAlt}  label="Privacy Policy"        onClick={() => navigate("/privacy-policy")}    iconBg="bg-gray-100"   iconColor="text-gray-600" />
-                <MenuRow icon={FaFileAlt}    label="Terms &amp; Conditions" onClick={() => navigate("/terms")}             iconBg="bg-gray-100"   iconColor="text-gray-600" />
-                <MenuRow icon={HiOutlineExclamationCircle} label="Complaints" onClick={() => handleMobileNav("complaint")} iconBg="bg-orange-50"  iconColor="text-orange-600" />
+                <MenuRow icon={FaInfoCircle} label="About Us"              onClick={() => navigate("/about")}          iconBg="bg-sky-50"   iconColor="text-sky-600" />
+                <MenuRow icon={FaPhone}      label="Contact Us"            onClick={() => navigate("/contact-us")}     iconBg="bg-teal-50"  iconColor="text-teal-600" />
+                <MenuRow icon={FaShieldAlt}  label="Privacy Policy"        onClick={() => navigate("/privacy-policy")} iconBg="bg-gray-100" iconColor="text-gray-600" />
+                <MenuRow icon={FaFileAlt}    label="Terms &amp; Conditions" onClick={() => navigate("/terms")}          iconBg="bg-gray-100" iconColor="text-gray-600" />
+                <MenuRow icon={HiOutlineExclamationCircle} label="Complaints" onClick={() => handleMobileNav("complaint")} iconBg="bg-orange-50" iconColor="text-orange-600" />
               </MenuSection>
 
-              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
+              <div className="h-3" />
 
               {/* Logout */}
-              <div className="bg-white">
+              <div className="p-5">
+                <div className="bg-white rounded-2xl">
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -930,12 +981,13 @@ export default function Profile() {
                   <span className="flex-1 text-[15px] text-red-500 font-medium">Log out</span>
                 </button>
               </div>
+              </div>
 
-              <div className="h-2 bg-gradient-to-b from-transparent to-sky-50/70" />
+              <div className="h-3" />
 
               {/* Brand footer */}
               <div className="bg-white py-6 flex flex-col items-center gap-1">
-                <p className="text-base font-bold text-gray-300 tracking-widest uppercase">Raphaaa</p>
+                <p className="text-sm font-bold text-gray-300 tracking-widest uppercase">Raphaaa</p>
                 <p className="text-[11px] text-gray-300">v1.0.0</p>
               </div>
             </div>
@@ -948,18 +1000,168 @@ export default function Profile() {
               <div className="flex items-center gap-3 px-4 py-3.5">
                 <button
                   type="button"
-                  onClick={() => setMobileShowMenu(true)}
+                  onClick={() => {
+                    if (activeTab === "address" && showAddressForm) {
+                      setShowAddressForm(false);
+                    } else {
+                      setMobileShowMenu(true);
+                    }
+                  }}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-700 transition"
                 >
                   <FaArrowLeft size={14} />
                 </button>
-                <h1 className="text-base font-semibold text-gray-800">{TAB_TITLES[activeTab] || "Account"}</h1>
+                <h1 className="text-base font-semibold text-gray-800">
+                  {activeTab === "address" && showAddressForm
+                    ? "Add new address"
+                    : TAB_TITLES[activeTab] || "Account"}
+                </h1>
               </div>
             </div>
 
             {/* Tab content */}
-            <div className="bg-white min-h-screen pt-14">
-              <TabContent />
+            <div className="bg-gray-50 min-h-screen pt-14">
+              {activeTab === "address" ? (
+                /* ── Mobile address view (Zomato-style) ── */
+                showAddressForm ? (
+                  /* Form-only view */
+                  <div className="p-4">
+                    <AddressForm
+                      showSavedList={false}
+                      initialEditIndex={mobileEditAddress?.idx ?? null}
+                      initialEditAddress={mobileEditAddress?.addr ?? null}
+                    />
+                  </div>
+                ) : (
+                  /* Address list view */
+                  <>
+                    {/* Top action rows */}
+                    <div className="bg-white divide-y divide-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileEditAddress(null);
+                          setShowAddressForm(true);
+                        }}
+                        className="w-full flex items-center gap-4 px-4 py-4 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                      >
+                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <FaPlus className="text-sky-600 text-sm" />
+                        </div>
+                        <span className="flex-1 text-[15px] text-sky-600 font-medium text-left">Add new address</span>
+                        <FaChevronRight className="text-gray-300 text-xs shrink-0" />
+                      </button>
+                    </div>
+
+                    {/* Address list */}
+                    {addrLoading ? (
+                      <div className="flex items-center justify-center py-16 gap-2 text-gray-400 text-sm">
+                        <span className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                        Loading addresses…
+                      </div>
+                    ) : profileAddresses.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                        <FaMapMarkerAlt className="text-4xl text-gray-200 mb-3" />
+                        <p className="text-sm font-semibold text-gray-500">No saved addresses</p>
+                        <p className="text-xs text-gray-400 mt-1">Tap "Add new address" to get started</p>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <p className="text-[13px] text-gray-400 px-4 pt-4 pb-1 font-medium">Your saved addresses</p>
+                        <div className="divide-y divide-gray-100">
+                          {profileAddresses.map((addr, idx) => {
+                            const isDefault    = addr.isDefault || idx === 0;
+                            const TypeIcon     = addr.addressType === "Work" ? FaBriefcase : addr.addressType === "Other" ? FaMapMarkerAlt : FaHome;
+                            const isExpanded   = expandedAddrIdx === idx;
+                            return (
+                              <div key={idx} className="px-4 py-4">
+                                <div className="flex gap-3">
+                                  {/* Left icon thumbnail */}
+                                  <div className="relative shrink-0">
+                                    <div className="w-14 h-14 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center">
+                                      <TypeIcon className="text-amber-500 text-xl" />
+                                    </div>
+                                    {isDefault && (
+                                      <div className="absolute -top-2 -left-2 bg-green-500 text-white text-[8px] font-bold px-1.5 py-1 rounded-md leading-none text-center z-10">
+                                        You're<br />here
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Content */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                                      <p className="text-[15px] font-bold text-gray-900">{addr.addressType || "Home"}</p>
+                                      {/* Bookmark/pin icon */}
+                                      {/* <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-300 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                      </svg> */}
+                                    </div>
+                                    <p className="text-[13px] text-gray-500 leading-snug">
+                                      {[addr.firstName, addr.lastName].filter(Boolean).join(" ")}
+                                      {(addr.firstName || addr.lastName) ? ", " : ""}
+                                      {addr.address}
+                                      {addr.landmark ? `, ${addr.landmark}` : ""}
+                                      {addr.city ? `, ${addr.city}` : ""}
+                                      {addr.state ? `, ${addr.state}` : ""}
+                                      {addr.postalCode ? ` ${addr.postalCode}` : ""}
+                                    </p>
+                                    {addr.phone && (
+                                      <p className="text-[13px] text-gray-500 mt-1">Phone number: {addr.phone}</p>
+                                    )}
+                                    {/* Action row */}
+                                    <div className="flex items-center gap-4 mt-2.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedAddrIdx(isExpanded ? null : idx)}
+                                        className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 transition"
+                                        title="Options"
+                                      >
+                                        <span className="text-base font-bold leading-none tracking-widest">···</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMobileEditAddress({ idx, addr });
+                                          setShowAddressForm(true);
+                                        }}
+                                        className="text-[13px] text-sky-600 font-medium border border-sky-200 px-3 py-1 rounded-lg hover:bg-sky-50 transition"
+                                      >
+                                        <PenIcon size={12} />
+                                      </button>
+                                    </div>
+                                    {/* Expanded options */}
+                                    {isExpanded && (
+                                      <div className="mt-2 flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteAddr(idx)}
+                                          className="text-xs font-semibold text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition flex items-center gap-1.5"
+                                        >
+                                          <FaTrash className="text-[10px]" /> Delete
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setExpandedAddrIdx(null)}
+                                          className="text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              ) : (
+                <TabContent />
+              )}
             </div>
           </>
         )}
