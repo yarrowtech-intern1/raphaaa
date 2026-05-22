@@ -136,6 +136,7 @@ app.use("/uploads", express.static("uploads"));
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/website/hero", heroRoutes);
+app.use("/api/hero-slides", require("./routes/heroSlideRoutes"));
 app.use("/api/suggestions", suggestionRoutes);
 app.use("/api/settings/contact", contactSettingRoutes);
 app.use("/api/settings/about", aboutRoutes);

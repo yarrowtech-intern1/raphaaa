@@ -1,191 +1,261 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import heroImg from "../../assets/heroimg.webp";
-import heroImg2 from "../../assets/hero_img.webp";
-import heroImg3 from "../../assets/hero3.webp";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay } from "swiper/modules";
+import { Autoplay, Pagination, Navigation } from "swiper/modules";
 import "swiper/css";
-import useSmartLoader from "../../hooks/useSmartLoader";
+import "swiper/css/pagination";
+import "swiper/css/navigation";
 import axios from "axios";
-import { FaLock, FaShippingFast } from "react-icons/fa";
-import { FaRepeat } from "react-icons/fa6";
 
+import heroImg   from "../../assets/heroimg.webp";
+import heroImg2  from "../../assets/hero_img.webp";
+import heroImg3  from "../../assets/hero3.webp";
+import mensImg   from "../../assets/mens-collection.jpg";
+import womensImg from "../../assets/womens-collection.jpg";
+import classicImg from "../../assets/classic.webp";
+
+const DEFAULT_SLIDES = [
+  {
+    image: heroImg,
+    badge: "New Season",
+    title: "Summer\nCollection",
+    subtitle: "Fresh Arrivals · 2025",
+    desc: "Premium fabric. Every occasion. Limited stocks.",
+    cta: "Shop Now",        ctaLink: "/collections/all",
+    ctaSub: "Shop Women",   ctaSubLink: "/collections/all?gender=Women",
+    align: "left",
+    overlay: "from-sky-950/80 via-sky-900/40 to-transparent",
+  },
+  {
+    image: heroImg2,
+    badge: "Men's Edit",
+    title: "Elevate\nYour Style",
+    subtitle: "Men's Collection · Bold Fits",
+    desc: "Classic fits and bold colours for modern life.",
+    cta: "Shop Men",        ctaLink: "/collections/all?gender=Men",
+    ctaSub: "View All",     ctaSubLink: "/collections/all",
+    align: "right",
+    overlay: "from-blue-950/80 via-blue-900/40 to-transparent",
+  },
+  {
+    image: heroImg3,
+    badge: "Limited Drop",
+    title: "Exclusive\nDrops",
+    subtitle: "While Stocks Last",
+    desc: "Hand-picked pieces dropping every week.",
+    cta: "Explore Drops",   ctaLink: "/collections/all",
+    ctaSub: "New Arrivals",  ctaSubLink: "/collections/all?sort=newest",
+    align: "left",
+    overlay: "from-indigo-950/80 via-indigo-900/40 to-transparent",
+  },
+];
+
+const CATEGORIES = [
+  { label: "Men",          icon: "👔", link: "/collections/all?gender=Men" },
+  { label: "Women",        icon: "👗", link: "/collections/all?gender=Women" },
+  { label: "New Arrivals", icon: "✨", link: "/collections/all?sort=newest" },
+  { label: "Top Wear",     icon: "👕", link: "/collections/all?category=Top+Wear" },
+  { label: "Bottom Wear",  icon: "👖", link: "/collections/all?category=Bottom+Wear" },
+  { label: "Best Sellers", icon: "🔥", link: "/collections/all?sort=bestseller" },
+  { label: "Sale",         icon: "🏷️", link: "/collections/all?sale=true" },
+];
+
+const PROMO = [
+  { image: mensImg,    label: "Men's Collection",  sub: "Top Wear & More",  link: "/collections/all?gender=Men",   badge: "New In" },
+  { image: womensImg,  label: "Women's Fashion",   sub: "Trending Styles",  link: "/collections/all?gender=Women", badge: "Hot" },
+  { image: classicImg, label: "Classic Fits",      sub: "Timeless Pieces",  link: "/collections/all",              badge: "Editor's Pick" },
+];
 
 const Hero = () => {
-  const heroImages = [heroImg, heroImg2, heroImg3];
-  const [timeLeft, setTimeLeft] = useState({
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
-
-  const { loading } = useSmartLoader(async () => {
-    // Simulate remote resource fetch
-    await new Promise((res) => setTimeout(res, 300));
-    return true;
-  });
-
-  // Countdown to 11:59 PM today
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const diff = endOfDay - now;
-      const hours = Math.floor(diff / 1000 / 60 / 60);
-      const minutes = Math.floor((diff / 1000 / 60) % 60);
-      const seconds = Math.floor((diff / 1000) % 60);
-      setTimeLeft({ hours, minutes, seconds });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   const [collabActive, setCollabActive] = useState(false);
+  const [slides, setSlides] = useState(DEFAULT_SLIDES);
 
   useEffect(() => {
-    axios
-      .get(`${import.meta.env.VITE_BACKEND_URL}/api/collabs/active`)
-      .then((res) => setCollabActive(res.data.isActive))
-      .catch(() => setCollabActive(false));
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/collabs/active`)
+      .then((r) => setCollabActive(r.data.isActive))
+      .catch(() => {});
+
+    // Fetch admin-managed slides from the new multi-slide API
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/hero-slides`)
+      .then(({ data }) => {
+        if (Array.isArray(data) && data.length > 0) {
+          // Map DB fields → component shape
+          setSlides(data.map((s) => ({
+            image:       s.image,
+            badge:       s.badge       || "Trending",
+            title:       s.title,
+            subtitle:    s.subtitle    || "",
+            desc:        s.description || "",
+            cta:         s.ctaText          || "Shop Now",
+            ctaLink:     s.ctaLink          || "/collections/all",
+            ctaSub:      s.ctaSecondaryText || "",
+            ctaSubLink:  s.ctaSecondaryLink || "/collections/all",
+            align:       s.textAlign   || "left",
+            overlay:     s.overlayColor || "from-sky-950/80 via-sky-900/40 to-transparent",
+          })));
+        }
+      })
+      .catch(() => {}); // silently fall back to DEFAULT_SLIDES
   }, []);
 
-  if (collabActive) return null; // ⛔ hide section when active
-
-  if (loading) {
-    return (
-      <div className="md:h-[80vh] flex flex-col sm:flex-row justify-between gap-2 px-6 md:px-28 py-8">
-        <div className="w-full sm:w-1/2 flex items-center justify-center py-10 sm:py-0">
-          <div className="w-full h-60 bg-gray-200 rounded-2xl animate-pulse"></div>
-        </div>
-        <div className="w-full sm:w-1/2 aspect-square overflow-hidden">
-          <div className="w-full h-full bg-gray-200 rounded-full md:rounded-l-none md:rounded-r-full animate-pulse"></div>
-        </div>
-      </div>
-    );
-  }
+  if (collabActive) return null;
 
   return (
-    <>
-    {/* Raphaaa Marquee Banner */}
-{/* <div className="relative overflow-hidden bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 py-3 shadow-lg rounded-lg">
-  <div className="whitespace-nowrap animate-marquee text-white font-semibold text-sm sm:text-base tracking-wide flex items-center gap-6">
-    <span className="px-4">🔥 Limited Time Offer! 🔥</span>
-    <span className="px-4">💬 If you face any issue, reach us at Contact Support</span>
-    <span className="px-4">✍️ Enter Title & Subject — we’ll reply soon</span>
-  </div>
+    <section className="w-full bg-white">
 
-  <div className="pointer-events-none absolute top-0 left-0 h-full w-16 bg-gradient-to-r from-purple-900 to-transparent"></div>
-  <div className="pointer-events-none absolute top-0 right-0 h-full w-16 bg-gradient-to-l from-indigo-900 to-transparent"></div>
-</div> */}
-      <div className="w-full flex flex-col lg:flex-row items-stretch justify-between gap-4 md:gap-6 px-3 sm:px-4 md:px-8 lg:px-16 xl:px-24 py-4 md:py-6 relative transition-all duration-700">
-        {/* 🔥 Floating Offer Badge */}
-        <div className="absolute top-2 sm:top-3 lg:top-5 right-3 sm:right-4 lg:right-6 z-10">
-          <div className="bg-gradient-to-r from-red-600 to-orange-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-md animate-pulse">
-            🔥 Limited Time Offer!
-          </div>
-        </div>
-
-        {/* Left Side */}
-        <div
-          className="w-full lg:w-1/2 flex items-center justify-center py-8 sm:py-10 lg:py-8 
-        bg-white/80 backdrop-blur-xl border border-white/30 shadow-[0_12px_40px_rgba(0,0,0,0.1)] rounded-2xl hover:shadow-2xl transition-shadow duration-500"
+      {/* ── MAIN CAROUSEL ── */}
+      <div className="relative w-full" style={{ height: "min(58vw, 640px)", minHeight: "260px" }}>
+        <Swiper
+          loop
+          autoplay={{ delay: 4500, disableOnInteraction: false }}
+          pagination={{ clickable: true }}
+          navigation={{ nextEl: ".hero-next", prevEl: ".hero-prev" }}
+          modules={[Autoplay, Pagination, Navigation]}
+          className="w-full h-full hero-swiper"
         >
-          <div className="text-[#202020] px-3 sm:px-5 lg:px-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-[2px] bg-gradient-to-r from-blue-600 to-sky-400 rounded-full"></span>
-              <p className="text-xs md:text-sm font-semibold tracking-wider text-sky-700 uppercase">
-                Trending Now
-              </p>
-            </div>
+          {slides.map((slide, idx) => (
+            <SwiperSlide key={idx} className="relative overflow-hidden">
+              <img
+                src={slide.image}
+                alt={`Slide ${idx + 1}`}
+                className="absolute inset-0 w-full h-full object-cover object-top"
+                loading={idx === 0 ? "eager" : "lazy"}
+              />
 
-            <h1 className="text-2xl sm:text-3xl md:text-4xl xl:text-5xl font-extrabold leading-tight text-transparent bg-clip-text bg-gradient-to-r from-black to-blue-600">
-              <span className="text-black">Refresh your </span>wardrobe with Raphaaa
-            </h1>
+              {/* gradient */}
+              <div className={`absolute inset-0 bg-linear-to-r ${slide.overlay}`} />
 
-            <p className="text-gray-600 text-sm sm:text-base font-medium tracking-wide">
-              Discover styles loved by thousands. Limited stocks available!
-            </p>
+              {/* text */}
+              <div className={`absolute inset-0 flex items-end px-5 sm:px-10 md:px-16 lg:px-24 pb-10 sm:pb-14 md:pb-20 ${
+                slide.align === "right" ? "justify-end text-right" : "justify-start text-left"
+              }`}>
+                <div className="max-w-lg space-y-2 sm:space-y-3">
+                  <span className="inline-block bg-sky-500/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">
+                    {slide.badge}
+                  </span>
+                  <h1 className="text-white font-extrabold leading-[1.05] text-3xl sm:text-4xl md:text-5xl lg:text-6xl drop-shadow-lg whitespace-pre-line">
+                    {slide.title}
+                  </h1>
+                  <p className="text-sky-200 text-xs sm:text-sm font-semibold tracking-wide">{slide.subtitle}</p>
+                  <p className="text-white/75 text-xs sm:text-sm hidden sm:block leading-relaxed">{slide.desc}</p>
+                  <div className={`flex items-center gap-3 pt-1 ${slide.align === "right" ? "justify-end" : "justify-start"}`}>
+                    <Link to={slide.ctaLink}
+                      className="px-5 sm:px-7 py-2.5 bg-white text-sky-700 font-bold text-sm sm:text-[15px] rounded-full hover:bg-sky-50 active:scale-95 transition-all shadow-lg">
+                      {slide.cta}
+                    </Link>
+                    <Link to={slide.ctaSubLink}
+                      className="px-4 sm:px-6 py-2.5 border-2 border-white/60 text-white font-semibold text-sm sm:text-[15px] rounded-full hover:bg-white/10 active:scale-95 transition-all backdrop-blur-sm">
+                      {slide.ctaSub}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
 
-            {/* ⏰ Countdown Timer */}
-            {/* <div className="text-red-600 font-semibold text-sm md:text-base">
-            Ends in:{" "}
-            <span className="tabular-nums">
-              {timeLeft.hours.toString().padStart(2, "0")}:
-              {timeLeft.minutes.toString().padStart(2, "0")}:
-              {timeLeft.seconds.toString().padStart(2, "0")}
-            </span>{" "}
-            hrs
-          </div> */}
+        {/* Arrow buttons */}
+        <button className="hero-prev absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-11 sm:h-11 bg-white/20 hover:bg-white/40 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white transition-all">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <button className="hero-next absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-11 sm:h-11 bg-white/20 hover:bg-white/40 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white transition-all">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
 
-            <div className="flex flex-wrap items-center gap-3 mt-4">
-              <Link
-                to="/collections/all"
-                className="px-5 py-2.5 text-white bg-gradient-to-r from-sky-600 to-blue-700 font-semibold rounded-md shadow-lg hover:scale-105 hover:shadow-2xl transition-all duration-300"
-              >
-                Shop Now
+        <style>{`
+          .hero-swiper .swiper-pagination { bottom: 12px; }
+          .hero-swiper .swiper-pagination-bullet { width: 6px; height: 6px; background: rgba(255,255,255,.5); opacity: 1; transition: all .3s; }
+          .hero-swiper .swiper-pagination-bullet-active { width: 22px; border-radius: 4px; background: #fff; }
+          .hero-swiper .swiper-button-disabled { opacity: 0; pointer-events: none; }
+        `}</style>
+      </div>
+
+      {/* ── CATEGORY PILLS ── */}
+      <div className="bg-white border-b border-sky-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5">
+          <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide">
+            {CATEGORIES.map(({ label, icon, link }) => (
+              <Link key={label} to={link}
+                className="flex items-center gap-1.5 shrink-0 px-4 py-2 bg-sky-50 hover:bg-sky-100 border border-sky-200 hover:border-sky-500 rounded-full text-sm font-semibold text-sky-800 transition-all group">
+                <span className="text-base leading-none group-hover:scale-110 transition-transform">{icon}</span>
+                {label}
               </Link>
-              <span className="text-xs text-gray-500">
-                Free delivery on first order
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side */}
-        <div className="w-full lg:w-1/2 h-[280px] sm:h-[360px] md:h-[460px] lg:h-auto lg:aspect-square overflow-hidden rounded-2xl lg:rounded-l-none lg:rounded-r-[999px] shadow-lg border-4 border-white">
-          <Swiper
-            loop
-            autoplay={{ delay: 3000, disableOnInteraction: false }}
-            modules={[Autoplay]}
-            className="w-full h-full"
-          >
-            {heroImages.map((img, idx) => (
-              <SwiperSlide key={idx}>
-                <img
-                  src={img}
-                  alt={`Hero ${idx}`}
-                  width={1000}
-                  height={1000}
-                  className="w-full h-full object-cover transition-transform duration-1000 scale-100 hover:scale-105"
-                  loading="lazy"
-                />
-              </SwiperSlide>
             ))}
-          </Swiper>
-        </div>
-      </div>
-      {/* <marquee behavior="scroll" direction="left">🔥 Limited Time Offer!</marquee> */}
-      {/* USP strip */}
-      <div className="px-3 sm:px-4 md:px-8 lg:px-16 xl:px-24 mt-8 sm:mt-10 md:mt-12 mb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 backdrop-blur px-4 py-3 shadow-sm">
-            <span className="text-xl text-sky-600"><FaShippingFast /></span>
-            <div className="text-sm">
-              <p className="font-semibold text-slate-800">Free Shipping</p>
-              <p className="text-slate-500">On first order</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 backdrop-blur px-4 py-3 shadow-sm">
-            <span className="text-xl text-sky-600"> <FaRepeat /> </span>
-            <div className="text-sm">
-              <p className="font-semibold text-slate-800">Easy Returns</p>
-              <p className="text-slate-500">7-day hassle free</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 backdrop-blur px-4 py-3 shadow-sm">
-            <span className="text-xl text-sky-600"><FaLock /></span>
-            <div className="text-sm">
-              <p className="font-semibold text-slate-800">Secure Payments</p>
-              <p className="text-slate-500">UPI / Cards / Wallets</p>
-            </div>
+            <Link to="/collections/all"
+              className="flex items-center gap-1 shrink-0 ml-1 px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-full text-sm font-bold transition-all">
+              All
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
           </div>
         </div>
       </div>
 
-    </>
+      {/* ── PROMO BANNER GRID ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Section header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base sm:text-lg font-extrabold text-gray-800">Shop by Category</h2>
+          <Link to="/collections/all" className="text-xs sm:text-sm font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1 transition-colors">
+            View All
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          {PROMO.map((b, idx) => (
+            <Link key={idx} to={b.link}
+              className="relative overflow-hidden rounded-2xl group block"
+              style={{ aspectRatio: "4/3" }}>
+              <img src={b.image} alt={b.label}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <div className="absolute inset-0 bg-linear-to-t from-sky-950/75 via-sky-900/20 to-transparent" />
+              <span className="absolute top-3 left-3 bg-sky-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                {b.badge}
+              </span>
+              <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+                <p className="text-white font-extrabold text-base sm:text-xl leading-tight">{b.label}</p>
+                <p className="text-sky-200 text-xs sm:text-sm mt-0.5 mb-2.5">{b.sub}</p>
+                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white border border-white/50 px-3 py-1.5 rounded-full group-hover:bg-white group-hover:text-sky-700 transition-all duration-200">
+                  Shop Now
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TRUST / FEATURE STRIP ── */}
+      <div className="bg-linear-to-r from-sky-600 via-sky-700 to-blue-800">
+        <div className="max-w-7xl mx-auto px-4 py-3.5">
+          <div className="flex items-center justify-between sm:justify-around gap-4 overflow-x-auto scrollbar-hide">
+            {[
+              { icon: "🚚", text: "Free Shipping ₹999+" },
+              { icon: "↩️", text: "15-Day Returns" },
+              { icon: "🔒", text: "Secure Payments" },
+              { icon: "✅", text: "100% Authentic" },
+              { icon: "🎁", text: "First Order Free" },
+            ].map(({ icon, text }) => (
+              <div key={text} className="flex items-center gap-2 shrink-0">
+                <span className="text-base">{icon}</span>
+                <span className="text-sky-100 text-xs sm:text-sm font-medium whitespace-nowrap">{text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+    </section>
   );
 };
 

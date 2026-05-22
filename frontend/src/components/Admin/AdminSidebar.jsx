@@ -304,6 +304,7 @@ const AdminSidebar = () => {
         )}
         {isAdmin && (
           <AccordionGroup icon={FaCog} label="Website Settings">
+            <SubItem to="/admin/website-settings/hero"           icon={FaStore}         label="Hero Carousel" />
             <SubItem to="/admin/website-settings/about"          icon={FaUser}          label="About Section" />
             <SubItem to="/admin/website-settings/privacy&policy" icon={FaClipboardList} label="Privacy & Policy" />
             <SubItem to="/admin/website-settings/contact"        icon={FaStore}         label="Contact Details" />
