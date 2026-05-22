@@ -12,7 +12,7 @@ import { HiOutlineExclamationCircle } from "react-icons/hi2";
 import { MdVerified } from "react-icons/md";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { logout } from "../redux/slices/authSlice";
 import { clearCart } from "../redux/slices/cartSlice";
 import axios from "axios";
@@ -143,6 +143,7 @@ function MenuSection({ title, children }) {
 export default function Profile() {
   const { user }  = useSelector((s) => s.auth);
   const navigate  = useNavigate();
+  const location  = useLocation();
   const dispatch  = useDispatch();
 
   const [activeTab,       setActiveTab]      = useState("orders");
@@ -166,6 +167,16 @@ export default function Profile() {
   const [couponLoading,   setCouponLoading] = useState(false);
 
   useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
+
+  useEffect(() => {
+    const isProfileRoute = location.pathname === "/profile";
+    const isMobileOrTablet = typeof window !== "undefined" ? window.innerWidth < 1024 : false;
+    const hide = isProfileRoute && isMobileOrTablet && !mobileShowMenu;
+    window.dispatchEvent(new CustomEvent("profile-mobile-submenu", { detail: { hide } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("profile-mobile-submenu", { detail: { hide: false } }));
+    };
+  }, [mobileShowMenu, location.pathname]);
 
   useEffect(() => {
     if (activeTab !== "profile" && activeTab !== "coupons") return;
@@ -933,7 +944,7 @@ export default function Profile() {
           /* ── Sub-page view ── */
           <>
             {/* Sticky sub-header */}
-            <div className="sticky top-0 z-30 bg-white shadow-sm border-b border-gray-100">
+            <div className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b border-gray-100 lg:hidden">
               <div className="flex items-center gap-3 px-4 py-3.5">
                 <button
                   type="button"
@@ -947,7 +958,7 @@ export default function Profile() {
             </div>
 
             {/* Tab content */}
-            <div className="bg-white min-h-screen">
+            <div className="bg-white min-h-screen pt-14">
               <TabContent />
             </div>
           </>

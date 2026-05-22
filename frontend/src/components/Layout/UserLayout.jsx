@@ -11,6 +11,7 @@ const UserLayout = () => {
   const location = useLocation()
   const hideMobileFooterMenu =
     location.pathname === "/checkout" || location.pathname === "/cart"
+  const hideFooterOnMobile = location.pathname === "/profile"
   const isHomePage = location.pathname === "/"
   const hideTopbarOnMobile = !isHomePage
 
@@ -20,7 +21,9 @@ const UserLayout = () => {
       <main className="pb-20 lg:pb-0">
         <Outlet/>
       </main>
-      <Footer/>
+      <div className={hideFooterOnMobile ? "hidden lg:block" : ""}>
+        <Footer/>
+      </div>
       {!hideMobileFooterMenu && <MobileFooterNav />}
       <div className="hidden lg:block">
         <ScrollToTopButton/>

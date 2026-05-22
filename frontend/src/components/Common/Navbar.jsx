@@ -19,6 +19,7 @@ const Navbar = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
   const [isNavbarFixed, setIsNavbarFixed] = useState(false);
+  const [hideOnMobileProfileSubmenu, setHideOnMobileProfileSubmenu] = useState(false);
   const { cart } = useSelector((state) => state.cart);
   const { user } = useSelector((state) => state.auth);
   const location = useLocation();
@@ -70,6 +71,14 @@ const Navbar = () => {
     setProfileOpen(false);
   }, [location]);
 
+  useEffect(() => {
+    const onProfileSubmenu = (e) => {
+      setHideOnMobileProfileSubmenu(Boolean(e?.detail?.hide));
+    };
+    window.addEventListener("profile-mobile-submenu", onProfileSubmenu);
+    return () => window.removeEventListener("profile-mobile-submenu", onProfileSubmenu);
+  }, []);
+
   const isActive = (path) => location.pathname === path;
 
   const cartItemCount =
@@ -105,11 +114,13 @@ const Navbar = () => {
     );
   }
 
+  const hideNavbarClass = hideOnMobileProfileSubmenu ? "hidden lg:block" : "";
+
   return (
     <>
-      {isNavbarFixed && <div className="h-[104px] md:h-[88px]" />}
+      {isNavbarFixed && !hideOnMobileProfileSubmenu && <div className="h-[104px] md:h-[88px]" />}
       <div
-        className={`w-full ${
+        className={`${hideNavbarClass} w-full ${
           isNavbarFixed
             ? "fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-sm border-b border-gray-100"
             : "relative bg-transparent"
