@@ -1,19 +1,25 @@
 import React from 'react'
 import Header from '../Common/Header'
 import Footer from '../Common/Footer'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import ScrollToTopButton from '../Common/ScrollToTopButton'
 import WhatsAppWidget from '../Common/WhatsAppWidget'
 import ExitIntentPopup from '../Common/ExitIntentPopup'
+import MobileFooterNav from './MobileFooterNav'
 
 const UserLayout = () => {
+  const location = useLocation()
+  const hideMobileFooterMenu =
+    location.pathname === "/checkout" || location.pathname === "/cart"
+
   return (
     <>
       <Header/>
-      <main>
+      <main className="pb-20 lg:pb-0">
         <Outlet/>
       </main>
       <Footer/>
+      {!hideMobileFooterMenu && <MobileFooterNav />}
       <div className="hidden lg:block">
         <ScrollToTopButton/>
       </div>

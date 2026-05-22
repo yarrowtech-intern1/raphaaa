@@ -180,7 +180,7 @@ const Navbar = () => {
 
           {user ? (
             user.role === "customer" && (
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative hidden lg:block" ref={dropdownRef}>
                 <button
                   onClick={() => setProfileOpen((prev) => !prev)}
                   className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-gray-100 transition-all"

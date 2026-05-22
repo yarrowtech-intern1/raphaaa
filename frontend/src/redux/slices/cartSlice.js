@@ -222,6 +222,13 @@ const saveCartToStorage = (cart) => {
   localStorage.setItem("cart", JSON.stringify(cart));
 };
 
+const applyLocalCartUpdate = (updater) => {
+  const current = loadCartFromStorage();
+  const next = updater(current || { products: [] });
+  saveCartToStorage(next);
+  return next;
+};
+
 // Fetch cart for a user or guest
 export const fetchCart = createAsyncThunk(
   "cart/fetchCart",
@@ -296,6 +303,25 @@ export const updateCartItemQuantity = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
+      const token = localStorage.getItem("userToken");
+      const isGuestFallback = !token && error?.response?.status === 404;
+      if (isGuestFallback) {
+        const next = applyLocalCartUpdate((cart) => {
+          const products = Array.isArray(cart?.products) ? [...cart.products] : [];
+          const idx = products.findIndex(
+            (p) =>
+              String(p.productId) === String(productId) &&
+              String(p.size || "") === String(size || "") &&
+              String(p.color || "") === String(color || "")
+          );
+          if (idx === -1) return cart || { products: [] };
+          if (quantity > 0) products[idx] = { ...products[idx], quantity };
+          else products.splice(idx, 1);
+          const totalPrice = products.reduce((acc, p) => acc + Number(p.price || 0) * Number(p.quantity || 0), 0);
+          return { ...(cart || {}), products, totalPrice };
+        });
+        return next;
+      }
       return rejectWithValue(error.response.data);
     }
   }
@@ -315,6 +341,23 @@ export const removeFromCart = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
+      const token = localStorage.getItem("userToken");
+      const isGuestFallback = !token && error?.response?.status === 404;
+      if (isGuestFallback) {
+        const next = applyLocalCartUpdate((cart) => {
+          const products = (cart?.products || []).filter(
+            (p) =>
+              !(
+                String(p.productId) === String(productId) &&
+                String(p.size || "") === String(size || "") &&
+                String(p.color || "") === String(color || "")
+              )
+          );
+          const totalPrice = products.reduce((acc, p) => acc + Number(p.price || 0) * Number(p.quantity || 0), 0);
+          return { ...(cart || {}), products, totalPrice };
+        });
+        return next;
+      }
       return rejectWithValue(error.response.data);
     }
   }
