@@ -2,6 +2,7 @@ const Offer          = require("../models/offer");
 const Order          = require("../models/Order");
 const Product        = require("../models/Product");
 const ShippingConfig = require("../models/ShippingConfig");
+const User           = require("../models/User");
 
 const clampMoney = (n) => Math.max(0, Math.round((Number(n) || 0) * 100) / 100);
 
@@ -314,7 +315,36 @@ async function priceQuote({
 
   const afterCart = clampMoney(afterItems - state.cartDiscount);
   const shippingAfter = clampMoney(state.shipping - state.shippingDiscount);
-  const total = clampMoney(afterCart + shippingAfter);
+  let personalCouponApplied = false;
+  let personalCouponCode = "";
+
+  // Personal first-order coupon support (user-specific 10% style coupon from register flow)
+  if (userId && couponSet.size > 0) {
+    const user = await User.findById(userId).select("coupon").lean();
+    const userCouponCode = String(user?.coupon?.code || "").trim().toUpperCase();
+    const userCouponDiscount = Number(user?.coupon?.discount || 0);
+    const couponExpiry = user?.coupon?.expiresAt ? new Date(user.coupon.expiresAt) : null;
+    const hasAnyOrder = (await Order.countDocuments({ user: userId }).limit(1)) > 0;
+    const validPersonalCoupon =
+      userCouponCode &&
+      couponSet.has(userCouponCode) &&
+      userCouponDiscount > 0 &&
+      couponExpiry &&
+      couponExpiry > now &&
+      !hasAnyOrder;
+
+    if (validPersonalCoupon) {
+      const personalDiscount = clampMoney((afterCart * userCouponDiscount) / 100);
+      if (personalDiscount > 0) {
+        state.cartDiscount = clampMoney(state.cartDiscount + personalDiscount);
+        personalCouponApplied = true;
+        personalCouponCode = userCouponCode;
+      }
+    }
+  }
+
+  const afterPersonalCoupon = clampMoney(afterItems - state.cartDiscount);
+  const total = clampMoney(afterPersonalCoupon + shippingAfter);
 
   return {
     currency: "INR",
@@ -337,10 +367,11 @@ async function priceQuote({
       lineTotal: clampMoney(it.lineSubtotal - (state.itemDiscounts[idx] || 0)),
     })),
     appliedOffers: state.appliedOffers,
+    personalCouponApplied,
+    personalCouponCode,
   };
 }
 
 module.exports = {
   priceQuote,
 };
-

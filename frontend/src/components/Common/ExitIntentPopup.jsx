@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 
-const STORAGE_KEY = "exitIntentDismissed";
-const COOLDOWN_HOURS = 24;
+const STORAGE_KEY = "exitIntentFirstOrderCouponSeen";
 
 const ExitIntentPopup = () => {
   const [visible, setVisible]     = useState(false);
@@ -24,8 +23,8 @@ const ExitIntentPopup = () => {
 
   useEffect(() => {
     if (!couponCode) return; // don't attach until we have config
-    const last = localStorage.getItem(STORAGE_KEY);
-    if (last && Date.now() - Number(last) < COOLDOWN_HOURS * 3600 * 1000) return;
+    const seen = localStorage.getItem(STORAGE_KEY);
+    if (seen === "1") return;
 
     const onMouseLeave = (e) => {
       if (e.clientY <= 5) setVisible(true);
@@ -35,7 +34,7 @@ const ExitIntentPopup = () => {
   }, [couponCode]);
 
   const dismiss = () => {
-    localStorage.setItem(STORAGE_KEY, String(Date.now()));
+    localStorage.setItem(STORAGE_KEY, "1");
     setVisible(false);
   };
 

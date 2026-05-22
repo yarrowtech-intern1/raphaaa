@@ -491,7 +491,13 @@ router.get("/my-coupon", protect, async (req, res) => {
       return res.status(404).json({ message: "No coupon found" });
     }
 
-    res.json(user.coupon);
+    const hasAnyOrder = (await require("../models/Order").countDocuments({ user: req.user._id }).limit(1)) > 0;
+    const isExpired = user?.coupon?.expiresAt ? new Date(user.coupon.expiresAt) <= new Date() : true;
+    res.json({
+      ...user.coupon.toObject?.() || user.coupon,
+      used: hasAnyOrder,
+      status: hasAnyOrder ? "used" : isExpired ? "expired" : "unused",
+    });
   } catch (error) {
     console.error("Coupon fetch failed:", error);
     res.status(500).json({ message: "Server error while fetching coupon" });
@@ -504,12 +510,15 @@ router.get("/my-coupon", protect, async (req, res) => {
 router.post("/validate-coupon", protect, async (req, res) => {
   const { couponCode } = req.body;
   const user = await User.findById(req.user._id);
+  const Order = require("../models/Order");
+  const hasAnyOrder = (await Order.countDocuments({ user: req.user._id }).limit(1)) > 0;
 
   if (
     user &&
     user.coupon &&
     user.coupon.code.toUpperCase() === couponCode.toUpperCase() &&
-    new Date(user.coupon.expiresAt) > new Date()
+    new Date(user.coupon.expiresAt) > new Date() &&
+    !hasAnyOrder
   ) {
     return res.json({ valid: true, discount: user.coupon.discount });
   } else {

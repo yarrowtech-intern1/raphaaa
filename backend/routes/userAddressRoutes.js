@@ -20,9 +20,21 @@ router.get("/", protect, async (req, res) => {
 
 // POST: Add a new address
 router.post("/", protect, async (req, res) => {
-  const { address, city, state, postalCode, country, phone } = req.body;
+  const {
+    firstName,
+    lastName,
+    address,
+    landmark,
+    city,
+    state,
+    postalCode,
+    country,
+    phone,
+    addressType,
+    isDefault,
+  } = req.body;
 
-  if (!address || !city || !postalCode || !country || !phone) {
+  if (!firstName || !address || !city || !postalCode || !country || !phone) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -31,12 +43,17 @@ router.post("/", protect, async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
     user.addresses.push({
+      firstName: String(firstName || "").trim(),
+      lastName: String(lastName || "").trim(),
       address,
+      landmark: String(landmark || "").trim(),
       city,
       state: state || city || "N/A",
       postalCode,
       country,
       phone,
+      addressType: ["Home", "Work", "Other"].includes(addressType) ? addressType : "Home",
+      isDefault: Boolean(isDefault),
     });
     await user.save();
     res.status(201).json({ message: "Address added", addresses: user.addresses });

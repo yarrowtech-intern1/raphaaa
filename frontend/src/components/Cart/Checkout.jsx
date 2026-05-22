@@ -700,7 +700,7 @@ const Checkout = () => {
                             >
                               <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
                                 {selectedAddressIndex === index && <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />}
-                                {fullUser?.name}
+                                {[addr.firstName, addr.lastName].filter(Boolean).join(" ") || fullUser?.name || "—"}
                               </p>
                               <p className="text-xs text-gray-500 mt-1 leading-relaxed">
                                 {addr.address}<br />

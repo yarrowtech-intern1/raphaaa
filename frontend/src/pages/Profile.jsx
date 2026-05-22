@@ -47,8 +47,22 @@ export default function Profile() {
   const [topupAmount,     setTopupAmount]    = useState("");
   const [topupLoading,    setTopupLoading]   = useState(false);
   const [expandedTxn,     setExpandedTxn]   = useState(null);
+  const [myCoupon,        setMyCoupon]      = useState(null);
+  const [couponLoading,   setCouponLoading] = useState(false);
 
   useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
+
+  useEffect(() => {
+    if (activeTab !== "profile") return;
+    setCouponLoading(true);
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL}/api/users/my-coupon`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+      })
+      .then(({ data }) => setMyCoupon(data || null))
+      .catch(() => setMyCoupon(null))
+      .finally(() => setCouponLoading(false));
+  }, [activeTab]);
 
   /* ── wishlist ── */
   useEffect(() => {
@@ -909,6 +923,47 @@ export default function Profile() {
                     </svg>
                     Edit Profile
                   </Link>
+                </div>
+
+                {/* Coupon section */}
+                <div className="mt-6 rounded-2xl border border-amber-100 overflow-hidden bg-amber-50/50">
+                  <div className="flex items-center gap-2.5 px-4 py-3 border-b border-amber-100 bg-amber-50">
+                    <FaGift className="text-amber-600 text-sm" />
+                    <h3 className="text-sm font-bold text-amber-800">My Coupon</h3>
+                  </div>
+                  <div className="p-4">
+                    {couponLoading ? (
+                      <p className="text-sm text-gray-500">Loading coupon…</p>
+                    ) : !myCoupon?.code ? (
+                      <p className="text-sm text-gray-500">No coupon available.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Code</p>
+                        <p className="text-base font-extrabold text-amber-700 tracking-wider">{myCoupon.code}</p>
+                        <p className="text-sm text-gray-600">
+                          Discount: <span className="font-semibold">{myCoupon.discount || 0}%</span>
+                        </p>
+                        {myCoupon.expiresAt && (
+                          <p className="text-sm text-gray-600">
+                            Expires:{" "}
+                            <span className="font-semibold">
+                              {new Date(myCoupon.expiresAt).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          Status:{" "}
+                          <span className={`font-bold ${myCoupon.status === "used" ? "text-rose-600" : myCoupon.status === "expired" ? "text-amber-700" : "text-emerald-600"}`}>
+                            {myCoupon.status === "used" ? "Used" : myCoupon.status === "expired" ? "Expired" : "Unused"}
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
