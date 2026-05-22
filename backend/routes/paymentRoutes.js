@@ -331,8 +331,6 @@ const mongoose = require("mongoose");
 const { sendMail } = require("../utils/sendMail");
 const { buildInvoicePDF } = require("../utils/invoice");
 const sendWhatsApp = require("../utils/sendWhatsApp");
-const { earnCredit } = require("../services/walletService");
-const CASHBACK_PERCENT = 1;
 const { creditReferrerOnFirstOrder } = require("./referralRoutes");
 
 const applyVariantStockDeduction = (product, item) => {
@@ -902,22 +900,6 @@ router.post("/verify-payment", protect, async (req, res) => {
       } catch (emailErr) {
         console.error("Failed to send online payment invoice email:", emailErr.message);
       }
-
-      // Cashback: 1% wallet credit on online payment
-      try {
-        if (populatedOrder.user?._id) {
-          const cashback = Math.floor((populatedOrder.totalPrice * CASHBACK_PERCENT) / 100);
-          if (cashback >= 1) {
-            await earnCredit({
-              userId: populatedOrder.user._id,
-              amount: cashback,
-              refType: "order",
-              refId: String(populatedOrder._id),
-              note: `${CASHBACK_PERCENT}% cashback on order ${populatedOrder.orderId}`,
-            });
-          }
-        }
-      } catch (_) {}
 
       // Referrer reward on first purchase
       if (populatedOrder.user?._id) {

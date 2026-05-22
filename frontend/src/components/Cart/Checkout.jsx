@@ -124,6 +124,7 @@ const Checkout = () => {
   // Phase 4: promos + wallet
   const [couponCode, setCouponCode] = useState("");
   const [couponCodes, setCouponCodes] = useState([]);
+  const [couponPrefilled, setCouponPrefilled] = useState(false);
   const [walletRedeem, setWalletRedeem] = useState(0);
   const [orderNote, setOrderNote] = useState("");
   const [quote, setQuote] = useState(null);
@@ -330,6 +331,31 @@ const Checkout = () => {
 
     fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("userToken");
+    if (!token || couponPrefilled) return;
+
+    const fetchMyCoupon = async () => {
+      try {
+        const { data } = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/users/my-coupon`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const code = String(data?.code || "").trim().toUpperCase();
+        const status = String(data?.status || "").toLowerCase();
+        if (code && status === "unused") {
+          setCouponCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
+        }
+      } catch (_) {
+        // no coupon, expired, or unavailable
+      } finally {
+        setCouponPrefilled(true);
+      }
+    };
+
+    fetchMyCoupon();
+  }, [couponPrefilled]);
 
   const validatePhone = (phone) => {
     if (!phone.startsWith("+91")) {

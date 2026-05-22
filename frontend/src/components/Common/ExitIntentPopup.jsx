@@ -27,7 +27,10 @@ const ExitIntentPopup = () => {
     if (seen === "1") return;
 
     const onMouseLeave = (e) => {
-      if (e.clientY <= 5) setVisible(true);
+      if (e.clientY <= 5) {
+        localStorage.setItem(STORAGE_KEY, "1");
+        setVisible(true);
+      }
     };
     document.addEventListener("mouseleave", onMouseLeave);
     return () => document.removeEventListener("mouseleave", onMouseLeave);
