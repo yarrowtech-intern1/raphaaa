@@ -28,6 +28,86 @@ const NAV_ITEMS = [
   { key: "complaint", label: "Complaints",  icon: HiOutlineExclamationCircle },
 ];
 
+/* ─── Coupon graphic helpers ─── */
+const couponTheme = (status) => {
+  if (status === "used")    return { bg: "from-rose-400 to-rose-600",    light: "bg-rose-50",   border: "border-rose-200",   text: "text-rose-600",   badge: "bg-rose-100 text-rose-700",   label: "Used" };
+  if (status === "expired") return { bg: "from-gray-400 to-gray-500",    light: "bg-gray-50",   border: "border-gray-200",   text: "text-gray-500",   badge: "bg-gray-100 text-gray-500",   label: "Expired" };
+  return                           { bg: "from-amber-400 to-orange-500", light: "bg-amber-50",  border: "border-amber-200",  text: "text-amber-600",  badge: "bg-emerald-100 text-emerald-700", label: "Active" };
+};
+
+function CouponCard({ c }) {
+  const t = couponTheme(c.status);
+  const inactive = c.status === "used" || c.status === "expired";
+  return (
+    <div className={`relative flex rounded-xl shadow-md overflow-hidden ${inactive ? "opacity-60" : ""}`}>
+      {/* Left gradient stub */}
+      <div className={`relative bg-linear-to-b ${t.bg} text-white w-24 shrink-0 flex flex-col items-center justify-center px-2 py-5`}>
+        <span className="text-3xl font-black leading-none">{c.discount || "?"}<span className="text-base font-bold">%</span></span>
+        <span className="text-[10px] font-bold uppercase tracking-widest mt-0.5 opacity-90">OFF</span>
+      </div>
+      {/* Punch-out notches — white circles centered on the tear line, clipped by overflow-hidden.
+          Left half shows on gradient (= white semicircle = punch-out); right half invisible on white body. */}
+      <span className="absolute top-0 left-24 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white z-10" />
+      <span className="absolute bottom-0 left-24 -translate-x-1/2 translate-y-1/2 w-6 h-6 rounded-full bg-white z-10" />
+      {/* Right body */}
+      <div className="flex-1 bg-white px-4 py-3 flex flex-col justify-between border-l-0">
+        {/* Dashed tear line */}
+        <span className="absolute left-24 top-3 bottom-3 border-l-2 border-dashed border-gray-200 pointer-events-none" />
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Coupon Code</p>
+            <p className="text-base font-black text-gray-800 tracking-widest mt-0.5 font-mono">{c.code}</p>
+          </div>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${t.badge}`}>{t.label}</span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5">
+          {c.expiresAt && (
+            <p className="text-[11px] text-gray-500">
+              Expires: <span className="font-semibold text-gray-700">{new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+            </p>
+          )}
+          <p className="text-[11px] text-gray-500">
+            Save: <span className="font-semibold text-gray-700">{c.discount || 0}% on your order</span>
+          </p>
+        </div>
+        <div className="mt-3 pt-2 border-t border-dashed border-gray-200 flex items-center gap-1">
+          <FaGift className={`text-xs ${t.text}`} />
+          <span className="text-[10px] text-gray-400 font-medium">Apply at checkout to redeem</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniCouponCard({ c }) {
+  const t = couponTheme(c.status);
+  const inactive = c.status === "used" || c.status === "expired";
+  return (
+    <div className={`relative flex rounded-lg shadow-sm overflow-hidden ${inactive ? "opacity-55" : ""}`}>
+      {/* Left gradient stub */}
+      <div className={`relative bg-linear-to-b ${t.bg} text-white w-16 shrink-0 flex flex-col items-center justify-center px-1 py-3`}>
+        <span className="text-xl font-black leading-none">{c.discount || "?"}<span className="text-[10px] font-bold">%</span></span>
+        <span className="text-[8px] font-bold uppercase tracking-wider opacity-90">OFF</span>
+      </div>
+      {/* Punch-out notches */}
+      <span className="absolute top-0 left-16 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white z-10" />
+      <span className="absolute bottom-0 left-16 -translate-x-1/2 translate-y-1/2 w-4 h-4 rounded-full bg-white z-10" />
+      {/* Right body */}
+      <div className="flex-1 bg-white px-3 py-2 flex items-center justify-between">
+        <span className="absolute left-16 top-2 bottom-2 border-l-2 border-dashed border-gray-200 pointer-events-none" />
+        <div>
+          <p className="text-xs font-black text-gray-800 tracking-widest font-mono">{c.code}</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            {c.discount ? `${c.discount}% OFF` : "Discount offer"}
+            {c.expiresAt ? ` · Expires ${new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+          </p>
+        </div>
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${t.badge}`}>{t.label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Profile() {
   const { user }    = useSelector((s) => s.auth);
   const navigate    = useNavigate();
@@ -931,82 +1011,37 @@ export default function Profile() {
                 </div>
 
                 {/* Coupon section */}
-                <div className="mt-6 rounded-2xl border border-amber-100 overflow-hidden bg-amber-50/50">
-                  <div className="flex items-center gap-2.5 px-4 py-3 border-b border-amber-100 bg-amber-50">
+                {/* <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-3">
                     <FaGift className="text-amber-600 text-sm" />
                     <h3 className="text-sm font-bold text-amber-800">My Coupon</h3>
                   </div>
-                  <div className="p-4">
-                    {couponLoading ? (
-                      <p className="text-sm text-gray-500">Loading coupon…</p>
-                    ) : !myCoupon?.code ? (
-                      <p className="text-sm text-gray-500">No coupon available.</p>
-                    ) : (
-                      <div className="space-y-2.5">
-                        <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Code</p>
-                        <p className="text-base font-extrabold text-amber-700 tracking-wider">{myCoupon.code}</p>
-                        <p className="text-sm text-gray-600">
-                          Discount: <span className="font-semibold">{myCoupon.discount || 0}%</span>
-                        </p>
-                        {myCoupon.expiresAt && (
-                          <p className="text-sm text-gray-600">
-                            Expires:{" "}
-                            <span className="font-semibold">
-                              {new Date(myCoupon.expiresAt).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                            </span>
-                          </p>
-                        )}
-                        <p className="text-sm text-gray-600">
-                          Status:{" "}
-                          <span className={`font-bold ${myCoupon.status === "used" ? "text-rose-600" : myCoupon.status === "expired" ? "text-amber-700" : "text-emerald-600"}`}>
-                            {myCoupon.status === "used" ? "Used" : myCoupon.status === "expired" ? "Expired" : "Unused"}
-                          </span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  {couponLoading ? (
+                    <p className="text-sm text-gray-500">Loading coupon…</p>
+                  ) : !myCoupon?.code ? (
+                    <p className="text-sm text-gray-500">No coupon available.</p>
+                  ) : (
+                    <MiniCouponCard c={myCoupon} />
+                  )}
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-gray-100 overflow-hidden bg-white">
-                  <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100 bg-gray-50">
+                <div className="mt-5">
+                  <div className="flex items-center gap-2 mb-3">
                     <FaGift className="text-sky-600 text-sm" />
                     <h3 className="text-sm font-bold text-gray-800">All Coupons</h3>
                   </div>
-                  <div className="p-4">
-                    {couponLoading ? (
-                      <p className="text-sm text-gray-500">Loading coupons…</p>
-                    ) : myCoupons.length === 0 ? (
-                      <p className="text-sm text-gray-500">No coupons found.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {myCoupons.map((c) => (
-                          <div key={c.code} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2.5">
-                            <div>
-                              <p className="text-sm font-bold text-gray-800 tracking-wide">{c.code}</p>
-                              <p className="text-xs text-gray-500">
-                                {c.discount ? `${c.discount}% OFF` : "Discount as per offer"}
-                                {c.expiresAt ? ` · Expires ${new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}
-                              </p>
-                            </div>
-                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                              c.status === "used"
-                                ? "bg-rose-100 text-rose-700"
-                                : c.status === "expired"
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                            }`}>
-                              {c.status === "used" ? "Used" : c.status === "expired" ? "Expired" : "Active"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  {couponLoading ? (
+                    <p className="text-sm text-gray-500">Loading coupons…</p>
+                  ) : myCoupons.length === 0 ? (
+                    <p className="text-sm text-gray-500">No coupons found.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {myCoupons.map((c) => (
+                        <MiniCouponCard key={c.code} c={c} />
+                      ))}
+                    </div>
+                  )}
+                </div> */}
               </div>
             )}
 
@@ -1028,26 +1063,9 @@ export default function Profile() {
                 ) : myCoupons.length === 0 ? (
                   <p className="text-sm text-gray-500">No coupons found.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     {myCoupons.map((c) => (
-                      <div key={c.code} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2.5 bg-white">
-                        <div>
-                          <p className="text-sm font-bold text-gray-800 tracking-wide">{c.code}</p>
-                          <p className="text-xs text-gray-500">
-                            {c.discount ? `${c.discount}% OFF` : "Discount as per offer"}
-                            {c.expiresAt ? ` · Expires ${new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}
-                          </p>
-                        </div>
-                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                          c.status === "used"
-                            ? "bg-rose-100 text-rose-700"
-                            : c.status === "expired"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-emerald-100 text-emerald-700"
-                        }`}>
-                          {c.status === "used" ? "Used" : c.status === "expired" ? "Expired" : "Active"}
-                        </span>
-                      </div>
+                      <CouponCard key={c.code} c={c} />
                     ))}
                   </div>
                 )}
