@@ -14,7 +14,9 @@ const UserLayout = () => {
         <Outlet/>
       </main>
       <Footer/>
-      <ScrollToTopButton/>
+      <div className="hidden lg:block">
+        <ScrollToTopButton/>
+      </div>
       <WhatsAppWidget />
       <ExitIntentPopup />
     </>

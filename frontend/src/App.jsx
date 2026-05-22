@@ -103,7 +103,9 @@ const App = () => {
       <BrowserRouter>
         <AutoLogout />
         <ScrollToTop />
-        <Chatbot onNavigateProduct={handleNavigateProduct} />
+        <div className="hidden lg:block">
+          <Chatbot onNavigateProduct={handleNavigateProduct} />
+        </div>
         <Routes>
           <Route path="/" element={<UserLayout />}>
             <Route path="/404" element={<NotFound />} />

@@ -3842,22 +3842,22 @@ const ProductDetails = ({ productId }) => {
       )}
 
       {/* ── Sticky Add-to-Cart bar ── */}
-      {selectedProduct && (
+      {/* {selectedProduct && (
         <div
           className={`fixed bottom-0 left-0 right-0 z-[70] bg-white border-t border-gray-200 shadow-2xl transition-transform duration-300 ${
             showStickyCTA ? "translate-y-0" : "translate-y-full"
           }`}
         >
-          {/* ── MOBILE layout (< sm): info row + full-width buttons row ── */}
+    
           <div className="sm:hidden px-4 pt-2.5 pb-3 space-y-2">
-            {/* Info row */}
+            
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-bold text-gray-800 truncate flex-1">{selectedProduct.name}</p>
               <span className="text-sm font-extrabold text-sky-700 shrink-0">
                 ₹{Math.floor(selectedProduct.discountPrice || selectedProduct.price).toLocaleString("en-IN")}
               </span>
             </div>
-            {/* Full-width buttons */}
+           
             {!isOutOfStock ? (
               <div className="flex gap-2">
                 <button
@@ -3880,15 +3880,15 @@ const ProductDetails = ({ productId }) => {
             )}
           </div>
 
-          {/* ── TABLET / DESKTOP layout (sm+): single row ── */}
+          
           <div className="hidden sm:flex max-w-7xl mx-auto px-6 py-3 items-center gap-4">
-            {/* Image */}
+          
             <img
               src={selectedProduct.colorVariants?.[0]?.images?.[0]?.url || selectedProduct.images?.[0]?.url || ""}
               alt={selectedProduct.name}
               className="w-12 h-14 object-cover rounded-lg shrink-0 border border-gray-100"
             />
-            {/* Info */}
+            
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-gray-800 truncate">{selectedProduct.name}</p>
               <div className="flex items-center gap-2 mt-0.5">
@@ -3902,7 +3902,7 @@ const ProductDetails = ({ productId }) => {
                 )}
               </div>
             </div>
-            {/* Buttons */}
+           
             {!isOutOfStock ? (
               <div className="flex gap-3 shrink-0">
                 <button
@@ -3925,7 +3925,7 @@ const ProductDetails = ({ productId }) => {
             )}
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
