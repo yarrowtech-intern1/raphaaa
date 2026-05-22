@@ -193,6 +193,17 @@ const Checkout = () => {
   }, [razorpayOrderId, paymentMethod]);
 
   useEffect(() => {
+    // If user switches from online payment to COD after creating/canceling Razorpay flow,
+    // reset checkout payment state so COD can proceed normally.
+    if (paymentMethod !== "cash_on_delivery") return;
+    if (!razorpayOrderId && !orderId) return;
+    dispatch(clearCheckout());
+    setOrderProcessing(false);
+    setOrderInitiated(false);
+    setSubmitDisabled(false);
+  }, [paymentMethod, razorpayOrderId, orderId, dispatch]);
+
+  useEffect(() => {
     const token = localStorage.getItem("userToken");
     if (!token) return;
     if (!cart?.products || cart.products.length === 0) return;

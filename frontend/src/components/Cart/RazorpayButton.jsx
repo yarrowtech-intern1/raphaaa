@@ -427,6 +427,11 @@ const RazorpayButton = ({
         modal: {
           ondismiss: function () {
             console.log("Razorpay modal closed by user");
+            onError?.({
+              code: "USER_CANCELLED",
+              description: "Payment popup closed by user",
+              reason: "user_cancelled",
+            });
           },
         },
       };
