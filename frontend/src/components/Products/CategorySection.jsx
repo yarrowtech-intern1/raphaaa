@@ -56,7 +56,7 @@ const CategorySection = () => {
   if (collabActive) return null;
 
   return (
-    <section className="px-4 md:px-10 lg:px-16 py-14">
+    <section className="px-4 sm:px-6 lg:px-16 py-10 md:py-12 lg:py-14">
 
       {/* ── Section header ── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-8">
@@ -64,7 +64,7 @@ const CategorySection = () => {
           <p className="text-[11px] font-bold tracking-[0.2em] text-sky-600 uppercase mb-2">
             Curated For You
           </p>
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
             Shop by Category
           </h2>
         </div>
@@ -80,7 +80,7 @@ const CategorySection = () => {
       </div>
 
       {/* ── Category grid ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4">
         {!ready
           ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} />)
           : CATEGORIES.map((cat) => (

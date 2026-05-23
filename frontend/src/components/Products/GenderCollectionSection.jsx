@@ -65,7 +65,7 @@ const GenderCard = ({ image, alt, badge, badgeDot, title, sub, href, size = "lar
 
 /* ── skeleton ─────────────────────────────────────────────────────── */
 const Skeleton = () => (
-  <section className="px-4 md:px-10 lg:px-16 py-14">
+  <section className="px-4 sm:px-6 lg:px-16 py-10 md:py-12 lg:py-14">
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-8">
       <div className="space-y-2">
         <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
@@ -101,7 +101,7 @@ const GenderCollectionSection = () => {
   if (loading) return <Skeleton />;
 
   return (
-    <section className="px-4 md:px-10 lg:px-16 py-14">
+    <section className="px-4 sm:px-6 lg:px-16 py-10 md:py-12 lg:py-14">
 
       {/* ── Section header ── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-8">
@@ -109,7 +109,7 @@ const GenderCollectionSection = () => {
           <p className="text-[11px] font-bold tracking-[0.2em] text-sky-600 uppercase mb-2">
             Collections
           </p>
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
             Shop by Gender
           </h2>
         </div>
@@ -129,10 +129,10 @@ const GenderCollectionSection = () => {
         Desktop: [Women — 2 cols] [Men + Kids — 1 col, stacked]
         Mobile:  all three stack vertically
       */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3 md:gap-4">
 
         {/* Women — takes 2/3 width on desktop */}
-        <div className="md:col-span-2 rounded-2xl overflow-hidden h-120 md:h-140 relative">
+        <div className="md:col-span-2 rounded-2xl overflow-hidden h-[420px] sm:h-[520px] md:h-140 relative">
           <GenderCard
             image={product1 || womenImg}
             alt="Women's Collection"
@@ -146,8 +146,8 @@ const GenderCollectionSection = () => {
         </div>
 
         {/* Men + Kids — stacked in right 1/3 */}
-        <div className="grid grid-rows-2 gap-3 md:gap-4 h-90 md:h-140">
-          <div className="rounded-2xl overflow-hidden h-full">
+        <div className="grid grid-rows-2 gap-2.5 sm:gap-3 md:gap-4 h-auto md:h-140">
+          <div className="rounded-2xl overflow-hidden h-[210px] sm:h-[250px] md:h-full">
             <GenderCard
               image={product2 || menImg}
               alt="Men's Collection"
@@ -159,7 +159,7 @@ const GenderCollectionSection = () => {
               size="small"
             />
           </div>
-          <div className="rounded-2xl overflow-hidden h-full">
+          <div className="rounded-2xl overflow-hidden h-[210px] sm:h-[250px] md:h-full">
             <GenderCard
               image={menImg}
               alt="Kids Collection"

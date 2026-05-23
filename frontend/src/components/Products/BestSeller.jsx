@@ -42,7 +42,7 @@ const BestSellersSection = () => {
 
   if (loading)
     return (
-      <div className="mx-auto max-w-6xl px-6 md:px-12 py-12">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 md:px-12 py-10 md:py-12">
         <div className="bs-skeleton">
           <div className="bs-skel-title" />
           <div className="bs-skel-row">
@@ -72,9 +72,9 @@ const BestSellersSection = () => {
   const looped = [...bestSellers, ...bestSellers];
 
   return (
-    <section className="py-12">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 inline-block relative">
+    <section className="py-10 md:py-12">
+      <div className="text-center mb-6 md:mb-8 px-4">
+        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 inline-block relative">
           <span className="">
             Best Seller
           </span>
@@ -85,7 +85,7 @@ const BestSellersSection = () => {
         </p>
       </div>
 
-      <div className="p-4">
+      <div className="px-2 sm:px-4">
         <div className="best-seller-wrapper">
           <div className="best-seller-marquee" aria-label="Best seller carousel">
             {looped.map((item, idx) => (

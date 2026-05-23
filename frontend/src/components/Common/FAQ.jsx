@@ -54,11 +54,11 @@ export default function FAQ() {
   );
 
   return (
-    <section className="py-16">
-      <div className="max-w-6xl mx-auto px-6 md:px-12">
+    <section className="py-10 md:py-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-12">
         {/* Heading */}
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+        <div className="text-center mb-8 md:mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
             <span className="">
               Frequently Asked Questions
             </span>
@@ -67,7 +67,7 @@ export default function FAQ() {
         </div>
 
         {/* List */}
-        <div className="space-y-5">
+        <div className="space-y-4 md:space-y-5">
           {faqData.map((faq, i) => {
             const open = activeIndex === i;
             return (

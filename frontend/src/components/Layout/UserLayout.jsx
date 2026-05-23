@@ -9,9 +9,14 @@ import MobileFooterNav from './MobileFooterNav'
 
 const UserLayout = () => {
   const location = useLocation()
-  const hideMobileFooterMenu =
-    location.pathname === "/checkout" || location.pathname === "/cart"
-  const hideFooterOnMobile = location.pathname === "/profile"
+  const hideMobileFooterMenu = location.pathname === "/checkout"
+  const hideFooterOnMobileRoutes = [
+    "/profile",
+    "/login",
+    "/register",
+    "/forgot-password",
+  ]
+  const hideFooterOnMobile = hideFooterOnMobileRoutes.includes(location.pathname)
   const isHomePage = location.pathname === "/"
   const hideTopbarOnMobile = !isHomePage
 

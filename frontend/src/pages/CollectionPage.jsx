@@ -110,7 +110,7 @@ const CollectionPage = () => {
           {/* ── Mobile filter FAB ── */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40
+            className="lg:hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-[60]
                        flex items-center gap-2 px-5 py-2.5
                        bg-gray-900 text-white text-sm font-semibold rounded-full
                        shadow-xl active:scale-95 transition-all"

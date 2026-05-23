@@ -104,7 +104,7 @@ const Hero = () => {
     <section className="w-full bg-white">
 
       {/* ── MAIN CAROUSEL ── */}
-      <div className="relative w-full" style={{ height: "min(58vw, 640px)", minHeight: "260px" }}>
+      <div className="relative w-full" style={{ height: "min(58vw, 640px)", minHeight: "320px" }}>
         <Swiper
           loop
           autoplay={{ delay: 4500, disableOnInteraction: false }}
@@ -126,19 +126,19 @@ const Hero = () => {
               <div className={`absolute inset-0 bg-linear-to-r ${slide.overlay}`} />
 
               {/* text */}
-              <div className={`absolute inset-0 flex items-end px-5 sm:px-10 md:px-16 lg:px-24 pb-10 sm:pb-14 md:pb-20 ${
+              <div className={`absolute inset-0 flex items-end px-4 sm:px-8 md:px-12 lg:px-24 pb-8 sm:pb-12 md:pb-16 lg:pb-20 ${
                 slide.align === "right" ? "justify-end text-right" : "justify-start text-left"
               }`}>
                 <div className="max-w-lg space-y-2 sm:space-y-3">
                   <span className="inline-block bg-sky-500/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">
                     {slide.badge}
                   </span>
-                  <h1 className="text-white font-extrabold leading-[1.05] text-3xl sm:text-4xl md:text-5xl lg:text-6xl drop-shadow-lg whitespace-pre-line">
+                  <h1 className="text-white font-extrabold leading-[1.05] text-2xl sm:text-4xl md:text-5xl lg:text-6xl drop-shadow-lg whitespace-pre-line">
                     {slide.title}
                   </h1>
                   <p className="text-sky-200 text-xs sm:text-sm font-semibold tracking-wide">{slide.subtitle}</p>
                   <p className="text-white/75 text-xs sm:text-sm hidden sm:block leading-relaxed">{slide.desc}</p>
-                  <div className={`flex items-center gap-3 pt-1 ${slide.align === "right" ? "justify-end" : "justify-start"}`}>
+                  <div className={`flex flex-wrap items-center gap-2 sm:gap-3 pt-1 ${slide.align === "right" ? "justify-end" : "justify-start"}`}>
                     <Link to={slide.ctaLink}
                       className="px-5 sm:px-7 py-2.5 bg-white text-sky-700 font-bold text-sm sm:text-[15px] rounded-full hover:bg-sky-50 active:scale-95 transition-all shadow-lg">
                       {slide.cta}
