@@ -1721,6 +1721,11 @@ const ProductDetails = ({ productId }) => {
   // ✅ Inside your ProductDetails component (near useState declarations)
   const [showModal, setShowModal] = useState(false);
   const [modalImage, setModalImage] = useState("");
+  const [modalIndex, setModalIndex] = useState(0);
+  const [modalIsGallery, setModalIsGallery] = useState(false);
+  const [modalZoom, setModalZoom] = useState(1);
+  const [modalOffset, setModalOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [finalPrice, setFinalPrice] = useState(null);
   const [wishlistItems, setWishlistItems] = useState([]);
@@ -1742,6 +1747,15 @@ const ProductDetails = ({ productId }) => {
   const [ctlProducts, setCtlProducts] = useState([]);
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [sizeChartTab, setSizeChartTab] = useState("chart"); // "chart" | "measure"
+  const modalTouchRef = useRef({
+    mode: null, // "pan" | "pinch" | null
+    startX: 0,
+    startY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+    startDistance: 0,
+    startZoom: 1,
+  });
 
   const cart = useSelector((state) => state.cart);
 
@@ -1792,6 +1806,10 @@ const ProductDetails = ({ productId }) => {
           ? mainImage
           : displayImages[0].url)
       : mainImage;
+  const modalImages = displayImages.map((img) => img.url).filter(Boolean);
+  const modalCurrentImage = modalIsGallery
+    ? (modalImages[modalIndex] || modalImage || effectiveMainImage || selectedProduct?.images?.[0]?.url || "")
+    : (modalImage || effectiveMainImage || selectedProduct?.images?.[0]?.url || "");
 
   // Sizes available for the selected color (or all sizes for legacy)
   const effectiveSizes = hasColorVariants
@@ -2230,12 +2248,90 @@ const ProductDetails = ({ productId }) => {
     validateUserCoupon();
   }, [couponCode, selectedProduct]);
 
-  const handleImageClick = (imgUrl) => {
+  const handleImageClick = (imgUrl, index = 0) => {
+    const galleryIndex = index >= 0 ? index : modalImages.findIndex((url) => url === imgUrl);
     setModalImage(imgUrl);
+    setModalIndex(galleryIndex >= 0 ? galleryIndex : 0);
+    setModalIsGallery(galleryIndex >= 0);
+    setModalZoom(1);
+    setModalOffset({ x: 0, y: 0 });
     setShowModal(true);
   };
 
-  const handleCloseModal = () => setShowModal(false);
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setModalZoom(1);
+    setModalOffset({ x: 0, y: 0 });
+    setIsPanning(false);
+    setModalIsGallery(false);
+  };
+
+  const goToModalImage = (dir) => {
+    if (!modalIsGallery || !modalImages.length) return;
+    setModalIndex((prev) => (prev + dir + modalImages.length) % modalImages.length);
+    setModalZoom(1);
+    setModalOffset({ x: 0, y: 0 });
+  };
+
+  const getTouchDistance = (touches) => {
+    if (!touches || touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const handleModalTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      modalTouchRef.current = {
+        ...modalTouchRef.current,
+        mode: "pinch",
+        startDistance: getTouchDistance(e.touches),
+        startZoom: modalZoom,
+      };
+      return;
+    }
+
+    if (e.touches.length === 1 && modalZoom > 1) {
+      const t = e.touches[0];
+      modalTouchRef.current = {
+        ...modalTouchRef.current,
+        mode: "pan",
+        startX: t.clientX,
+        startY: t.clientY,
+        startOffsetX: modalOffset.x,
+        startOffsetY: modalOffset.y,
+      };
+      setIsPanning(true);
+    }
+  };
+
+  const handleModalTouchMove = (e) => {
+    if (modalTouchRef.current.mode === "pinch" && e.touches.length === 2) {
+      const nextDistance = getTouchDistance(e.touches);
+      if (!modalTouchRef.current.startDistance) return;
+      const ratio = nextDistance / modalTouchRef.current.startDistance;
+      const nextZoom = Math.max(1, Math.min(4, modalTouchRef.current.startZoom * ratio));
+      setModalZoom(nextZoom);
+      if (nextZoom <= 1) setModalOffset({ x: 0, y: 0 });
+      return;
+    }
+
+    if (modalTouchRef.current.mode === "pan" && e.touches.length === 1 && modalZoom > 1) {
+      e.preventDefault();
+      const t = e.touches[0];
+      const dx = t.clientX - modalTouchRef.current.startX;
+      const dy = t.clientY - modalTouchRef.current.startY;
+      setModalOffset({
+        x: modalTouchRef.current.startOffsetX + dx,
+        y: modalTouchRef.current.startOffsetY + dy,
+      });
+    }
+  };
+
+  const handleModalTouchEnd = () => {
+    modalTouchRef.current.mode = null;
+    setIsPanning(false);
+  };
 
   useEffect(() => {
     const escHandler = (e) => {
@@ -2659,11 +2755,11 @@ const ProductDetails = ({ productId }) => {
             </div>
           </div>
 
-          <div className="max-w-7xl mx-auto px-4 md:px-6 pt-6">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 pt-4 md:pt-6">
           <div className="overflow-visible">
-            <div className="grid grid-cols-1 lg:grid-cols-12">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 lg:gap-0">
               {/* LEFT: Image Gallery */}
-              <div className="lg:col-span-5 p-4 lg:p-6">
+              <div className="lg:col-span-5 p-1 sm:p-2 md:p-4 lg:p-6">
                 <div className="lg:sticky lg:top-20">
                   <div className="flex gap-3 relative">
                     {/* Thumbnails (desktop) — vertical strip */}
@@ -2710,13 +2806,13 @@ const ProductDetails = ({ productId }) => {
                         onTouchStart={() => setZoom((s) => ({ ...s, active: true }))}
                         onTouchEnd={handleZoomLeave}
                         onTouchMove={handleZoomTouchMove}
+                        onClick={() => handleImageClick(effectiveMainImage, Math.max(0, modalImages.findIndex((url) => url === effectiveMainImage)))}
                       >
                         <img
                           ref={imgRef}
                           src={effectiveMainImage || selectedProduct.images?.[0]?.url}
                           alt="Main Product"
-                          onClick={() => handleImageClick(effectiveMainImage)}
-                          className="w-full h-full object-contain pointer-events-none select-none"
+                          className="w-full h-full object-contain select-none"
                           draggable={false}
                         />
 
@@ -2792,7 +2888,7 @@ const ProductDetails = ({ productId }) => {
 
               {/* RIGHT: Product Info + Buy Box */}
               {/* isolate creates a new stacking context so nothing here leaks above the fixed zoom panel */}
-              <div className="lg:col-span-7 p-4 lg:p-8 space-y-5 isolate">
+              <div className="lg:col-span-7 p-2 sm:p-3 md:p-4 lg:p-8 space-y-4 md:space-y-5 isolate">
                 {/* Brand + Title */}
                 <div>
                   {selectedProduct.brand && (
@@ -3819,10 +3915,12 @@ const ProductDetails = ({ productId }) => {
       {showModal && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={handleCloseModal}
+          onClick={() => {
+            if (!isPanning) handleCloseModal();
+          }}
         >
           <div
-            className="w-full h-full max-w-4xl max-h-screen relative flex items-center justify-center"
+            className="w-full max-w-4xl max-h-[92vh] relative flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -3831,12 +3929,76 @@ const ProductDetails = ({ productId }) => {
             >
               ×
             </button>
-            <img
-              src={modalImage}
-              alt="Zoomed Product"
-              className="max-w-full max-h-full object-contain rounded-lg"
-              style={{ touchAction: "pan-x pan-y", userSelect: "none" }}
-            />
+            {modalIsGallery && modalImages.length > 1 && (
+              <>
+                <button
+                  onClick={() => goToModalImage(-1)}
+                  className="absolute left-1 sm:left-3 top-1/2 -translate-y-1/2 z-50 bg-black/40 text-white hover:bg-black/60 w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                  aria-label="Previous image"
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={() => goToModalImage(1)}
+                  className="absolute right-1 sm:right-3 top-1/2 -translate-y-1/2 z-50 bg-black/40 text-white hover:bg-black/60 w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                  aria-label="Next image"
+                >
+                  ›
+                </button>
+              </>
+            )}
+            <div
+              className="w-full h-[78vh] sm:h-[85vh] flex items-center justify-center overflow-hidden touch-none"
+              onDoubleClick={() => {
+                if (modalZoom > 1) {
+                  setModalZoom(1);
+                  setModalOffset({ x: 0, y: 0 });
+                } else {
+                  setModalZoom(2);
+                }
+              }}
+              onTouchStart={handleModalTouchStart}
+              onTouchMove={handleModalTouchMove}
+              onTouchEnd={handleModalTouchEnd}
+            >
+              <img
+                src={modalCurrentImage}
+                alt="Zoomed Product"
+                className="max-w-full max-h-full object-contain rounded-lg transition-transform duration-100"
+                style={{
+                  userSelect: "none",
+                  touchAction: "none",
+                  transform: `translate(${modalOffset.x}px, ${modalOffset.y}px) scale(${modalZoom})`,
+                }}
+                draggable={false}
+              />
+            </div>
+            <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-white/80 bg-black/35 px-3 py-1 rounded-full">
+              Pinch or double-tap to zoom
+            </p>
+            {modalIsGallery && modalImages.length > 1 && (
+              <div className="absolute left-0 right-0 bottom-16 sm:bottom-4 px-3">
+                <div className="mx-auto max-w-xl flex items-center gap-2 overflow-x-auto bg-black/35 backdrop-blur-sm rounded-xl p-2">
+                  {modalImages.map((url, i) => (
+                    <button
+                      key={`${url}-${i}`}
+                      onClick={() => {
+                        setModalIndex(i);
+                        setModalImage(url);
+                        setModalZoom(1);
+                        setModalOffset({ x: 0, y: 0 });
+                      }}
+                      className={`w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-md overflow-hidden border-2 transition ${
+                        i === modalIndex ? "border-white" : "border-white/30"
+                      }`}
+                      aria-label={`View image ${i + 1}`}
+                    >
+                      <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

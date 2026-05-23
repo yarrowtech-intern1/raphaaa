@@ -95,6 +95,25 @@ router.post("/register", async (req, res) => {
 // @route POST /api/user
 // @desc Authenticate user
 // @access Public
+router.post("/prelogin-role", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").toLowerCase().trim();
+    if (!email) return res.json({ requiresCaptcha: false });
+
+    const user = await User.findOne({ email }).select("role");
+    const staffRoles = new Set(["admin", "merchantise", "marketing", "delivery_boy"]);
+    const role = user?.role || "customer";
+
+    return res.json({
+      role,
+      requiresCaptcha: staffRoles.has(role),
+    });
+  } catch (error) {
+    console.error("prelogin-role error:", error);
+    return res.json({ requiresCaptcha: false });
+  }
+});
+
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 

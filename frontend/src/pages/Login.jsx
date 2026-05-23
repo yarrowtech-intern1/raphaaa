@@ -17,6 +17,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaQuestion, setCaptchaQuestion] = useState({});
+  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
   const canvasRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -72,6 +73,30 @@ const Login = () => {
   }, []);
 
   useEffect(() => {
+    const normalized = email.toLowerCase().trim();
+    if (!validateEmail(normalized)) {
+      setRequiresCaptcha(false);
+      setCaptchaAnswer("");
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL}/api/users/prelogin-role`,
+          { email: normalized }
+        );
+        setRequiresCaptcha(Boolean(data?.requiresCaptcha));
+      } catch (_) {
+        setRequiresCaptcha(false);
+        setCaptchaAnswer("");
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [email]);
+
+  useEffect(() => {
     const a = Math.floor(Math.random() * 10) + 1;
     const b = Math.floor(Math.random() * 10) + 1;
     setCaptchaQuestion({ a, b, answer: a + b });
@@ -80,26 +105,28 @@ const Login = () => {
   useEffect(() => {
     if (canvasRef.current && captchaQuestion.a !== undefined) {
       const ctx = canvasRef.current.getContext("2d");
-      canvasRef.current.width = 100;
-      canvasRef.current.height = 40;
+      canvasRef.current.width = 140;
+      canvasRef.current.height = 44;
 
-      ctx.fillStyle = "#f0f0f0";
-      ctx.fillRect(0, 0, 100, 40);
+      ctx.clearRect(0, 0, 140, 44);
+      ctx.fillStyle = "#f4f4f5";
+      ctx.fillRect(0, 0, 140, 44);
 
       // Add random lines for scratch effect
       for (let i = 0; i < 6; i++) {
-        ctx.strokeStyle = `rgba(0,0,0,${Math.random()})`;
+        ctx.strokeStyle = "rgba(17,24,39,0.35)";
         ctx.beginPath();
-        ctx.moveTo(Math.random() * 100, Math.random() * 40);
-        ctx.lineTo(Math.random() * 100, Math.random() * 40);
+        ctx.moveTo(Math.random() * 140, Math.random() * 44);
+        ctx.lineTo(Math.random() * 140, Math.random() * 44);
         ctx.stroke();
       }
 
-      ctx.font = "bold 16px Arial";
-      ctx.fillStyle = "#333";
-      ctx.fillText(`${captchaQuestion.a} + ${captchaQuestion.b} = ?`, 10, 25);
+      ctx.font = "700 30px monospace";
+      ctx.fillStyle = "#111827";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`${captchaQuestion.a}+${captchaQuestion.b}=?`, 8, 22);
     }
-  }, [captchaQuestion]);
+  }, [captchaQuestion, requiresCaptcha]);
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -113,7 +140,7 @@ const Login = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!email || !password || !captchaAnswer) {
+    if (!email || !password) {
       toast.error("Please fill in all fields");
       return;
     }
@@ -123,9 +150,16 @@ const Login = () => {
       return;
     }
 
-    if (parseInt(captchaAnswer) !== captchaQuestion.answer) {
-      toast.error("Captcha is incorrect");
-      return;
+    if (requiresCaptcha) {
+      if (!captchaAnswer) {
+        toast.error("Please solve captcha");
+        return;
+      }
+
+      if (parseInt(captchaAnswer) !== captchaQuestion.answer) {
+        toast.error("Captcha is incorrect");
+        return;
+      }
     }
 
     dispatch(loginUser({ email, password }));
@@ -181,29 +215,33 @@ const Login = () => {
           </div>
 
 
-          {/* ✅ Captcha Field with Canvas + Refresh Button */}
-          <div className="mb-6 flex gap-2">
-            <div className="flex items-center gap-3">
-              <canvas
-                ref={canvasRef}
-                className="rounded shadow-sm border border-gray-300"
+          {/* ✅ Captcha only for staff accounts */}
+          {requiresCaptcha && (
+            <div className="mb-6 flex flex-col sm:flex-row gap-3 items-stretch">
+              <div className="flex items-center gap-2 shrink-0">
+                <canvas
+                  ref={canvasRef}
+                  width={140}
+                  height={44}
+                  className="w-[150px] h-11 rounded shadow-sm border border-gray-300 bg-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={refreshCaptcha}
+                  className="h-10 w-10 flex items-center justify-center text-lg bg-blue-600 text-white rounded hover:bg-blue-800 transition"
+                >
+                  <FiRefreshCcw className="animate-spin-slow" />
+                </button>
+              </div>
+              <input
+                type="number"
+                value={captchaAnswer}
+                onChange={(e) => setCaptchaAnswer(e.target.value)}
+                className="flex-1 min-w-0 h-10 px-4 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+                placeholder="Answer"
               />
-              <button
-                type="button"
-                onClick={refreshCaptcha}
-                className="flex items-center gap-1 text-lg bg-blue-600 text-white px-3 p-4 py-1 rounded hover:bg-blue-800 transition"
-              >
-                <FiRefreshCcw className="animate-spin-slow" />
-              </button>
             </div>
-            <input
-              type="number"
-              value={captchaAnswer}
-              onChange={(e) => setCaptchaAnswer(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
-              placeholder="Answer"
-            />
-          </div>
+          )}
           <div className="mb-5 text-sm text-right">
             <Link
               to="/forgot-password"
