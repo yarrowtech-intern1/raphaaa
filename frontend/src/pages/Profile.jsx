@@ -880,7 +880,7 @@ export default function Profile() {
   return (
     <>
       {/* ══════════════════════════════════════════
-          MOBILE / TABLET  (< lg)
+          MOBILE / TABLET  (< lg)sd
       ══════════════════════════════════════════ */}
       <div className="lg:hidden min-h-screen bg-gradient-to-b from-sky-300 via-sky-100 to-sky-30 pb-20">
 
