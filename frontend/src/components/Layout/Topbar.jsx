@@ -37,7 +37,7 @@ const Topbar = () => {
   if (loading) {
     return (
       <div className="bg-gradient-to-r from-sky-100 via-sky-300 to-sky-50 text-zinc-800">
-        <div className="container mx-auto flex justify-between items-center py-3">
+        <div className="container mx-auto flex justify-between items-center py-3 px-4 sm:px-6 lg:px-8">
           <div className="hidden md:flex items-center space-x-4">
             <div className="h-5 w-5 bg-sky-200 rounded-full animate-pulse"></div>
             <div className="h-5 w-5 bg-sky-200 rounded-full animate-pulse"></div>
@@ -55,7 +55,7 @@ const Topbar = () => {
 
   return (
     <div className="bg-gradient-to-r from-sky-100 via-sky-300 to-sky-50 text-zinc-800">
-      <div className="container mx-auto flex justify-between items-center py-3 px-4 md:px-0">
+      <div className="container mx-auto flex justify-between items-center py-3 px-4 sm:px-6 lg:px-8">
         {/* Left: Social Icons */}
         <span className="font-semibold text-xs mr-3 hidden md:flex md:flex-wrap md:justify-center md:items-center md:gap-1">Follow Us:</span>
         <div className="hidden md:flex items-center space-x-4">
