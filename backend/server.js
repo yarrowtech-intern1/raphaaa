@@ -189,7 +189,7 @@ setInterval(() => {
     .get("https://raphaaa-backend.onrender.com/healthz" || "http://localhost:9000/healthz" || "https://raphaaa-backend-glnl.onrender.com/healthz")
     .then(() => console.log("[SELF-PING] Success. Server responding OK."))
     .catch((err) => console.error("[SELF-PING ERROR]:", err.message));
-}, 10 * 60 * 1000); // every 1 minute
+}, 30 * 1000); // every 1 minute
 
 // Sync shipped orders with Shiprocket tracking updates every 15 minutes
 setInterval(async () => {
