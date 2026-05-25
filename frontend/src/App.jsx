@@ -68,6 +68,7 @@ import AdminSizeCharts from "./pages/AdminSizeCharts";
 import AdminShippingSettings from "./pages/AdminShippingSettings";
 import AdminLegalSettings from "./pages/AdminLegalSettings";
 import ReferAndEarn from "./pages/ReferAndEarn";
+import AdminReturnsManagement from "./pages/AdminReturnsManagement";
 // import AdminAboutSettings from "./pages/AdminAboutSettings";
 
 const App = () => {
@@ -290,6 +291,14 @@ const App = () => {
               element={
                 <ProtectedRoute role={["admin", "merchantise", "delivery_boy"]}>
                   <OrderManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="returns"
+              element={
+                <ProtectedRoute role={["admin", "merchantise", "marketing"]}>
+                  <AdminReturnsManagement />
                 </ProtectedRoute>
               }
             />

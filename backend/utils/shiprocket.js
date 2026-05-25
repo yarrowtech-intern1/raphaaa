@@ -144,6 +144,77 @@ const createShiprocketOrder = async (order) => {
   };
 };
 
+const buildShiprocketReturnPayload = ({ order, returnRequest }) => {
+  const shipAddress = order.shippingAddress || {};
+  const pickupLocation = process.env.SHIPROCKET_PICKUP_LOCATION || "Home";
+  const fallbackState = process.env.SHIPROCKET_DEFAULT_STATE || "West Bengal";
+  const fallbackCountry = shipAddress.country || "India";
+  const phone = String(shipAddress.phone || "").replace(/[^\d]/g, "").slice(-10);
+  const email = order?.user?.email || "customer@example.com";
+  const { first: fallbackFirst, last: fallbackLast } = parseCustomerName(order?.user?.name || "");
+  const billingFirst = String(shipAddress.firstName || "").trim() || fallbackFirst;
+  const billingLast = String(shipAddress.lastName || "").trim() || fallbackLast;
+  const fullAddress = [shipAddress.address, shipAddress.landmark].filter(Boolean).join(", ") || "Address not provided";
+  const returnItems = Array.isArray(returnRequest?.items) ? returnRequest.items : [];
+
+  return {
+    order_id: `${order.orderId || String(order._id)}-RET-${String(returnRequest?._id || "").slice(-6)}`,
+    order_date: new Date().toISOString().slice(0, 19).replace("T", " "),
+    pickup_location: pickupLocation,
+    channel_id: "",
+    comment: `Reverse pickup for return request ${String(returnRequest?._id || "")}`,
+    billing_customer_name: billingFirst,
+    billing_last_name: billingLast,
+    billing_address: fullAddress,
+    billing_city: shipAddress.city || "Unknown",
+    billing_pincode: String(shipAddress.postalCode || "000000"),
+    billing_state: shipAddress.state || fallbackState,
+    billing_country: fallbackCountry,
+    billing_email: email,
+    billing_phone: phone || "9999999999",
+    shipping_is_billing: true,
+    order_items: returnItems.map((item) => ({
+      name: item.name || "Item",
+      sku: item.sku || `SKU-${String(item.productId || "NA")}`,
+      units: Number(item.quantity) || 1,
+      selling_price: Number(item.price || 0),
+      discount: "",
+      tax: "",
+      hsn: "",
+    })),
+    payment_method: "Prepaid",
+    shipping_charges: 0,
+    giftwrap_charges: 0,
+    transaction_charges: 0,
+    total_discount: 0,
+    sub_total: Number(order.totalPrice) || 0,
+    length: Number(process.env.SHIPROCKET_PACKAGE_LENGTH || 10),
+    breadth: Number(process.env.SHIPROCKET_PACKAGE_BREADTH || 10),
+    height: Number(process.env.SHIPROCKET_PACKAGE_HEIGHT || 10),
+    weight: Number(process.env.SHIPROCKET_PACKAGE_WEIGHT || 0.5),
+  };
+};
+
+const createShiprocketReturnOrder = async ({ order, returnRequest }) => {
+  if (!order || !returnRequest) throw new Error("Order and returnRequest are required");
+  const client = await shiprocketClient();
+  const payload = buildShiprocketReturnPayload({ order, returnRequest });
+  const { data } = await client.post("/orders/create/return", payload);
+
+  if (data?.status_code >= 400 || data?.status === false) {
+    throw new Error(data?.message || "Shiprocket return order creation failed");
+  }
+
+  const parsed = data?.data || data;
+  return {
+    returnOrderId: parsed?.order_id || null,
+    shipmentId: parsed?.shipment_id || null,
+    awbCode: parsed?.awb_code || null,
+    courierName: parsed?.courier_name || null,
+    rawResponse: data,
+  };
+};
+
 const getTrackingByAwb = async (awbCode) => {
   if (!awbCode) throw new Error("AWB code required");
   const client = await shiprocketClient();
@@ -296,6 +367,9 @@ const checkDeliveryServiceability = async ({
 
 module.exports = {
   createShiprocketOrder,
+  createShiprocketReturnOrder,
+  getTrackingByAwb,
+  mapTrackingToLocalStatus,
   syncOrderTrackingStatus,
   syncShiprocketStatusesForOpenOrders,
   checkDeliveryServiceability,

@@ -174,6 +174,7 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
       variants,
       colorVariants,
       sizeChart,
+      returnPolicy,
     } = req.body;
 
     const cleanStr = (v) => {
@@ -235,6 +236,11 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
       sku: finalSku,
       offerPercentage: Number(offerPercentage || 0),
       sizeChart,
+      returnPolicy: {
+        eligible: returnPolicy?.eligible !== false,
+        days: Number.isFinite(Number(returnPolicy?.days)) ? Math.max(0, Number(returnPolicy.days)) : 7,
+        text: String(returnPolicy?.text || "").trim(),
+      },
       user: req.user._id,
     });
 
@@ -763,6 +769,7 @@ router.put("/:id", protect, admin, async (req, res) => {
       variants,
       colorVariants,
       sizeChart,
+      returnPolicy,
     } = req.body;
 
     const product = await Product.findById(req.params.id);
@@ -818,6 +825,13 @@ router.put("/:id", protect, admin, async (req, res) => {
       product.sku = finalSku;
       product.offerPercentage = offerPercentage ?? 0;
       product.sizeChart = sizeChart ?? product.sizeChart;
+      if (returnPolicy !== undefined) {
+        product.returnPolicy = {
+          eligible: returnPolicy?.eligible !== false,
+          days: Number.isFinite(Number(returnPolicy?.days)) ? Math.max(0, Number(returnPolicy.days)) : (product.returnPolicy?.days ?? 7),
+          text: String(returnPolicy?.text || "").trim(),
+        };
+      }
 
       const updatedProduct = await product.save();
       res.json(updatedProduct);

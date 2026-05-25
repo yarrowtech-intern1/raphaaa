@@ -260,6 +260,9 @@ const AdminSidebar = () => {
           <>
             <SectionLabel>Orders</SectionLabel>
             <NavItem to="/admin/orders" icon={FaClipboardList} label="Orders" />
+            {(isAdmin || isMerchandise || isMarketing) && (
+              <NavItem to="/admin/returns" icon={FaTruck} label="Returns" />
+            )}
           </>
         )}
 

@@ -13,6 +13,16 @@ const MyOrders = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "createdAt", direction: "desc" });
   const [reviewedProducts, setReviewedProducts] = useState(new Set());
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [returnForm, setReturnForm] = useState({
+    orderId: "",
+    requestType: "return",
+    reason: "",
+    damageType: "",
+    damageDescription: "",
+    evidenceFiles: [],
+  });
 
   const itemsPerPage = 5;
   const dispatch = useDispatch();
@@ -84,16 +94,52 @@ const MyOrders = () => {
 
   const handleReturnReplace = async (e, order, requestType) => {
     e.stopPropagation();
-    const reason = window.prompt(`Enter ${requestType === "replace" ? "replacement" : "return"} reason`);
-    if (!reason || !reason.trim()) return;
+    setReturnForm({
+      orderId: order._id,
+      requestType,
+      reason: "",
+      damageType: "",
+      damageDescription: "",
+      evidenceFiles: [],
+    });
+    setReturnModalOpen(true);
+  };
+
+  const submitReturnRequest = async () => {
+    if (!returnForm.reason.trim()) {
+      toast.error("Please enter return reason");
+      return;
+    }
+    const order = orders.find((o) => String(o._id) === String(returnForm.orderId));
+    if (!order) {
+      toast.error("Order not found");
+      return;
+    }
     const productIds = (order.orderItems || [])
       .map((it) => String(it.productId?._id || it.productId || ""))
       .filter(Boolean);
+    setReturnSubmitting(true);
     const res = await dispatch(createReturnRequest({
-      orderId: order._id, requestType, reason: reason.trim(), itemProductIds: productIds,
+      orderId: order._id,
+      requestType: returnForm.requestType,
+      reason: returnForm.reason.trim(),
+      damageType: returnForm.damageType,
+      damageDescription: returnForm.damageDescription.trim(),
+      evidenceFiles: returnForm.evidenceFiles,
+      itemProductIds: productIds,
     }));
+    setReturnSubmitting(false);
     if (res.meta.requestStatus === "fulfilled") {
-      toast.success(`${requestType === "replace" ? "Replacement" : "Return"} request submitted`);
+      toast.success(`${returnForm.requestType === "replace" ? "Replacement" : "Return"} request submitted`);
+      setReturnModalOpen(false);
+      setReturnForm({
+        orderId: "",
+        requestType: "return",
+        reason: "",
+        damageType: "",
+        damageDescription: "",
+        evidenceFiles: [],
+      });
     } else {
       toast.error(res.payload?.message || "Failed to submit request");
     }
@@ -118,6 +164,7 @@ const MyOrders = () => {
   const cancelledCount = orders.filter((o) => o.status === "Cancelled").length;
 
   return (
+    <>
     <div className="space-y-5">
 
       {/* ── Header ── */}
@@ -390,6 +437,76 @@ const MyOrders = () => {
         </div>
       )}
     </div>
+    {returnModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/35">
+        <div className="w-full max-w-lg rounded-2xl border border-amber-100 bg-white shadow-xl overflow-hidden">
+          <div className="px-5 py-4 bg-gradient-to-r from-amber-50 to-yellow-100 border-b border-amber-100">
+            <h3 className="text-sm font-bold text-amber-800">
+              {returnForm.requestType === "replace" ? "Replacement Request" : "Return Request"}
+            </h3>
+            <p className="text-xs text-amber-700 mt-1">Share reason and damage details for pickup processing.</p>
+          </div>
+          <div className="p-5 space-y-3">
+            <textarea
+              value={returnForm.reason}
+              onChange={(e) => setReturnForm((p) => ({ ...p, reason: e.target.value }))}
+              rows={3}
+              placeholder="Why are you requesting return/replacement?"
+              className="w-full rounded-xl border border-amber-200 bg-amber-50/30 px-3 py-2 text-sm"
+            />
+            <select
+              value={returnForm.damageType}
+              onChange={(e) => setReturnForm((p) => ({ ...p, damageType: e.target.value }))}
+              className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Select damage type (optional)</option>
+              <option value="damaged">Damaged</option>
+              <option value="defective">Defective</option>
+              <option value="wrong_item">Wrong item</option>
+              <option value="size_issue">Size issue</option>
+              <option value="quality_issue">Quality issue</option>
+              <option value="other">Other</option>
+            </select>
+            <textarea
+              value={returnForm.damageDescription}
+              onChange={(e) => setReturnForm((p) => ({ ...p, damageDescription: e.target.value }))}
+              rows={2}
+              placeholder="Damage description (optional)"
+              className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm"
+            />
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => setReturnForm((p) => ({ ...p, evidenceFiles: Array.from(e.target.files || []).slice(0, 5) }))}
+              className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm"
+            />
+            {!!returnForm.evidenceFiles?.length && (
+              <p className="text-xs text-gray-500">{returnForm.evidenceFiles.length} file(s) selected</p>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                onClick={() => {
+                  if (returnSubmitting) return;
+                  setReturnModalOpen(false);
+                }}
+                className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-600"
+              >
+                Close
+              </button>
+              <button
+                onClick={submitReturnRequest}
+                disabled={returnSubmitting}
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white text-sm font-semibold disabled:opacity-60"
+              >
+                {returnSubmitting ? "Submitting..." : "Submit Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

@@ -48,6 +48,7 @@ const complaintRoutes = require("./routes/complaintRoutes");
 const sizeChartRoutes = require("./routes/sizeChartRoutes");
 const returnRequestRoutes = require("./routes/returnRequestRoutes");
 const { syncShiprocketStatusesForOpenOrders } = require("./utils/shiprocket");
+const { syncShiprocketStatusesForOpenReturns } = require("./routes/returnRequestRoutes");
 const { expireDueCredits } = require("./services/walletService");
 const { scanAndTriggerAlerts } = require("./services/alertService");
 const { startJobWorker } = require("./workers/jobWorker");
@@ -183,13 +184,13 @@ startJobWorker({
   concurrency: Number(process.env.JOB_WORKER_CONCURRENCY || 1),
 });
 
-// Self-ping every 1 minute to prevent sleeping (Render free tier)
+// Self-ping every 30 seconds to prevent sleeping (Render free tier)
 setInterval(() => {
   axios
     .get("https://raphaaa-backend.onrender.com/healthz" || "http://localhost:9000/healthz" || "https://raphaaa-backend-glnl.onrender.com/healthz")
     .then(() => console.log("[SELF-PING] Success. Server responding OK."))
     .catch((err) => console.error("[SELF-PING ERROR]:", err.message));
-}, 30 * 1000); // every 1 minute
+}, 30 * 1000); // every 30 seconds
 
 // Sync shipped orders with Shiprocket tracking updates every 15 minutes
 setInterval(async () => {
@@ -199,6 +200,15 @@ setInterval(async () => {
     console.error("[SHIPROCKET SYNC ERROR]:", error.message);
   }
 }, 15 * 60 * 1000);
+
+// Sync return reverse-pickup statuses from Shiprocket every 10 minutes
+setInterval(async () => {
+  try {
+    await syncShiprocketStatusesForOpenReturns(100);
+  } catch (error) {
+    console.error("[SHIPROCKET RETURN SYNC ERROR]:", error.message);
+  }
+}, 10 * 60 * 1000);
 
 // Wallet expiry + alert scanning (Phase 4)
 cron.schedule("10 * * * *", async () => {
