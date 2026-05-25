@@ -16,6 +16,7 @@ const OrderDetailsPage = () => {
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [showAllUpdates, setShowAllUpdates] = useState(false);
   const [returnForm, setReturnForm] = useState({
     requestType: "return",
     reason: "",
@@ -291,6 +292,150 @@ const OrderDetailsPage = () => {
   const { pill, dot } = statusConfig(orderDetails.status);
   const canCancel = !!orderDetails?.cancellationEligibility?.canCancel;
   const showReturnReplace = orderDetails.status === "Delivered";
+  const deliveredDate = orderDetails?.deliveredAt ? new Date(orderDetails.deliveredAt) : null;
+  const cancelledDate = orderDetails?.cancellation?.cancelledAt ? new Date(orderDetails.cancellation.cancelledAt) : null;
+  const statusDate = orderDetails.status === "Cancelled"
+    ? (cancelledDate || (orderDetails?.updatedAt ? new Date(orderDetails.updatedAt) : null))
+    : (deliveredDate || (orderDetails?.updatedAt ? new Date(orderDetails.updatedAt) : null));
+  const returnPolicyEndDate = deliveredDate
+    ? new Date(deliveredDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+    : null;
+  const statusDateLabel = statusDate
+    ? statusDate.toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+    : null;
+  const formatTimelineHeaderDate = (value) =>
+    value
+      ? new Date(value).toLocaleDateString("en-IN", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          year: "2-digit",
+        })
+      : "";
+  const formatTimelineDetailDate = (value) =>
+    value
+      ? new Date(value).toLocaleDateString("en-IN", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          year: "2-digit",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
+  const stageOrder = [
+    "Order Confirmed",
+    "Shipped",
+    "In Transit",
+    "Out For Delivery",
+    "Delivered",
+    "Cancelled",
+    "RTO",
+    "Live Update",
+  ];
+  const normalizeStage = (text = "") => {
+    const t = String(text).toLowerCase();
+    if (t.includes("cancel")) return "Cancelled";
+    if (t.includes("rto")) return "RTO";
+    if (t.includes("deliver")) return "Delivered";
+    if (t.includes("out for delivery")) return "Out For Delivery";
+    if (t.includes("transit")) return "In Transit";
+    if (t.includes("ship")) return "Shipped";
+    if (t.includes("pickup")) return "Order Confirmed";
+    if (t.includes("process") || t.includes("confirm") || t.includes("pack")) return "Order Confirmed";
+    return "";
+  };
+
+  const rawTrackingActivities = Array.isArray(orderDetails?.shiprocket?.rawTracking?.shipment_track_activities)
+    ? orderDetails.shiprocket.rawTracking.shipment_track_activities
+    : [];
+  const liveTrackingEvents = rawTrackingActivities
+    .map((item) => {
+      const message = item?.activity || item?.sr_status || item?.status || item?.current_status || "";
+      const eventAt = item?.date || item?.created_at || item?.datetime || item?.updated_at || null;
+      const stage = normalizeStage(message || item?.status || item?.current_status) || "Live Update";
+      return { stage, message, eventAt };
+    })
+    .filter((x) => x.message)
+    .sort((a, b) => new Date(a.eventAt || 0).getTime() - new Date(b.eventAt || 0).getTime());
+
+  const fallbackEvents = [
+    {
+      stage: "Order Confirmed",
+      message: "Your order has been placed.",
+      eventAt: orderDetails?.createdAt || null,
+    },
+    {
+      stage: "Shipped",
+      message: "Your item has been shipped.",
+      eventAt: orderDetails?.shiprocket?.trackingUpdatedAt || null,
+    },
+    {
+      stage: "Out For Delivery",
+      message: "Your item is out for delivery.",
+      eventAt: null,
+    },
+    {
+      stage: "Delivered",
+      message: "Your item has been delivered.",
+      eventAt: orderDetails?.deliveredAt || null,
+    },
+    {
+      stage: "Cancelled",
+      message: orderDetails?.cancellation?.reason
+        ? `Order cancelled: ${orderDetails.cancellation.reason}`
+        : "Your order has been cancelled.",
+      eventAt: orderDetails?.cancellation?.cancelledAt || null,
+    },
+  ].filter((row) => {
+    if (row.stage === "Delivered") return orderDetails.status === "Delivered";
+    if (row.stage === "Cancelled") return orderDetails.status === "Cancelled";
+    if (row.stage === "Out For Delivery") return ["Out For Delivery", "Delivered"].includes(orderDetails.status);
+    if (row.stage === "Shipped") return ["Shipped", "In Transit", "Out For Delivery", "Delivered", "Cancelled"].includes(orderDetails.status);
+    return true;
+  });
+  const combinedEvents = [...fallbackEvents, ...liveTrackingEvents]
+    .filter((event) => event.message)
+    .sort((a, b) => new Date(a.eventAt || 0).getTime() - new Date(b.eventAt || 0).getTime());
+  const timelineMap = new Map();
+  combinedEvents.forEach((event) => {
+    const key = event.stage || "Live Update";
+    if (!timelineMap.has(key)) timelineMap.set(key, { stage: key, eventAt: event.eventAt, updates: [] });
+    const bucket = timelineMap.get(key);
+    bucket.updates.push(event);
+    if (!bucket.eventAt || (event.eventAt && new Date(event.eventAt).getTime() < new Date(bucket.eventAt).getTime())) {
+      bucket.eventAt = event.eventAt;
+    }
+  });
+  const currentStage = normalizeStage(orderDetails?.status || "") || orderDetails?.status || "Live Update";
+  if (!timelineMap.has(currentStage)) {
+    timelineMap.set(currentStage, {
+      stage: currentStage,
+      eventAt: orderDetails?.updatedAt || orderDetails?.createdAt || null,
+      updates: [
+        {
+          stage: currentStage,
+          message: `Current status: ${orderDetails?.status || "Processing"}`,
+          eventAt: orderDetails?.updatedAt || orderDetails?.createdAt || null,
+        },
+      ],
+    });
+  }
+  const timelineUpdates = Array.from(timelineMap.values())
+    .map((group) => ({
+      ...group,
+      updates: [...(group.updates || [])].sort(
+        (a, b) => new Date(a.eventAt || 0).getTime() - new Date(b.eventAt || 0).getTime()
+      ),
+    }))
+    .sort((a, b) => {
+      const ai = stageOrder.indexOf(a.stage);
+      const bi = stageOrder.indexOf(b.stage);
+      const aRank = ai === -1 ? 999 : ai;
+      const bRank = bi === -1 ? 999 : bi;
+      if (aRank !== bRank) return aRank - bRank;
+      return new Date(a.eventAt || 0).getTime() - new Date(b.eventAt || 0).getTime();
+    });
 
   const handleCancelOrder = async () => {
     if (!canCancel) return;
@@ -400,6 +545,32 @@ const OrderDetailsPage = () => {
               </div>
             </div>
           </div>
+          <div className="px-5 py-4 border-b border-gray-100 bg-white">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className={`text-lg font-extrabold ${orderDetails.status === "Delivered" ? "text-emerald-600" : "text-sky-700"}`}>
+                  {orderDetails.status || "Processing"}{statusDateLabel ? `, ${statusDateLabel}` : ""}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  {returnPolicyEndDate
+                    ? `Return policy ended on ${returnPolicyEndDate.toLocaleDateString("en-IN", { month: "short", day: "numeric" })}`
+                    : "Check tracking updates for latest delivery timeline"}
+                </p>
+              </div>
+              <div className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-2xl ${
+                orderDetails.status === "Delivered" ? "bg-emerald-600 text-white" : "bg-sky-100 text-sky-700"
+              }`}>
+                {orderDetails.status === "Delivered" ? "✓" : "•"}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAllUpdates(true)}
+            className="w-full px-5 py-3 text-center text-base font-semibold text-blue-600 hover:text-blue-700 border-b border-gray-100"
+          >
+            See all updates
+          </button>
 
           {/* Shiprocket tracking */}
           {orderDetails.shiprocket?.trackingStatus && (
@@ -727,6 +898,52 @@ const OrderDetailsPage = () => {
                 >
                   {returnSubmitting ? "Submitting..." : "Submit Request"}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showAllUpdates && (
+        <div className="fixed inset-x-0 top-0 bottom-20 lg:bottom-0 z-40 bg-[#f4f4f4] overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-5 py-6">
+            <button
+              type="button"
+              onClick={() => setShowAllUpdates(false)}
+              className="text-4xl leading-none text-gray-700 hover:text-black"
+              aria-label="Back to order details"
+            >
+              ←
+            </button>
+            <div className="mt-8 relative">
+              <div className="absolute left-4 top-4 bottom-4 w-1 bg-green-500 rounded-full" />
+              <div className="space-y-10">
+                {timelineUpdates.map((event, idx) => {
+                  return (
+                    <div key={`${event.stage}-${idx}`} className="relative pl-14">
+                      <span className="absolute left-[5px] top-1 w-5 h-5 rounded-full bg-green-500 border-2 border-green-500" />
+                      <div>
+                        <p className="text-[20px] font-medium text-gray-900 leading-tight">
+                          {event.stage}
+                          {event.eventAt ? (
+                            <span className="text-gray-500 font-normal ml-2">{formatTimelineHeaderDate(event.eventAt)}</span>
+                          ) : null}
+                        </p>
+                        <div className="mt-3 space-y-3">
+                          {(event.updates || []).map((update, uIdx) => (
+                            <div key={`${event.stage}-u-${uIdx}`}>
+                              <p className="text-[15px] text-gray-800 leading-snug">{update.message}</p>
+                              {update.eventAt ? (
+                                <p className="text-[13px] text-gray-500 mt-1">
+                                  {formatTimelineDetailDate(update.eventAt)}
+                                </p>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
