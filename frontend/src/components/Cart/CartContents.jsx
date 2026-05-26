@@ -3,6 +3,7 @@ import { useDispatch } from "react-redux";
 import { removeFromCart, updateCartItemQuantity, addToCart } from "../../redux/slices/cartSlice";
 import { HiTrash } from "react-icons/hi2";
 import { MdBookmarkBorder, MdBookmark } from "react-icons/md";
+import axios from "axios";
 
 const SFL_KEY = "saveForLater";
 
@@ -16,10 +17,32 @@ const formatColor = (value) => {
   if (!c) return "";
   return HEX_COLOR_RE.test(c) ? "Selected Color" : c;
 };
+const itemKey = (p) =>
+  `${String(p?.productId || "")}__${String(p?.size || "")}__${String(p?.color || "")}__${String(p?.sku || "")}`;
+
+const resolveAvailableStock = (product, cartItem) => {
+  const size = String(cartItem?.size || "").trim();
+  const color = String(cartItem?.color || "").trim();
+  const sku = String(cartItem?.sku || "").trim();
+
+  if (Array.isArray(product?.colorVariants) && color && size) {
+    const cv = product.colorVariants.find((v) => String(v?.color || "").trim() === color);
+    const sizeEntry = cv?.sizes?.find((s) => String(s?.size || "").trim() === size);
+    if (sizeEntry) return Number(sizeEntry?.countInStock || 0);
+  }
+
+  if (Array.isArray(product?.variants) && sku) {
+    const bySku = product.variants.find((v) => String(v?.sku || "").trim() === sku);
+    if (bySku) return Number(bySku?.countInStock || 0);
+  }
+
+  return Number(product?.countInStock || 0);
+};
 
 const CartContents = ({ cart, userId, guestId, onContinueShopping }) => {
   const dispatch = useDispatch();
   const [savedItems, setSavedItems] = useState(loadSaved);
+  const [stockByItem, setStockByItem] = useState({});
 
   const products = cart?.products || [];
 
@@ -36,6 +59,36 @@ const CartContents = ({ cart, userId, guestId, onContinueShopping }) => {
   );
 
   const totalSavings = originalAmount - totalAmount;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStock = async () => {
+      if (!products.length) {
+        if (!cancelled) setStockByItem({});
+        return;
+      }
+
+      try {
+        const rows = await Promise.all(
+          products.map(async (p) => {
+            const pid = String(p?.productId || "").trim();
+            if (!pid) return [itemKey(p), Number(p?.quantity || 0)];
+            const { data } = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/products/${pid}`);
+            return [itemKey(p), resolveAvailableStock(data, p)];
+          })
+        );
+        if (!cancelled) setStockByItem(Object.fromEntries(rows));
+      } catch (_) {
+        if (!cancelled) setStockByItem({});
+      }
+    };
+
+    loadStock();
+    return () => {
+      cancelled = true;
+    };
+  }, [products]);
 
   const handleQty = (productId, delta, quantity, size, color) => {
     const next = quantity + delta;
@@ -101,6 +154,9 @@ const CartContents = ({ cart, userId, guestId, onContinueShopping }) => {
       {products.map((product, index) => {
         const hasDiscount = product.discountPrice && product.discountPrice < product.price;
         const lineTotal   = (product.discountPrice ?? product.price) * product.quantity;
+        const key = itemKey(product);
+        const maxStock = Number(stockByItem[key] ?? 0);
+        const stockLimitReached = maxStock > 0 && product.quantity >= maxStock;
 
         return (
           <div
@@ -160,18 +216,23 @@ const CartContents = ({ cart, userId, guestId, onContinueShopping }) => {
                   </span>
                   <button
                     onClick={() => {
-                      if (totalQty < 10)
+                      if (totalQty < 10 && !stockLimitReached)
                         handleQty(product.productId, 1, product.quantity, product.size, product.color);
                     }}
-                    disabled={totalQty >= 10}
+                    disabled={totalQty >= 10 || stockLimitReached}
                     className={`w-7 h-7 flex items-center justify-center transition text-base border-l border-gray-200 font-medium
-                      ${totalQty >= 10 ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
+                      ${totalQty >= 10 || stockLimitReached ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
                   >
                     +
                   </button>
                 </div>
                 {totalQty >= 10 && (
                   <p className="text-[10px] text-red-500 font-medium">Max 10 items</p>
+                )}
+                {totalQty < 10 && maxStock > 0 && (
+                  <p className="text-[10px] text-amber-600 font-medium">
+                    Only {maxStock} left
+                  </p>
                 )}
               </div>
             </div>

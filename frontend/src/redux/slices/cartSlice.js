@@ -245,7 +245,10 @@ export const fetchCart = createAsyncThunk(
       return response.data;
     } catch (error) {
       console.error("Error fetching cart:", error);
-      return rejectWithValue(error.response.data);
+      return rejectWithValue({
+        status: error?.response?.status,
+        message: error?.response?.data?.message || "Failed to fetch cart",
+      });
     }
   }
 );
@@ -413,7 +416,17 @@ const cartSlice = createSlice({
         })
         .addCase(fetchCart.rejected, (state, action) => {
             state.loading = false;
-            state.error = action.error.message || "Failed to fetch cart";
+            const status = action.payload?.status;
+            const message = action.payload?.message;
+
+            if (status === 404 || message === "cart not found") {
+              state.cart = { products: [], totalPrice: 0 };
+              saveCartToStorage(state.cart);
+              state.error = null;
+              return;
+            }
+
+            state.error = message || action.error.message || "Failed to fetch cart";
         })
         .addCase(addToCart.pending, (state) => {
             state.loading = true;
