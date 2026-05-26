@@ -839,59 +839,72 @@ router.post("/verify-payment", protect, async (req, res) => {
 
       console.log("Payment verification completed successfully for order:", order._id);
 
+      // Prepare populated order once for post-payment side effects
+      let populatedOrder = null;
+      try {
+        populatedOrder = await Order.findById(order._id)
+          .populate("user", "name email")
+          .populate("orderItems.productId", "sku")
+          .lean();
+      } catch (populateErr) {
+        console.error("Failed to populate order after payment:", populateErr.message);
+      }
+
       // === Email the invoice to the user (online payment) ===
-     try {
-       // load user fields to address the email properly
-       const populatedOrder = await Order.findById(order._id)
+      try {
+        // load user fields to address the email properly
+        if (!populatedOrder) {
+          populatedOrder = await Order.findById(order._id)
          .populate("user", "name email")
          .populate("orderItems.productId", "sku")
          .lean();
-       if (populatedOrder?.user?.email) {
-         populatedOrder.paymentResult = {
-           ...(populatedOrder.paymentResult || {}),
-           id:
-             populatedOrder?.paymentResult?.id ||
-             payment?.razorpayPaymentId ||
-             razorpayPaymentId,
-           status:
-             populatedOrder?.paymentResult?.status ||
-             payment?.status ||
-             "captured",
-           update_time:
-             populatedOrder?.paymentResult?.update_time ||
-             payment?.capturedAt ||
-             new Date(),
-           email_address:
-             populatedOrder?.paymentResult?.email_address ||
-             populatedOrder?.user?.email,
-         };
+        }
+        if (populatedOrder?.user?.email) {
+          populatedOrder.paymentResult = {
+            ...(populatedOrder.paymentResult || {}),
+            id:
+              populatedOrder?.paymentResult?.id ||
+              payment?.razorpayPaymentId ||
+              razorpayPaymentId,
+            status:
+              populatedOrder?.paymentResult?.status ||
+              payment?.status ||
+              "captured",
+            update_time:
+              populatedOrder?.paymentResult?.update_time ||
+              payment?.capturedAt ||
+              new Date(),
+            email_address:
+              populatedOrder?.paymentResult?.email_address ||
+              populatedOrder?.user?.email,
+          };
 
-         if (!populatedOrder.paymentResult?.id) {
-           const paid = await Payment.findOne({ orderId: populatedOrder._id }).lean();
-           if (paid?.razorpayPaymentId) {
-             populatedOrder.paymentResult = {
-               id: paid.razorpayPaymentId,
-               status: paid.status,
-               update_time: paid.capturedAt || paid.updatedAt,
-               email_address: populatedOrder.user?.email,
-             };
-           }
-         }
-         // Build PDF buffer (same builder used elsewhere)
-         const invoiceBuffer = await buildInvoicePDF(populatedOrder);
-         const orderDate = new Date(populatedOrder.createdAt)
-           .toLocaleDateString("en-GB");
-         const lines = (populatedOrder.orderItems || [])
-           .map((it) => `
-             <p><strong>Product:</strong> ${it.name}</p>
-             <p><strong>Color:</strong> ${it.color || "-"}</p>
-             <p><strong>Size:</strong> ${it.size || "-"}</p>
-             <p><strong>Quantity:</strong> ${it.quantity}</p>
-             <hr/>`)
-           .join("");
-         await sendMail({
-           to: populatedOrder.user.email,
-           subject: "🧾 Payment Successful — Your Raphaaa Invoice",
+          if (!populatedOrder.paymentResult?.id) {
+            const paid = await Payment.findOne({ orderId: populatedOrder._id }).lean();
+            if (paid?.razorpayPaymentId) {
+              populatedOrder.paymentResult = {
+                id: paid.razorpayPaymentId,
+                status: paid.status,
+                update_time: paid.capturedAt || paid.updatedAt,
+                email_address: populatedOrder.user?.email,
+              };
+            }
+          }
+          // Build PDF buffer (same builder used elsewhere)
+          const invoiceBuffer = await buildInvoicePDF(populatedOrder);
+          const orderDate = new Date(populatedOrder.createdAt)
+            .toLocaleDateString("en-GB");
+          const lines = (populatedOrder.orderItems || [])
+            .map((it) => `
+              <p><strong>Product:</strong> ${it.name}</p>
+              <p><strong>Color:</strong> ${it.color || "-"}</p>
+              <p><strong>Size:</strong> ${it.size || "-"}</p>
+              <p><strong>Quantity:</strong> ${it.quantity}</p>
+              <hr/>`)
+            .join("");
+          await sendMail({
+            to: populatedOrder.user.email,
+            subject: "🧾 Payment Successful — Your Raphaaa Invoice",
             message: `
               <p>Hi ${populatedOrder.user.name || "Customer"},</p>
               <p>We received your online payment on <strong>${orderDate}</strong>. Thanks for shopping with Raphaaa!</p>
@@ -911,13 +924,13 @@ router.post("/verify-payment", protect, async (req, res) => {
       }
 
       // Referrer reward on first purchase
-      if (populatedOrder.user?._id) {
+      if (populatedOrder?.user?._id) {
         await creditReferrerOnFirstOrder(populatedOrder.user._id, populatedOrder.totalPrice);
       }
 
       // WhatsApp payment confirmation
       try {
-        const phone = populatedOrder.shippingAddress?.phone;
+        const phone = populatedOrder?.shippingAddress?.phone;
         if (phone) {
           const waMsg =
             `✅ *Payment Confirmed — Raphaaa*\n\n` +
