@@ -10,12 +10,14 @@ import MobileFooterNav from './MobileFooterNav'
 const UserLayout = () => {
   const location = useLocation()
   const isOrderDetailsPage = /^\/order\/[^/]+$/.test(location.pathname)
-  const hideMobileFooterMenu = location.pathname === "/checkout"
+  const isCheckoutPage = location.pathname === "/checkout"
+  const hideMobileFooterMenu = isCheckoutPage
   const hideFooterOnMobileRoutes = [
     "/profile",
     "/login",
     "/register",
     "/forgot-password",
+    "/checkout",
   ]
   const hideFooterOnMobile = hideFooterOnMobileRoutes.includes(location.pathname) || isOrderDetailsPage
   const isHomePage = location.pathname === "/"
@@ -23,7 +25,9 @@ const UserLayout = () => {
 
   return (
     <>
-      <Header hideTopbarOnMobile={hideTopbarOnMobile} />
+      <div className={isCheckoutPage ? "hidden lg:block" : ""}>
+        <Header hideTopbarOnMobile={hideTopbarOnMobile} />
+      </div>
       <main className="pb-20 lg:pb-0">
         <Outlet/>
       </main>
