@@ -58,31 +58,61 @@ const CheckoutProgress = ({ currentStep = 2 }) => {
     { id: 2, label: "Order Summary" },
     { id: 3, label: "Payment" },
   ];
+  const N = 14;
+
   return (
-    <div className="flex items-center justify-center gap-0 mb-6">
-      {steps.map((s, i) => {
-        const active = s.id === currentStep;
-        const done   = s.id < currentStep;
-        return (
-          <React.Fragment key={s.id}>
-            <div className="flex flex-col items-center">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                ${done   ? "bg-emerald-500 text-white"
-                : active ? "bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-200"
-                : "bg-gray-100 text-gray-400"}`}
+    <div className="flex justify-center mb-6">
+      <div className="flex h-10" style={{ filter: "drop-shadow(0 2px 8px rgba(14,165,233,0.22))" }}>
+        {steps.map((s, i) => {
+          const done = s.id < currentStep;
+          const active = s.id === currentStep;
+          const isFirst = i === 0;
+          const isLast = i === steps.length - 1;
+
+          const bg = done
+            ? "linear-gradient(to right, #0ea5e9, #2563eb)"
+            : active
+            ? "linear-gradient(to right, #7dd3fc, #38bdf8)"
+            : "#f1f5f9";
+
+          const clip = isFirst
+            ? `polygon(0 0, calc(100% - ${N}px) 0, 100% 50%, calc(100% - ${N}px) 100%, 0 100%)`
+            : isLast
+            ? `polygon(${N}px 0, 100% 0, 100% 100%, ${N}px 100%, 0 50%)`
+            : `polygon(${N}px 0, calc(100% - ${N}px) 0, 100% 50%, calc(100% - ${N}px) 100%, ${N}px 100%, 0 50%)`;
+
+          return (
+            <div
+              key={s.id}
+              className="relative flex items-center gap-2 h-full select-none"
+              style={{
+                background: bg,
+                clipPath: clip,
+                marginLeft: isFirst ? 0 : `${-(N - 1)}px`,
+                zIndex: steps.length - i,
+                paddingLeft: isFirst ? "20px" : `${N + 12}px`,
+                paddingRight: isLast ? "20px" : `${N + 12}px`,
+              }}
+            >
+              <span
+                className="flex items-center justify-center text-[11px] font-bold w-5 h-5 rounded-full shrink-0"
+                style={{
+                  background: done || active ? "rgba(255,255,255,0.28)" : "#e2e8f0",
+                  color: done || active ? "#fff" : "#94a3b8",
+                }}
               >
                 {done ? "✓" : s.id}
-              </div>
-              <span className={`mt-1.5 text-[10px] font-bold uppercase tracking-wider text-center leading-tight max-w-[60px] ${done || active ? "text-gray-700" : "text-gray-400"}`}>
+              </span>
+              <span
+                className="text-xs font-semibold whitespace-nowrap"
+                style={{ color: done || active ? "#fff" : "#94a3b8" }}
+              >
                 {s.label}
               </span>
             </div>
-            {i < steps.length - 1 && (
-              <div className={`h-0.5 w-12 md:w-24 mx-1.5 mb-5 rounded-full ${done ? "bg-emerald-400" : "bg-gray-200"}`} />
-            )}
-          </React.Fragment>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };

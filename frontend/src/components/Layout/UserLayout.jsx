@@ -15,7 +15,7 @@ const UserLayout = () => {
   const location = useLocation()
   const isOrderDetailsPage = /^\/order\/[^/]+$/.test(location.pathname)
   const isCheckoutPage = location.pathname === "/checkout"
-  const hideMobileFooterMenu = isCheckoutPage
+  const hideMobileFooterMenu = isCheckoutPage || location.pathname === "/cart"
   const hideFooterOnMobileRoutes = [
     "/profile",
     "/login",
