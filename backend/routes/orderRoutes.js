@@ -253,7 +253,7 @@ router.post("/cod", protect, async (req, res) => {
         sku: resolveOrderItemSku(item),
       })),
       shippingAddress: {
-        address: `${shippingAddress.firstName} ${shippingAddress.lastName}, ${shippingAddress.address}`,
+        address: String(shippingAddress.address || "").trim(),
         city: shippingAddress.city,
         postalCode: shippingAddress.postalCode,
         country: shippingAddress.country,

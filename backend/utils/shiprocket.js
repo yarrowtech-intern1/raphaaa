@@ -67,6 +67,15 @@ const parseCustomerName = (fullName) => {
   return { first: parts[0], last: parts.slice(1).join(" ") || "" };
 };
 
+const cleanAddressPart = (value) => {
+  const v = String(value || "").trim();
+  if (!v) return "";
+  const low = v.toLowerCase();
+  // Avoid sending placeholder/debug text to shipping providers.
+  if (["junk", "na", "n/a", "none", "null", "undefined", "-"].includes(low)) return "";
+  return v;
+};
+
 const buildShiprocketOrderPayload = (order) => {
   const shipAddress = order.shippingAddress || {};
   const pickupLocation = process.env.SHIPROCKET_PICKUP_LOCATION || "Home";
@@ -81,7 +90,7 @@ const buildShiprocketOrderPayload = (order) => {
   const billingLast  = String(shipAddress.lastName  || "").trim() || fallbackLast;
 
   // Full delivery address (include landmark if present)
-  const fullAddress = [shipAddress.address, shipAddress.landmark]
+  const fullAddress = [cleanAddressPart(shipAddress.address), cleanAddressPart(shipAddress.landmark)]
     .filter(Boolean).join(", ") || "Address not provided";
 
   return {
@@ -154,7 +163,8 @@ const buildShiprocketReturnPayload = ({ order, returnRequest }) => {
   const { first: fallbackFirst, last: fallbackLast } = parseCustomerName(order?.user?.name || "");
   const billingFirst = String(shipAddress.firstName || "").trim() || fallbackFirst;
   const billingLast = String(shipAddress.lastName || "").trim() || fallbackLast;
-  const fullAddress = [shipAddress.address, shipAddress.landmark].filter(Boolean).join(", ") || "Address not provided";
+  const fullAddress = [cleanAddressPart(shipAddress.address), cleanAddressPart(shipAddress.landmark)]
+    .filter(Boolean).join(", ") || "Address not provided";
   const returnItems = Array.isArray(returnRequest?.items) ? returnRequest.items : [];
 
   return {
