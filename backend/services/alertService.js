@@ -3,6 +3,13 @@ const Product = require("../models/Product");
 const { enqueueJob } = require("../services/jobQueue");
 
 const clampMoney = (n) => Math.max(0, Math.round((Number(n) || 0) * 100) / 100);
+const toSlug = (name = "") => String(name).toLowerCase().trim().replace(/\s+/g, "-");
+const productUrl = (product, sku = "") => {
+  const base = process.env.FRONTEND_URL || "http://localhost:5173";
+  const slug = toSlug(product?.name || "product");
+  const safeSku = String(sku || product?.sku || "").trim();
+  return safeSku ? `${base}/product/${slug}/p/${encodeURIComponent(safeSku)}` : `${base}/product/${slug}`;
+};
 
 function resolveSkuStock(product, sku) {
   const skuNorm = String(sku || "").trim().toLowerCase();
@@ -52,7 +59,7 @@ async function triggerBackInStockForProduct(productId) {
     if (stock === null || stock <= 0) continue;
 
     const subject = `Back in stock: ${product.name}`;
-    const link = `https://raphaaa.onrender.com/product/${product._id}`;
+    const link = productUrl(product, a.sku);
     const msg = `
       <h2>Good news!</h2>
       <p><strong>${product.name}</strong> is back in stock${a.sku ? ` (SKU: ${a.sku})` : ""}.</p>
@@ -89,7 +96,7 @@ async function triggerPriceDropForProduct(productId) {
     if (price > target) continue;
 
     const subject = `Price drop: ${product.name}`;
-    const link = `https://raphaaa.onrender.com/product/${product._id}`;
+    const link = productUrl(product, a.sku);
     const msg = `
       <h2>Price drop alert</h2>
       <p><strong>${product.name}</strong> is now <strong>₹${price}</strong>.</p>

@@ -1672,6 +1672,7 @@ import { BsPatchCheckFill, BsSearch } from "react-icons/bs";
 import { AiOutlineHeart, AiFillHeart } from "react-icons/ai";
 import axios from "axios";
 import { FiShoppingCart, FiZap } from "react-icons/fi";
+import { FiBell } from "react-icons/fi";
 import { GoDotFill } from "react-icons/go";
 import { FaCartShopping } from "react-icons/fa6";
 import { flyToCart } from "../../utils/flyToCart";
@@ -1747,6 +1748,8 @@ const ProductDetails = ({ productId }) => {
   const [ctlProducts, setCtlProducts] = useState([]);
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [sizeChartTab, setSizeChartTab] = useState("chart"); // "chart" | "measure"
+  const [isNotifySubmitting, setIsNotifySubmitting] = useState(false);
+  const [isNotifySubscribed, setIsNotifySubscribed] = useState(false);
   const modalTouchRef = useRef({
     mode: null, // "pan" | "pinch" | null
     startX: 0,
@@ -2609,6 +2612,51 @@ const ProductDetails = ({ productId }) => {
       });
   };
 
+  const handleNotifyMe = async () => {
+    if (!selectedProduct?._id) return;
+    if (!isOutOfStock) {
+      toast.success("This product is currently in stock.");
+      return;
+    }
+    if (!selectedVariantSku) {
+      toast.error("Please select a size and color first.");
+      return;
+    }
+
+    const normalizedUserEmail =
+      String(user?.email || JSON.parse(localStorage.getItem("userInfo") || "{}")?.email || "")
+        .trim()
+        .toLowerCase();
+
+    let email = normalizedUserEmail;
+    if (!email) {
+      const input = window.prompt("Enter your email to get notified when this item is back in stock:");
+      email = String(input || "").trim().toLowerCase();
+    }
+
+    if (!/.+@.+\..+/.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setIsNotifySubmitting(true);
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/alerts/subscribe`, {
+        type: "back_in_stock",
+        productId: selectedProduct._id,
+        sku: selectedVariantSku,
+        email,
+      });
+      setIsNotifySubscribed(true);
+      toast.success("You'll get an email when this item is back in stock.");
+    } catch (err) {
+      console.error("Notify subscription failed:", err);
+      toast.error(err?.response?.data?.message || "Failed to subscribe for restock alert.");
+    } finally {
+      setIsNotifySubmitting(false);
+    }
+  };
+
   useEffect(() => {
     const fetchCollab = async () => {
       try {
@@ -3190,8 +3238,21 @@ const ProductDetails = ({ productId }) => {
                     </button>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700 text-center">
-                    This product is currently out of stock.
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700 text-center space-y-3">
+                    <p>This product is currently out of stock.</p>
+                    <button
+                      type="button"
+                      onClick={handleNotifyMe}
+                      disabled={isNotifySubmitting || isNotifySubscribed || !selectedVariantSku}
+                      className={`mx-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition ${
+                        isNotifySubmitting || isNotifySubscribed || !selectedVariantSku
+                          ? "border-sky-200 bg-sky-100 text-sky-400 cursor-not-allowed"
+                          : "border-sky-600 text-sky-700 bg-white hover:bg-sky-600 hover:text-white"
+                      }`}
+                    >
+                      <FiBell className="text-base" />
+                      {isNotifySubscribed ? "Subscribed" : isNotifySubmitting ? "Submitting..." : "Notify Me"}
+                    </button>
                   </div>
                 )}
 

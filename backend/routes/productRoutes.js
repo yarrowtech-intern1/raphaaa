@@ -841,7 +841,7 @@ router.put("/:id", protect, admin, async (req, res) => {
         const nextPrice = Number(updatedProduct.discountPrice || updatedProduct.price || 0);
         const nextStock = Number(updatedProduct.countInStock || 0);
 
-        if (prevStock <= 0 && nextStock > 0) {
+        if (nextStock > 0 && nextStock !== prevStock) {
           await triggerBackInStockForProduct(updatedProduct._id);
         }
         if (nextPrice > 0 && nextPrice < prevPrice) {
