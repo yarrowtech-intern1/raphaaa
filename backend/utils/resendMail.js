@@ -3,7 +3,7 @@ const { Resend } = require("resend");
 const dotenv = require("dotenv");
 dotenv.config();
 
-const resend = new Resend('re_i7yg2iqf_MHSJKjvigBjgQZucUH8Hg47e');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const wrapHtml = (subject, bodyHtml) => `
   <div style="background: linear-gradient(to bottom right, #e0f2fe, #0284c7); padding: 32px; font-family: 'Segoe UI', sans-serif; color: #0f172a;">
@@ -21,12 +21,11 @@ const wrapHtml = (subject, bodyHtml) => `
  * @param {{to: string|string[], subject: string, message: string}} params
  */
 const sendResendMail = async ({ to, subject, message }) => {
-//   const from = process.env.FROM_EMAIL || "website@resend.dev";
   const recipients = Array.isArray(to) ? to : [to];
 
   try {
     const resp = await resend.emails.send({
-      from: 'Acme <onboarding@resend.dev>',
+      from: process.env.FROM_EMAIL || "Acme <onboarding@resend.dev>",
       to: recipients,
       subject,
       html: wrapHtml(subject, message),

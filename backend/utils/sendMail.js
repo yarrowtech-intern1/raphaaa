@@ -1,18 +1,52 @@
 const nodemailer = require("nodemailer");
 
+const normalizePassword = (value) => (value ? value.replace(/\s+/g, "") : value);
+const stripHtml = (value) =>
+  String(value || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getSmtpConfig = () => {
+  const user = process.env.EMAIL_USER || process.env.SMTP_EMAIL;
+  const pass = normalizePassword(process.env.EMAIL_PASS || process.env.SMTP_PASSWORD);
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure =
+    process.env.SMTP_SECURE !== undefined
+      ? process.env.SMTP_SECURE === "true"
+      : port === 465;
+
+  const config = {
+    host,
+    port,
+    secure,
+  };
+
+  if (user && pass) {
+    config.auth = { user, pass };
+  }
+
+  return config;
+};
+
+const createTransporter = () => nodemailer.createTransport(getSmtpConfig());
+
+const resolveFromAddress = () =>
+  process.env.EMAIL_FROM || process.env.SMTP_EMAIL || process.env.EMAIL_USER;
+
 const sendMail = async ({ to, subject, message, attachments = [] }) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail", // or use your SMTP provider
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  const transporter = createTransporter();
+  const fromAddress = resolveFromAddress();
 
   const mailOptions = {
-    from: `"Raphaaa Support" <${process.env.SMTP_EMAIL}>`,
+    from: fromAddress ? `"Raphaaa Support" <${fromAddress}>` : "Raphaaa Support <no-reply@localhost>",
     to,
     subject,
+    text: stripHtml(message),
     html: `
   <div style="background: linear-gradient(135deg, #e0f2fe, #0284c7); padding: 40px 20px; font-family: 'Segoe UI', sans-serif; color: #0f172a;">
     <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.08);">
@@ -71,6 +105,8 @@ const sendMail = async ({ to, subject, message, attachments = [] }) => {
 
 // 🛍️ New Arrivals Notification
 const sendNewArrivalNotification = async (emails, products) => {
+  const transporter = createTransporter();
+  const fromAddress = resolveFromAddress();
   const htmlBody = `
     <div style="background: linear-gradient(to bottom right, #e0f2fe, #0284c7); padding: 32px; font-family: 'Segoe UI', sans-serif; color: #0f172a;">
       <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
@@ -102,9 +138,10 @@ const sendNewArrivalNotification = async (emails, products) => {
   `;
 
   await transporter.sendMail({
-    from: `"Raphaaa Store" <${process.env.EMAIL_USER}>`,
+    from: fromAddress ? `"Raphaaa Store" <${fromAddress}>` : "Raphaaa Store <no-reply@localhost>",
     to: emails,
     subject: "🆕 New Arrivals Just Dropped!",
+    text: stripHtml(htmlBody),
     html: htmlBody,
   });
 };
