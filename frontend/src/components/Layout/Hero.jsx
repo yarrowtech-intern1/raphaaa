@@ -130,7 +130,7 @@ const Hero = () => {
   if (collabActive) return null;
 
   return (
-    <section className="w-full bg-white">
+    <section className="w-full">
 
       {/* ── MAIN CAROUSEL ── */}
       <div className="relative w-full" style={{ height: "min(58vw, 640px)", minHeight: "320px" }}>
@@ -220,7 +220,7 @@ const Hero = () => {
       </div>
 
       {/* ── CATEGORY PILLS ── */}
-      <div className="bg-white border-b border-sky-100">
+      <div className="">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5">
           <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide">
             {CATEGORIES.map(({ label, icon, link }) => (
