@@ -7,6 +7,18 @@ const { protect, admin } = require("../middleware/authMiddleware");
 const router  = express.Router();
 const upload  = multer({ storage: multer.diskStorage({}) });
 
+const OVERLAY_DIRECTION_CLASSES = {
+  left: "bg-linear-to-r from-sky-950/80 via-sky-900/40 to-transparent",
+  right: "bg-linear-to-l from-sky-950/80 via-sky-900/40 to-transparent",
+  top: "bg-linear-to-b from-sky-950/80 via-sky-900/40 to-transparent",
+  bottom: "bg-linear-to-t from-sky-950/80 via-sky-900/40 to-transparent",
+};
+
+const normalizeOverlayDirection = (value) => {
+  const direction = String(value || "").trim().toLowerCase();
+  return ["left", "right", "top", "bottom"].includes(direction) ? direction : "left";
+};
+
 // ── GET /api/hero-slides  (public — frontend reads this)
 router.get("/", async (req, res) => {
   try {
@@ -51,7 +63,9 @@ router.post("/", protect, admin, upload.single("image"), async (req, res) => {
       ctaSecondaryText: req.body.ctaSecondaryText || "",
       ctaSecondaryLink: req.body.ctaSecondaryLink || "",
       textAlign:        req.body.textAlign        || "left",
-      overlayColor:     req.body.overlayColor     || "from-sky-950/80 via-sky-900/40 to-transparent",
+      contentPosition:  req.body.contentPosition  || "bottom",
+      overlayDirection: normalizeOverlayDirection(req.body.overlayDirection),
+      overlayColor:     OVERLAY_DIRECTION_CLASSES[normalizeOverlayDirection(req.body.overlayDirection)],
       isVisible:        req.body.isVisible !== "false",
       order:            count,
     });
@@ -76,8 +90,14 @@ router.put("/:id", protect, admin, upload.single("image"), async (req, res) => {
       slide.image = req.body.imageUrl;
     }
 
-    const fields = ["badge","title","subtitle","description","ctaText","ctaLink","ctaSecondaryText","ctaSecondaryLink","textAlign","overlayColor","order"];
+    const fields = ["badge","title","subtitle","description","ctaText","ctaLink","ctaSecondaryText","ctaSecondaryLink","textAlign","contentPosition","order"];
     fields.forEach((f) => { if (req.body[f] !== undefined) slide[f] = req.body[f]; });
+    if (req.body.overlayDirection !== undefined) {
+      slide.overlayDirection = normalizeOverlayDirection(req.body.overlayDirection);
+      slide.overlayColor = OVERLAY_DIRECTION_CLASSES[slide.overlayDirection];
+    } else if (req.body.overlayColor !== undefined) {
+      slide.overlayColor = req.body.overlayColor;
+    }
     if (req.body.isVisible !== undefined) slide.isVisible = req.body.isVisible !== "false" && req.body.isVisible !== false;
 
     await slide.save();

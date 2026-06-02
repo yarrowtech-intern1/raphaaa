@@ -24,7 +24,8 @@ const DEFAULT_SLIDES = [
     cta: "Shop Now",        ctaLink: "/collections/all",
     ctaSub: "Shop Women",   ctaSubLink: "/collections/all?gender=Women",
     align: "left",
-    overlay: "from-sky-950/80 via-sky-900/40 to-transparent",
+    position: "bottom",
+    overlay: "bg-linear-to-r from-sky-950/80 via-sky-900/40 to-transparent",
   },
   {
     image: heroImg2,
@@ -35,7 +36,8 @@ const DEFAULT_SLIDES = [
     cta: "Shop Men",        ctaLink: "/collections/all?gender=Men",
     ctaSub: "View All",     ctaSubLink: "/collections/all",
     align: "right",
-    overlay: "from-blue-950/80 via-blue-900/40 to-transparent",
+    position: "center",
+    overlay: "bg-linear-to-l from-sky-950/80 via-sky-900/40 to-transparent",
   },
   {
     image: heroImg3,
@@ -46,9 +48,35 @@ const DEFAULT_SLIDES = [
     cta: "Explore Drops",   ctaLink: "/collections/all",
     ctaSub: "New Arrivals",  ctaSubLink: "/collections/all?sort=newest",
     align: "left",
-    overlay: "from-indigo-950/80 via-indigo-900/40 to-transparent",
+    position: "top",
+    overlay: "bg-linear-to-b from-sky-950/80 via-sky-900/40 to-transparent",
   },
 ];
+
+const OVERLAY_CLASS_BY_DIRECTION = {
+  left: "bg-linear-to-r from-sky-950/80 via-sky-900/40 to-transparent",
+  right: "bg-linear-to-l from-sky-950/80 via-sky-900/40 to-transparent",
+  top: "bg-linear-to-b from-sky-950/80 via-sky-900/40 to-transparent",
+  bottom: "bg-linear-to-t from-sky-950/80 via-sky-900/40 to-transparent",
+};
+
+const normalizeOverlayDirection = (slide) => {
+  if (slide?.overlayDirection && OVERLAY_CLASS_BY_DIRECTION[slide.overlayDirection]) {
+    return slide.overlayDirection;
+  }
+  const overlayColor = String(slide?.overlayColor || "");
+  if (overlayColor.includes("bg-linear-to-l")) return "right";
+  if (overlayColor.includes("bg-linear-to-b")) return "top";
+  if (overlayColor.includes("bg-linear-to-t")) return "bottom";
+  return "left";
+};
+
+const getOverlayClass = (slide) => {
+  const direction = normalizeOverlayDirection(slide);
+  const overlayColor = String(slide?.overlayColor || "");
+  if (overlayColor.includes("bg-linear-to-")) return overlayColor;
+  return OVERLAY_CLASS_BY_DIRECTION[direction];
+};
 
 const CATEGORIES = [
   { label: "Men",          icon: "👔", link: "/collections/all?gender=Men" },
@@ -77,7 +105,7 @@ const Hero = () => {
 
     // Fetch admin-managed slides from the new multi-slide API
     axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/hero-slides`)
-      .then(({ data }) => {
+          .then(({ data }) => {
         if (Array.isArray(data) && data.length > 0) {
           // Map DB fields → component shape
           setSlides(data.map((s) => ({
@@ -91,7 +119,8 @@ const Hero = () => {
             ctaSub:      s.ctaSecondaryText || "",
             ctaSubLink:  s.ctaSecondaryLink || "/collections/all",
             align:       s.textAlign   || "left",
-            overlay:     s.overlayColor || "from-sky-950/80 via-sky-900/40 to-transparent",
+            position:    s.contentPosition || "bottom",
+            overlay:     getOverlayClass(s),
           })));
         }
       })
@@ -123,11 +152,21 @@ const Hero = () => {
               />
 
               {/* gradient */}
-              <div className={`absolute inset-0 bg-linear-to-r ${slide.overlay}`} />
+              <div className={`absolute inset-0 ${slide.overlay}`} />
 
               {/* text */}
-              <div className={`absolute inset-0 flex items-end px-4 sm:px-8 md:px-12 lg:px-24 pb-8 sm:pb-12 md:pb-16 lg:pb-20 ${
-                slide.align === "right" ? "justify-end text-right" : "justify-start text-left"
+              <div className={`absolute inset-0 flex px-4 sm:px-8 md:px-12 lg:px-24 ${
+                slide.position === "top"
+                  ? "items-start pt-8 sm:pt-10 md:pt-14 lg:pt-16"
+                  : slide.position === "center"
+                    ? "items-center py-8 sm:py-10"
+                    : "items-end pb-8 sm:pb-12 md:pb-16 lg:pb-20"
+              } ${
+                slide.align === "right"
+                  ? "justify-end text-right"
+                  : slide.align === "center"
+                    ? "justify-center text-center"
+                    : "justify-start text-left"
               }`}>
                 <div className="max-w-lg space-y-2 sm:space-y-3">
                   <span className="inline-block bg-sky-500/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">
@@ -138,7 +177,13 @@ const Hero = () => {
                   </h1>
                   <p className="text-sky-200 text-xs sm:text-sm font-semibold tracking-wide">{slide.subtitle}</p>
                   <p className="text-white/75 text-xs sm:text-sm hidden sm:block leading-relaxed">{slide.desc}</p>
-                  <div className={`flex flex-wrap items-center gap-2 sm:gap-3 pt-1 ${slide.align === "right" ? "justify-end" : "justify-start"}`}>
+                  <div className={`flex flex-wrap items-center gap-2 sm:gap-3 pt-1 ${
+                    slide.align === "right"
+                      ? "justify-end"
+                      : slide.align === "center"
+                        ? "justify-center"
+                        : "justify-start"
+                  }`}>
                     <Link to={slide.ctaLink}
                       className="px-5 sm:px-7 py-2.5 bg-white text-sky-700 font-bold text-sm sm:text-[15px] rounded-full hover:bg-sky-50 active:scale-95 transition-all shadow-lg">
                       {slide.cta}

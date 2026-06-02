@@ -8,17 +8,39 @@ const BACKEND = import.meta.env.VITE_BACKEND_URL;
 const authH = () => ({ Authorization: `Bearer ${localStorage.getItem("userToken")}` });
 
 const OVERLAY_OPTIONS = [
-  { label: "Sky Blue",   value: "from-sky-950/80 via-sky-900/40 to-transparent" },
-  { label: "Deep Blue",  value: "from-blue-950/80 via-blue-900/40 to-transparent" },
-  { label: "Indigo",     value: "from-indigo-950/80 via-indigo-900/40 to-transparent" },
-  { label: "Dark",       value: "from-gray-950/80 via-gray-900/40 to-transparent" },
+  { label: "Left", value: "left" },
+  { label: "Right", value: "right" },
+  { label: "Top", value: "top" },
+  { label: "Bottom", value: "bottom" },
 ];
 
 const EMPTY = {
   title: "", subtitle: "", description: "", badge: "",
   ctaText: "Shop Now", ctaLink: "/collections/all",
   ctaSecondaryText: "", ctaSecondaryLink: "",
-  textAlign: "left", overlayColor: OVERLAY_OPTIONS[0].value, isVisible: true,
+  textAlign: "left", contentPosition: "bottom", overlayDirection: "left", isVisible: true,
+};
+
+const directionToOverlayClass = (direction) => {
+  switch (direction) {
+    case "right":
+      return "bg-linear-to-l from-sky-950/80 via-sky-900/40 to-transparent";
+    case "top":
+      return "bg-linear-to-b from-sky-950/80 via-sky-900/40 to-transparent";
+    case "bottom":
+      return "bg-linear-to-t from-sky-950/80 via-sky-900/40 to-transparent";
+    case "left":
+    default:
+      return "bg-linear-to-r from-sky-950/80 via-sky-900/40 to-transparent";
+  }
+};
+
+const inferOverlayDirection = (value) => {
+  const overlay = String(value || "");
+  if (overlay.includes("bg-linear-to-l")) return "right";
+  if (overlay.includes("bg-linear-to-b")) return "top";
+  if (overlay.includes("bg-linear-to-t")) return "bottom";
+  return "left";
 };
 
 /* ── Slide form (used in modal) ── */
@@ -118,7 +140,7 @@ const SlideForm = ({ initial, existingImage, onSave, onCancel, saving }) => {
       </div>
 
       {/* Style */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Text Position</label>
           <div className="flex gap-2">
@@ -131,10 +153,43 @@ const SlideForm = ({ initial, existingImage, onSave, onCancel, saving }) => {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Overlay Theme</label>
-          <select className={inp} value={form.overlayColor} onChange={(e) => set("overlayColor", e.target.value)}>
-            {OVERLAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Content Position</label>
+          <div className="flex gap-2">
+            {["top", "center", "bottom"].map((position) => (
+              <button
+                key={position}
+                type="button"
+                onClick={() => set("contentPosition", position)}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold border transition capitalize ${
+                  form.contentPosition === position
+                    ? "bg-sky-600 text-white border-sky-600"
+                    : "border-gray-200 text-gray-600 hover:border-sky-300"
+                }`}
+              >
+                {position}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Overlay Direction</label>
+          <div className="grid grid-cols-2 gap-2">
+            {OVERLAY_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => set("overlayDirection", option.value)}
+                className={`py-2 rounded-xl text-xs font-bold border transition capitalize ${
+                  form.overlayDirection === option.value
+                    ? "bg-sky-600 text-white border-sky-600"
+                    : "border-gray-200 text-gray-600 hover:border-sky-300"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Dark overlay fades toward the selected side</p>
         </div>
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Visibility</label>
@@ -350,6 +405,12 @@ export default function HeroSettings() {
                     <span className="text-[10px] text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
                       Align: {slide.textAlign}
                     </span>
+                    <span className="text-[10px] text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
+                      Pos: {slide.contentPosition || "bottom"}
+                    </span>
+                    <span className="text-[10px] text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
+                      Overlay: {slide.overlayDirection || inferOverlayDirection(slide.overlayColor)}
+                    </span>
                   </div>
                 </div>
 
@@ -401,7 +462,10 @@ export default function HeroSettings() {
                   title: modal.title, subtitle: modal.subtitle, description: modal.description,
                   badge: modal.badge, ctaText: modal.ctaText, ctaLink: modal.ctaLink,
                   ctaSecondaryText: modal.ctaSecondaryText, ctaSecondaryLink: modal.ctaSecondaryLink,
-                  textAlign: modal.textAlign, overlayColor: modal.overlayColor, isVisible: modal.isVisible,
+                  textAlign: modal.textAlign,
+                  contentPosition: modal.contentPosition || "bottom",
+                  overlayDirection: modal.overlayDirection || inferOverlayDirection(modal.overlayColor),
+                  isVisible: modal.isVisible,
                 }}
                 existingImage={modal === "add" ? "" : modal.image}
                 onSave={handleSave}
