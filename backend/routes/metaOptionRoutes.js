@@ -1,28 +1,32 @@
 const express = require("express");
 const router = express.Router();
 const MetaOption = require("../models/MetaOption");
+const { protect, adminOrMerchantise } = require("../middleware/authMiddleware");
 
 // Get all
-router.get("/", async (req, res) => {
-  const options = await MetaOption.find();
+router.get("/", protect, adminOrMerchantise, async (req, res) => {
+  const options = await MetaOption.find()
+    .populate("createdBy", "name email role")
+    .sort({ createdAt: -1 });
   res.json(options);
 });
 
 // Add one
-router.post("/", async (req, res) => {
+router.post("/", protect, adminOrMerchantise, async (req, res) => {
   const { type, value } = req.body;
   if (!type || !value) return res.status(400).json({ message: "Type and value are required" });
 
   const exists = await MetaOption.findOne({ type, value });
   if (exists) return res.status(409).json({ message: "Option already exists" });
 
-  const newOption = new MetaOption({ type, value });
+  const newOption = new MetaOption({ type, value, createdBy: req.user?._id || null });
   await newOption.save();
-  res.status(201).json(newOption);
+  const populated = await MetaOption.findById(newOption._id).populate("createdBy", "name email role");
+  res.status(201).json(populated);
 });
 
 // Edit meta option
-router.put("/:id", async (req, res) => {
+router.put("/:id", protect, adminOrMerchantise, async (req, res) => {
   const { value } = req.body;
   try {
     const updated = await MetaOption.findByIdAndUpdate(
@@ -37,7 +41,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // Delete meta option
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", protect, adminOrMerchantise, async (req, res) => {
   try {
     await MetaOption.findByIdAndDelete(req.params.id);
     res.json({ message: "Deleted successfully" });

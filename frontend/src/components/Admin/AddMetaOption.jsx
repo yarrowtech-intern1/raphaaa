@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { FaPen, FaCheck, FaTrash, FaPlus } from "react-icons/fa";
 import { BiCategoryAlt } from "react-icons/bi";
+import { useSelector } from "react-redux";
 
 const TABS = [
   { key: "category",   label: "Categories",  color: "bg-blue-500",   light: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-200",   dot: "bg-blue-500"   },
@@ -12,6 +13,7 @@ const TABS = [
 ];
 
 const AddMetaOption = () => {
+  const { user } = useSelector((state) => state.auth);
   const [type,       setType]       = useState("category");
   const [value,      setValue]      = useState("");
   const [options,    setOptions]    = useState([]);
@@ -21,7 +23,10 @@ const AddMetaOption = () => {
   const [adding,     setAdding]     = useState(false);
 
   const fetchOptions = async () => {
-    const { data } = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options`);
+    const token = localStorage.getItem("userToken");
+    const { data } = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     setOptions(data);
   };
 
@@ -50,7 +55,12 @@ const AddMetaOption = () => {
     if (!value.trim()) return toast.error("Please enter a value");
     setAdding(true);
     try {
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options`, { type, value: value.trim() });
+      const token = localStorage.getItem("userToken");
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/meta-options`,
+        { type, value: value.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       toast.success("Option added");
       setValue("");
       fetchOptions();
@@ -62,7 +72,10 @@ const AddMetaOption = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options/${id}`);
+      const token = localStorage.getItem("userToken");
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       toast.success("Deleted");
       fetchOptions();
       fetchCategoryCounts();
@@ -71,7 +84,12 @@ const AddMetaOption = () => {
 
   const handleSave = async (id) => {
     try {
-      await axios.put(`${import.meta.env.VITE_BACKEND_URL}/api/meta-options/${id}`, { value: editedVal });
+      const token = localStorage.getItem("userToken");
+      await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/meta-options/${id}`,
+        { value: editedVal },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       toast.success("Updated");
       setEditingId(null);
       fetchOptions();
@@ -230,6 +248,52 @@ const AddMetaOption = () => {
           );
         })}
       </div>
+
+      {user?.role === "admin" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+            <h3 className="text-sm font-bold text-gray-800">Category Audit Trail</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Only admin can see who added or updated each category and when.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Value</th>
+                  <th className="px-4 py-3">Added By</th>
+                  <th className="px-4 py-3">Created At</th>
+                  <th className="px-4 py-3">Updated At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {options.map((opt) => (
+                  <tr key={opt._id} className="border-t border-gray-100">
+                    <td className="px-4 py-3 capitalize text-gray-700">{opt.type}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{opt.value}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {opt.createdBy?.name || opt.createdBy?.email || "Unknown"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {opt.createdAt ? new Date(opt.createdAt).toLocaleString() : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {opt.updatedAt ? new Date(opt.updatedAt).toLocaleString() : "—"}
+                    </td>
+                  </tr>
+                ))}
+                {options.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-6 text-center text-gray-400">
+                      No category activity yet
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
