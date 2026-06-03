@@ -16,6 +16,8 @@ import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import FAQ from "../components/Common/FAQ";
 import PreviouslyViewed from "./PreviouslyViewed";
+import { BsLightningCharge } from "react-icons/bs";
+import { FiArrowRight, FiClock } from "react-icons/fi";
 
 const Home = () => {
   const dispatch = useDispatch();
@@ -213,36 +215,36 @@ const Home = () => {
 
     const start = new Date(activeOffer.startDate).getTime();
     const end = new Date(activeOffer.endDate).getTime();
+    const fmt = (n) => String(n).padStart(2, "0");
 
     const tick = () => {
       const labelEl = document.getElementById("offer-phase-label");
-      const timerEl = document.getElementById("offer-live-timer");
-      if (!labelEl || !timerEl) return;
+      const dEl = document.getElementById("offer-days");
+      const hEl = document.getElementById("offer-hours");
+      const mEl = document.getElementById("offer-minutes");
+      const sEl = document.getElementById("offer-seconds");
+      if (!dEl) return;
 
       const now = Date.now();
-
-      // Determine phase + remaining ms
       let remaining = 0;
+
       if (now < start) {
-        labelEl.textContent = "Sale starts in";
+        if (labelEl) labelEl.textContent = "Sale starts in";
         remaining = start - now;
       } else if (now >= start && now <= end) {
-        labelEl.textContent = "SALE IS LIVE NOW — ending in";
+        if (labelEl) labelEl.textContent = "SALE IS LIVE — ending in";
         remaining = end - now;
       } else {
-        labelEl.textContent = "Sale ended";
-        timerEl.textContent = "";
+        if (labelEl) labelEl.textContent = "Sale ended";
+        [dEl, hEl, mEl, sEl].forEach((el) => { if (el) el.textContent = "00"; });
         return;
       }
 
-      // Convert remaining to H:M:S (hours may exceed 24)
-      const totalSeconds = Math.max(0, Math.floor(remaining / 1000));
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-
-      const fmt2 = (n) => String(n).padStart(2, "0");
-      timerEl.textContent = `${fmt2(hours)}:${fmt2(minutes)}:${fmt2(seconds)}`;
+      const totalSec = Math.max(0, Math.floor(remaining / 1000));
+      if (dEl) dEl.textContent = fmt(Math.floor(totalSec / 86400));
+      if (hEl) hEl.textContent = fmt(Math.floor((totalSec % 86400) / 3600));
+      if (mEl) mEl.textContent = fmt(Math.floor((totalSec % 3600) / 60));
+      if (sEl) sEl.textContent = fmt(totalSec % 60);
     };
 
     tick();
@@ -310,131 +312,190 @@ const Home = () => {
       )} */}
 
         {activeOffer && (
-          <div className="relative w-full mb-8">
-            {/* Full Width Banner */}
-            {activeOffer.bannerImage && (
-              <img
-                src={activeOffer.bannerImage}
-                alt={activeOffer.title}
-                className="w-full h-[220px] md:h-[420px] object-cover"
-              />
-            )}
+          <div className="relative w-full mb-0 overflow-hidden">
+            {/* Banner image */}
+            {activeOffer.bannerImage ? (
+              <div className="relative h-55 md:h-105 overflow-hidden">
+                <img
+                  src={activeOffer.bannerImage}
+                  alt={activeOffer.title}
+                  className="w-full h-full object-cover"
+                />
+                {/* Sky-blue gradient overlay */}
+                <div className="absolute inset-0 bg-linear-to-r from-sky-900/75 via-sky-800/45 to-transparent" />
 
-            {/* Overlay Content */}
-            <div className="absolute inset-0 flex flex-col md:flex-row items-center justify-between px-6 md:px-16 py-6 bg-black/40 text-white">
-              <div
-                className="flex-1 mix-blend-screen"
-                style={{
-                  textShadow: "1px 1px 3px rgba(0,0,0,0.8)",
-                }}
-              >
-                <h2 className="text-2xl md:text-4xl font-extrabold mb-2 uppercase">
-                  {activeOffer.title}
-                </h2>
-                <p className="text-sm md:text-lg font-medium">
-                  Save up to{" "}
-                  <span className="bg-red-500 font-bold text-xl text-white px-5 py-1">
-                    {activeOffer.offerPercentage}% OFF
-                  </span>{" "}
-                  from{" "}
-                  <span className="font-semibold text-amber-200">
-                    {new Date(activeOffer.startDate).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-semibold text-amber-200">
-                    {new Date(activeOffer.endDate).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                {/* Content on overlay */}
+                <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-14 lg:px-20">
+                  <span className="inline-flex items-center gap-1.5 bg-sky-500/90 backdrop-blur-sm text-white text-[10px] md:text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-3 w-fit border border-sky-400/50">
+                    <BsLightningCharge /> Exclusive Offer
                   </span>
-                </p>
+                  <h2 className="text-2xl md:text-4xl lg:text-5xl font-extrabold text-white mb-2 drop-shadow-lg max-w-2xl leading-tight">
+                    {activeOffer.title}
+                  </h2>
+                  <p className="text-sky-100 text-sm md:text-base mb-4">
+                    Up to{" "}
+                    <span className="font-extrabold text-white text-lg md:text-2xl">
+                      {activeOffer.offerPercentage}% OFF
+                    </span>{" "}
+                    ·{" "}
+                    <span className="text-sky-200 text-xs md:text-sm">
+                      {new Date(activeOffer.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      {" — "}
+                      {new Date(activeOffer.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </p>
 
-                {/* Countdown Timer (only before start) */}
-                {new Date() < new Date(activeOffer.startDate) && (
-                  <div className="mt-3 inline-block bg-amber-600 text-white px-4 py-1 rounded-full text-xs md:text-sm font-semibold tracking-wider">
-                    Starts in: <span id="offer-timer" className="ml-1" />
-                  </div>
-                )}
-              </div>
-
-              {/* View Offers Button: Only when offer is active */}
-              {new Date() >= new Date(activeOffer.startDate) && (
-                <Link
-                  to="/offers"
-                  className="mt-6 md:mt-0 bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg text-sm font-bold shadow-lg transition duration-200"
-                >
-                  View Offers
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
-        {/* Countdown Section (Raphaaa theme) */}
-        {activeOffer && (
-          <div className="mx-4 md:mx-16 -mt-4 mb-10">
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500 via-fuchsia-500 to-pink-500 text-white shadow-xl">
-              {/* Aura glow */}
-              <div
-                className="pointer-events-none absolute inset-0 opacity-30 mix-blend-screen"
-                style={{
-                  background:
-                    "radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,0.35), transparent 60%)",
-                }}
-              />
-              <div className="relative z-10 px-6 py-6 md:px-10 md:py-8 flex flex-col md:flex-row items-center justify-between gap-5">
-                {/* Left copy */}
-                <div className="text-center md:text-left">
-                  <div
-                    id="offer-phase-label"
-                    className="text-xs md:text-sm uppercase tracking-widest text-white/90"
-                  >
-                    {/* filled by JS */}
-                  </div>
-
-                  <div className="mt-1 font-mono text-[32px] md:text-5xl font-extrabold tabular-nums">
-                    <span id="offer-live-timer">--:--:--</span>
-                  </div>
-
-                  <div className="mt-2 text-xs md:text-sm text-white/85">
-                    From{" "}
-                    <strong>
-                      {new Date(activeOffer.startDate).toLocaleString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                        timeZone: "Asia/Kolkata",
-                      })}
-                      {" IST"}
-                    </strong>{" "}
-                    to{" "}
-                    <strong>
-                      {new Date(activeOffer.endDate).toLocaleString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                        timeZone: "Asia/Kolkata",
-                      })}
-                      {" IST"}
-                    </strong>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {new Date() < new Date(activeOffer.startDate) && (
+                      <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-xl px-4 py-2 text-white text-xs font-semibold">
+                        <FiClock className="text-sky-300 text-sm" />
+                        Starts in: <span id="offer-timer" className="ml-1 font-mono font-bold text-sky-200" />
+                      </div>
+                    )}
+                    {new Date() >= new Date(activeOffer.startDate) && (
+                      <Link
+                        to="/offers"
+                        className="inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-sky-900/30 transition active:scale-95"
+                      >
+                        Shop Now <FiArrowRight />
+                      </Link>
+                    )}
                   </div>
                 </div>
 
-                {/* CTA (always visible) */}
-                <Link
-                  to="/offers"
-                  className="rounded-xl bg-white px-6 py-3 font-semibold text-purple-700 shadow-lg transition hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  Shop Now
-                </Link>
+                {/* % badge (top right) */}
+                <div className="absolute top-4 right-4 md:top-8 md:right-10 flex flex-col items-center justify-center w-14 h-14 md:w-20 md:h-20 bg-sky-500 rounded-full border-4 border-white shadow-xl">
+                  <span className="text-white font-extrabold text-base md:text-2xl leading-none">
+                    {activeOffer.offerPercentage}%
+                  </span>
+                  <span className="text-sky-100 text-[8px] md:text-[10px] font-bold uppercase tracking-wide">
+                    OFF
+  </span>
+                </div>
+              </div>
+            ) : (
+              /* Fallback when no banner image */
+              <div className="relative overflow-hidden bg-linear-to-r from-sky-600 to-blue-700 py-12 px-6 md:px-14">
+                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+                <div className="relative z-10 max-w-2xl">
+                  <span className="inline-flex items-center gap-1.5 bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-3 border border-white/30">
+                    <BsLightningCharge /> Exclusive Offer
+                  </span>
+                  <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-2">{activeOffer.title}</h2>
+                  <p className="text-sky-100 text-sm mb-4">
+                    Up to <strong className="text-white text-lg">{activeOffer.offerPercentage}% OFF</strong>
+                  </p>
+                  {new Date() >= new Date(activeOffer.startDate) && (
+                    <Link to="/offers" className="inline-flex items-center gap-2 bg-white text-sky-700 hover:bg-sky-50 px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg transition">
+                      Shop Now <FiArrowRight />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Countdown Section */}
+        {activeOffer && (
+          <div className="mt-0">
+            <div className="relative overflow-hidden shadow-xl shadow-sky-300/40">
+              {/* Sky-to-blue gradient background */}
+              <div className="absolute inset-0 bg-linear-to-r from-sky-500 via-sky-600 to-blue-700" />
+              {/* Subtle dot texture */}
+              <div
+                className="absolute inset-0 opacity-[0.06]"
+                style={{ backgroundImage: "radial-gradient(circle, white 1.5px, transparent 1.5px)", backgroundSize: "22px 22px" }}
+              />
+              {/* Center glow */}
+              <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-full opacity-15 blur-2xl rounded-full bg-white" />
+
+              {/* ── 3-column layout ── */}
+              <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 items-center gap-4 px-5 py-5 md:px-8 md:py-6">
+
+                {/* Col 1 — Offer info */}
+                <div className="text-center md:text-left space-y-1">
+                  <span className="inline-flex items-center gap-1 bg-white/20 border border-white/30 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-widest">
+                    <BsLightningCharge /> {activeOffer.title}
+                  </span>
+                  <p className="text-white font-extrabold text-xl md:text-2xl leading-tight">
+                    Up to{" "}
+                    <span className="text-sky-100">{activeOffer.offerPercentage}% OFF</span>
+                  </p>
+                  <p className="text-[10px] text-sky-200/80 font-medium">
+                    {new Date(activeOffer.startDate).toLocaleString("en-GB", {
+                      day: "2-digit", month: "short",
+                      hour: "2-digit", minute: "2-digit",
+                      hour12: false, timeZone: "Asia/Kolkata",
+                    })}{" "}—{" "}
+                    {new Date(activeOffer.endDate).toLocaleString("en-GB", {
+                      day: "2-digit", month: "short",
+                      hour: "2-digit", minute: "2-digit",
+                      hour12: false, timeZone: "Asia/Kolkata",
+                    })}{" IST"}
+                  </p>
+                </div>
+
+                {/* Col 2 — Countdown (centered) */}
+                <div className="flex flex-col items-center gap-2">
+                  <p
+                    id="offer-phase-label"
+                    className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/70"
+                  />
+                  <div className="flex items-end gap-1">
+                    {[
+                      { id: "offer-days",    label: "Days" },
+                      { id: "offer-hours",   label: "Hrs"  },
+                      { id: "offer-minutes", label: "Min"  },
+                      { id: "offer-seconds", label: "Sec"  },
+                    ].map(({ id, label }, i) => (
+                      <React.Fragment key={id}>
+                        <div className="flex flex-col items-center">
+                          {/* Glass tile */}
+                          <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30 shadow-md shadow-sky-900/20">
+                            <span
+                              id={id}
+                              className="font-mono text-2xl md:text-3xl font-extrabold text-white tabular-nums leading-none"
+                            >
+                              00
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-sky-100/70 mt-1 font-bold uppercase tracking-wider">
+                            {label}
+                          </span>
+                        </div>
+                        {i < 3 && (
+                          <span className="text-white/40 text-2xl font-thin mb-7 select-none leading-none">
+                            :
+                          </span>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Col 3 — CTA (right-aligned) */}
+                <div className="flex flex-col items-center md:items-end gap-3">
+                  {/* Pill badge */}
+                  <div className="flex items-center gap-2 bg-white/10 border border-white/25 rounded-2xl px-4 py-2.5 backdrop-blur-sm">
+                    <div className="flex flex-col items-center justify-center w-10 h-10 bg-white/20 rounded-full border border-white/30">
+                      <span className="text-white font-extrabold text-sm leading-none">{activeOffer.offerPercentage}%</span>
+                      <span className="text-sky-100 text-[8px] font-bold uppercase">OFF</span>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold">Save up to</p>
+                      <p className="text-white font-extrabold text-base leading-none">
+                        {activeOffer.offerPercentage}% Discount
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/offers"
+                    className="inline-flex items-center gap-2 bg-white text-sky-700 hover:bg-sky-50 px-7 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-sky-900/25 transition active:scale-95 w-full md:w-auto justify-center"
+                  >
+                    Shop Now <FiArrowRight />
+                  </Link>
+                </div>
+
               </div>
             </div>
           </div>
@@ -491,37 +552,69 @@ const Home = () => {
         <PreviouslyViewed />
 
         {activeOffer && showAlert && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-            <div className="relative bg-orange-100 border border-orange-300 shadow-lg rounded-lg overflow-hidden animate-popup p-4 max-w-xs md:max-w-sm w-full text-center">
-              <img
-                src={activeOffer.alertImage}
-                alt={activeOffer.title}
-                className="w-auto max-w-full max-h-[70vh] object-contain mx-auto mb-4"
-              />
-
-              {/* Countdown Timer OR Shop Now */}
-              {new Date() < new Date(activeOffer.startDate) ? (
-                <div className="bg-amber-600 text-white px-4 py-2 rounded-full font-semibold text-sm inline-block mb-2">
-                  Offer starts in: <span id="alert-offer-timer" className="ml-1" />
-                </div>
-              ) : (
-                <Link
-                  to="/offers"
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-sky-950/50 backdrop-blur-sm px-4"
+            onClick={() => setShowAlert(false)}
+          >
+            <div
+              className="relative bg-white rounded-3xl overflow-hidden shadow-2xl shadow-sky-900/30 max-w-xs md:max-w-sm w-full animate-popup border border-sky-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header gradient */}
+              <div className="bg-linear-to-r from-sky-500 to-blue-600 px-5 py-3 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-white text-xs font-bold uppercase tracking-widest">
+                  <BsLightningCharge /> Exclusive Offer
+                </span>
+                <button
                   onClick={() => setShowAlert(false)}
-                  className="inline-block bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full font-semibold text-sm transition mb-2"
+                  className="text-white/70 hover:text-white text-lg font-bold leading-none transition"
+                  title="Close"
                 >
-                  🛍 Shop Now
-                </Link>
+                  ✕
+                </button>
+              </div>
+
+              {/* Offer image */}
+              {activeOffer.alertImage && (
+                <img
+                  src={activeOffer.alertImage}
+                  alt={activeOffer.title}
+                  className="w-full max-h-64 object-contain bg-sky-50"
+                />
               )}
 
-              {/* Close Button */}
-              <button
-                onClick={() => setShowAlert(false)}
-                className="absolute top-2 right-2 text-orange-800 hover:text-red-500 text-xl font-bold bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-sm"
-                title="Close"
-              >
-                ×
-              </button>
+              {/* Info + CTA */}
+              <div className="px-5 py-4 text-center space-y-3">
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900">{activeOffer.title}</h3>
+                  <p className="text-sky-600 font-bold text-2xl mt-0.5">
+                    {activeOffer.offerPercentage}% OFF
+                  </p>
+                </div>
+
+                {new Date() < new Date(activeOffer.startDate) ? (
+                  <div className="flex items-center justify-center gap-2 bg-sky-50 border border-sky-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-sky-700">
+                    <FiClock />
+                    Starts in:&nbsp;
+                    <span id="alert-offer-timer" className="font-mono font-bold text-sky-600" />
+                  </div>
+                ) : (
+                  <Link
+                    to="/offers"
+                    onClick={() => setShowAlert(false)}
+                    className="flex items-center justify-center gap-2 bg-linear-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-sky-200 transition active:scale-95"
+                  >
+                    Shop Now <FiArrowRight />
+                  </Link>
+                )}
+
+                <button
+                  onClick={() => setShowAlert(false)}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition"
+                >
+                  Maybe later
+                </button>
+              </div>
             </div>
           </div>
         )}

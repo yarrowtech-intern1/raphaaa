@@ -290,29 +290,52 @@ const AddEditOffer = () => {
 
           {/* Banner Image */}
           <div className="col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Banner Image
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="w-full"
-            />
+            <div className="flex items-end justify-between gap-4 mb-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Banner Image
+              </label>
+              <p className="text-xs text-gray-500">
+                Recommended: 1600 × 600 px, wide hero crop
+              </p>
+            </div>
+            <div
+              className="rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/60 p-4"
+              style={{ aspectRatio: "16 / 6" }}
+            >
+              <label className="flex h-full cursor-pointer items-center justify-center rounded-xl border border-sky-100 bg-white/80 text-center transition hover:bg-sky-50">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  multiple
+                />
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    Click to upload banner images
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Use a wide image so it looks clear in the hero preview and
+                    on the offers page.
+                  </p>
+                </div>
+              </label>
+            </div>
             {uploading && (
               <p className="text-sm text-sky-500 mt-2 animate-pulse">Uploading...</p>
             )}
             {formData.images.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-3">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {formData.images.map((image, index) => (
                   <div key={`${image.url}-${index}`} className="relative group">
                     <img
                       src={image.url}
                       alt={image.altText || `Offer image ${index + 1}`}
-                      className="w-32 h-32 object-cover rounded-xl border shadow-md"
+                      className="w-full rounded-2xl border shadow-md object-cover"
+                      style={{ aspectRatio: "16 / 6" }}
                     />
                     {index === 0 && (
-                      <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center rounded-b-xl py-0.5 font-medium">
+                      <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center rounded-b-2xl py-0.5 font-medium">
                         Main
                       </span>
                     )}
