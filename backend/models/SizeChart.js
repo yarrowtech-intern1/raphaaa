@@ -3,12 +3,7 @@ const mongoose = require("mongoose");
 const sizeChartSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    audience: {
-      type: String,
-      enum: ["Men", "Women", "Kids", "Unisex"],
-      required: true,
-      default: "Unisex",
-    },
+    audience: { type: String, required: true, trim: true, default: "Unisex" },
     chartImageUrl: { type: String, required: true, trim: true },
     measureImageUrl: { type: String, trim: true, default: "" },
     unit: { type: String, enum: ["in", "cm"], default: "in" },
@@ -23,4 +18,3 @@ const sizeChartSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("SizeChart", sizeChartSchema);
-

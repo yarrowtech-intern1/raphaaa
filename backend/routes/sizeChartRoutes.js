@@ -47,6 +47,53 @@ router.post("/", protect, adminOrMerchantise, async (req, res) => {
   }
 });
 
+// PUT /api/size-charts/:id
+router.put("/:id", protect, adminOrMerchantise, async (req, res) => {
+  try {
+    const chart = await SizeChart.findById(req.params.id);
+    if (!chart) return res.status(404).json({ message: "Size chart not found" });
+
+    const { name, audience, chartImageUrl, measureImageUrl, unit } = req.body;
+
+    if (name !== undefined) {
+      const nextName = String(name).trim();
+      if (!nextName) {
+        return res.status(400).json({ message: "Name is required" });
+      }
+      chart.name = nextName;
+    }
+
+    if (audience !== undefined) {
+      chart.audience = audience || "Unisex";
+    }
+
+    if (chartImageUrl !== undefined) {
+      const nextChartImage = String(chartImageUrl).trim();
+      if (!nextChartImage) {
+        return res.status(400).json({ message: "Chart image is required" });
+      }
+      chart.chartImageUrl = nextChartImage;
+    }
+
+    if (measureImageUrl !== undefined) {
+      chart.measureImageUrl = measureImageUrl ? String(measureImageUrl).trim() : "";
+    }
+
+    if (unit !== undefined) {
+      chart.unit = unit || "in";
+    }
+
+    await chart.save();
+    res.json(chart);
+  } catch (error) {
+    console.error("Failed to update size chart:", error);
+    if (error?.name === "ValidationError") {
+      return res.status(400).json({ message: "Invalid size chart data" });
+    }
+    res.status(500).json({ message: "Failed to update size chart" });
+  }
+});
+
 // DELETE /api/size-charts/:id
 router.delete("/:id", protect, adminOrMerchantise, async (req, res) => {
   try {
@@ -62,4 +109,3 @@ router.delete("/:id", protect, adminOrMerchantise, async (req, res) => {
 });
 
 module.exports = router;
-

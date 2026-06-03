@@ -4,7 +4,16 @@ import { useDispatch, useSelector } from "react-redux";
 import { createProduct } from "../../redux/slices/adminProductSlice";
 import { toast } from "sonner";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { Link } from "react-router-dom";
+import {
+  COLOR_OPTIONS,
+  createColorOption,
+  colorFilterOption,
+  findColorOption,
+  isValidCssColor,
+  prettyColorLabel,
+} from "../../utils/colorCatalog";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:9000";
 
@@ -22,39 +31,21 @@ const normalizeSize = (s) => {
   return t;
 };
 
-const COLOR_NAME_MAP = {
-  "#000000": "Black", "#FFFFFF": "White", "#FF0000": "Red",
-  "#00FF00": "Lime", "#0000FF": "Blue", "#FFFF00": "Yellow",
-  "#00FFFF": "Cyan", "#FF00FF": "Magenta", "#C0C0C0": "Silver",
-  "#808080": "Gray", "#800000": "Maroon", "#808000": "Olive",
-  "#008000": "Green", "#800080": "Purple", "#008080": "Teal",
-  "#000080": "Navy", "#FFA500": "Orange", "#FFC0CB": "Pink",
-  "#A52A2A": "Brown", "#F5F5DC": "Beige", "#D2691E": "Chocolate",
-  "#DC143C": "Crimson", "#FFD700": "Gold", "#4B0082": "Indigo",
-  "#F0E68C": "Khaki", "#E6E6FA": "Lavender", "#90EE90": "LightGreen",
-  "#ADD8E6": "LightBlue", "#D3D3D3": "LightGray",
-};
-
-const getColorName = (hex) => COLOR_NAME_MAP[hex?.toUpperCase()] || hex?.toUpperCase() || "";
-
-const generateColorOptions = () => {
-  const steps = ["00", "33", "66", "99", "CC", "FF"];
-  const colors = [];
-  for (let r of steps) for (let g of steps) for (let b of steps) colors.push(`#${r}${g}${b}`);
-  // Also include common named colors not in web-safe palette
-  ["#FFA500", "#FFC0CB", "#A52A2A", "#F5F5DC", "#D2691E", "#DC143C", "#FFD700",
-   "#4B0082", "#F0E68C", "#E6E6FA", "#90EE90", "#ADD8E6", "#D3D3D3"].forEach((c) => {
-    if (!colors.includes(c)) colors.push(c);
-  });
-  return colors.map((hex) => ({ value: hex, label: getColorName(hex) }));
-};
-
-const COLOR_OPTIONS = generateColorOptions();
 const selectPortalTarget = typeof document !== "undefined" ? document.body : null;
 const selectMenuStyles = {
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
   menu: (base) => ({ ...base, zIndex: 9999 }),
 };
+
+const formatColorOptionLabel = (opt) => (
+  <div className="flex items-center gap-2">
+    <span
+      className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
+      style={{ backgroundColor: opt.value }}
+    />
+    <span>{opt.label}</span>
+  </div>
+);
 
 const emptySize = () => ({ size: "", sku: "", countInStock: "" });
 const emptyColorVariant = (index) => ({
@@ -83,23 +74,32 @@ const AddProduct = () => {
   });
 
   const [metaOptions, setMetaOptions] = useState({ category: [], collection: [], gender: [], material: [] });
+  const [colorOptions, setColorOptions] = useState(() => COLOR_OPTIONS);
   const [uploadingColor, setUploadingColor] = useState(null);
   const [sizeCharts, setSizeCharts] = useState([]);
   const [selectedSizeChartId, setSelectedSizeChartId] = useState("");
 
   useEffect(() => {
-    axios.get(`${API_BASE}/api/meta-options`).then(({ data }) => {
-      const buckets = data.reduce(
-        (acc, { type, value }) => {
-          if (["category", "collection", "gender", "material"].includes(type)) {
-            if (!acc[type].includes(value)) acc[type].push(value);
-          }
-          return acc;
-        },
-        { category: [], collection: [], gender: [], material: [] }
-      );
-      setMetaOptions(buckets);
-    }).catch(console.error);
+    const token = localStorage.getItem("userToken");
+    if (!token) return;
+
+    axios
+      .get(`${API_BASE}/api/meta-options`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then(({ data }) => {
+        const buckets = data.reduce(
+          (acc, { type, value }) => {
+            if (["category", "collection", "gender", "material"].includes(type)) {
+              if (!acc[type].includes(value)) acc[type].push(value);
+            }
+            return acc;
+          },
+          { category: [], collection: [], gender: [], material: [] }
+        );
+        setMetaOptions(buckets);
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -149,6 +149,23 @@ const AddProduct = () => {
     setColorVariants((prev) =>
       prev.map((cv) => (cv.id === id ? { ...cv, [field]: value } : cv))
     );
+
+  const handleCreateColor = (id, inputValue) => {
+    const value = String(inputValue || "").trim();
+    if (!isValidCssColor(value)) {
+      toast.error("Enter a valid CSS color name or hex code.");
+      return;
+    }
+
+    const option = createColorOption(value);
+    setColorOptions((prev) =>
+      prev.some((item) => item.value.toLowerCase() === option.value.toLowerCase())
+        ? prev
+        : [option, ...prev]
+    );
+    updateColorVariant(id, "color", option.value);
+    updateColorVariant(id, "colorName", prettyColorLabel(option.value));
+  };
 
   // Images for a color
   const handleColorImageUpload = async (id, files) => {
@@ -221,7 +238,7 @@ const AddProduct = () => {
     const normalizedColorVariants = colorVariants
       .map((cv) => ({
         color: cv.color.trim(),
-        colorName: cv.colorName.trim() || getColorName(cv.color),
+        colorName: cv.colorName.trim() || prettyColorLabel(cv.color),
         images: cv.images,
         sizes: cv.sizes
           .map((s) => ({
@@ -579,11 +596,13 @@ const AddProduct = () => {
                 key={cv.id} cv={cv} cvIdx={cvIdx}
                 totalColors={colorVariants.length}
                 uploadingColor={uploadingColor}
+                colorOptions={colorOptions}
                 onColorChange={(color) => {
                   updateColorVariant(cv.id, "color", color);
-                  updateColorVariant(cv.id, "colorName", getColorName(color));
+                  updateColorVariant(cv.id, "colorName", prettyColorLabel(color));
                 }}
                 onColorNameChange={(name) => updateColorVariant(cv.id, "colorName", name)}
+                onCreateColor={(inputValue) => handleCreateColor(cv.id, inputValue)}
                 onImageUpload={(files) => handleColorImageUpload(cv.id, files)}
                 onImageRemove={(idx) => removeColorImage(cv.id, idx)}
                 onAddSize={() => addSize(cv.id)}
@@ -633,6 +652,7 @@ const SectionCard = ({ title, subtitle, children, action }) => (
 // ─── Sub-component: one color variant card ────────────────────────────────────
 const ColorVariantCard = ({
   cv, cvIdx, totalColors, uploadingColor,
+  colorOptions, onCreateColor,
   onColorChange, onColorNameChange,
   onImageUpload, onImageRemove,
   onAddSize, onRemoveSize, onSizeChange,
@@ -665,21 +685,22 @@ const ColorVariantCard = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Color *</label>
-          <Select
-            options={COLOR_OPTIONS}
-            value={cv.color ? { value: cv.color, label: getColorName(cv.color) } : null}
-            onChange={(sel) => onColorChange(sel?.value || "")}
+          <CreatableSelect
+            options={colorOptions}
+            value={findColorOption(cv.color, colorOptions) || (cv.color ? createColorOption(cv.color) : null)}
+            onChange={(sel) => {
+              onColorChange(sel?.value || "");
+              onColorNameChange(sel?.label || prettyColorLabel(sel?.value || ""));
+            }}
+            onCreateOption={onCreateColor}
+            isValidNewOption={(inputValue) => isValidCssColor(inputValue)}
+            filterOption={colorFilterOption}
+            formatOptionLabel={formatColorOptionLabel}
             placeholder="Pick a colour…"
             menuPortalTarget={selectPortalTarget}
             menuPosition="fixed"
             styles={selectMenuStyles}
-            formatOptionLabel={(opt) => (
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
-                  style={{ backgroundColor: opt.value }} />
-                <span>{opt.label}</span>
-              </div>
-            )}
+            formatCreateLabel={(inputValue) => `Use "${inputValue}"`}
           />
         </div>
         <div>

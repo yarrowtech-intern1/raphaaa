@@ -3,13 +3,6 @@ import axios from "axios";
 import { toast } from "sonner";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:9000";
-const normalizeAudience = (v) => {
-  const s = String(v || "").trim().toLowerCase();
-  if (s === "male" || s === "men" || s === "man") return "Men";
-  if (s === "female" || s === "women" || s === "woman") return "Women";
-  if (s === "kids" || s === "kid" || s === "children" || s === "child") return "Kids";
-  return "Unisex";
-};
 
 const emptyForm = {
   name: "",
@@ -22,6 +15,7 @@ const emptyForm = {
 const AdminSizeCharts = () => {
   const [charts, setCharts] = useState([]);
   const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [genderOptions, setGenderOptions] = useState([]);
@@ -44,18 +38,26 @@ const AdminSizeCharts = () => {
 
   useEffect(() => {
     const fetchGenderOptions = async () => {
+      if (!token) {
+        setGenderOptions(["Unisex"]);
+        setForm((prev) => ({ ...prev, audience: prev.audience || "Unisex" }));
+        return;
+      }
+
       try {
-        const { data } = await axios.get(`${API_BASE}/api/meta-options`);
+        const { data } = await axios.get(`${API_BASE}/api/meta-options`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const options = (Array.isArray(data) ? data : [])
           .filter((item) => item?.type === "gender" && String(item?.value || "").trim())
           .map((item) => String(item.value).trim());
 
-        const normalized = [...new Set(options.map(normalizeAudience))];
-        if (!normalized.includes("Unisex")) normalized.push("Unisex");
-        setGenderOptions(normalized);
-        setForm((prev) => ({ ...prev, audience: prev.audience || normalized[0] || "Unisex" }));
+        const unique = [...new Set(options)];
+        if (!unique.includes("Unisex")) unique.push("Unisex");
+        setGenderOptions(unique);
+        setForm((prev) => ({ ...prev, audience: prev.audience || unique[0] || "Unisex" }));
       } catch {
-        setGenderOptions(["Men", "Women", "Kids", "Unisex"]);
+        setGenderOptions(["Unisex"]);
         setForm((prev) => ({ ...prev, audience: prev.audience || "Unisex" }));
       }
     };
@@ -87,23 +89,49 @@ const AdminSizeCharts = () => {
 
   const createChart = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.chartImageUrl || !form.measureImageUrl) {
-      toast.error("Name, chart image, and how-to-measure image are required");
+    if (!form.name.trim() || !form.chartImageUrl || (!editingId && !form.measureImageUrl)) {
+      toast.error(editingId ? "Name and chart image are required" : "Name, chart image, and how-to-measure image are required");
       return;
     }
     try {
       setLoading(true);
-      await axios.post(`${API_BASE}/api/size-charts`, { ...form, audience: normalizeAudience(form.audience) }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      toast.success("Size chart created");
+      const payload = { ...form, audience: String(form.audience || "").trim() || "Unisex" };
+      if (editingId) {
+        await axios.put(`${API_BASE}/api/size-charts/${editingId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        toast.success("Size chart updated");
+      } else {
+        await axios.post(`${API_BASE}/api/size-charts`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        toast.success("Size chart created");
+      }
       setForm(emptyForm);
+      setEditingId("");
       fetchCharts();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to create size chart");
+      toast.error(err?.response?.data?.message || (editingId ? "Failed to update size chart" : "Failed to create size chart"));
     } finally {
       setLoading(false);
     }
+  };
+
+  const startEdit = (chart) => {
+    setEditingId(chart._id);
+    setForm({
+      name: chart.name || "",
+      audience: chart.audience || "Unisex",
+      unit: chart.unit || "in",
+      chartImageUrl: chart.chartImageUrl || "",
+      measureImageUrl: chart.measureImageUrl || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditingId("");
+    setForm(emptyForm);
   };
 
   const archiveChart = async (id) => {
@@ -113,19 +141,46 @@ const AdminSizeCharts = () => {
       });
       toast.success("Size chart archived");
       setCharts((prev) => prev.filter((c) => c._id !== id));
+      if (editingId === id) {
+        cancelEdit();
+      }
     } catch {
       toast.error("Failed to archive size chart");
     }
+  };
+
+  const clearMeasureImage = () => {
+    setForm((prev) => ({ ...prev, measureImageUrl: "" }));
   };
 
   return (
     <div className="min-h-screen p-4 md:p-6 space-y-5">
       <div>
         <h1 className="text-xl font-extrabold text-gray-900">Size Charts</h1>
-        <p className="text-sm text-gray-500">Create reusable Men/Women/Kids size charts for products.</p>
+        <p className="text-sm text-gray-500">Create reusable size charts using the stored gender categories.</p>
       </div>
 
       <form onSubmit={createChart} className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+              {editingId ? "Editing existing chart" : "Create new chart"}
+            </p>
+            <p className="text-sm text-gray-600">
+              {editingId ? "Replace images or update the existing size chart." : "Upload a new reusable size chart."}
+            </p>
+          </div>
+          {editingId && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl px-3 py-2 hover:bg-gray-50"
+            >
+              Cancel Edit
+            </button>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             value={form.name}
@@ -161,8 +216,17 @@ const AdminSizeCharts = () => {
             {uploading && uploadField === "measureImageUrl" ? "Uploading Measure..." : "Upload How-To-Measure Image"}
             <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadImage("measureImageUrl", e.target.files?.[0])} />
           </label>
+          {editingId && (
+            <button
+              type="button"
+              onClick={clearMeasureImage}
+              className="px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm font-semibold"
+            >
+              Remove Measure Image
+            </button>
+          )}
           <button disabled={loading || uploading} className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold disabled:opacity-60">
-            {loading ? "Saving..." : "Save Size Chart"}
+            {loading ? "Saving..." : editingId ? "Update Size Chart" : "Save Size Chart"}
           </button>
         </div>
 
@@ -207,13 +271,22 @@ const AdminSizeCharts = () => {
               </div>
               <p className="font-semibold text-gray-900">{c.name}</p>
               <p className="text-xs text-gray-500">{c.audience} • {c.unit}</p>
-              <button
-                type="button"
-                onClick={() => archiveChart(c._id)}
-                className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50"
-              >
-                Archive
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => startEdit(c)}
+                  className="text-xs font-semibold text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => archiveChart(c._id)}
+                  className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>

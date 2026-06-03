@@ -2,12 +2,21 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import {
   fetchProductDetails,
   updateProduct,
 } from "../../redux/slices/productsSlice";
 import axios from "axios";
 import { toast } from "sonner";
+import {
+  COLOR_OPTIONS,
+  createColorOption,
+  colorFilterOption,
+  findColorOption,
+  isValidCssColor,
+  prettyColorLabel,
+} from "../../utils/colorCatalog";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:9000";
 
@@ -24,33 +33,21 @@ const normalizeSize = (s) => {
   return t;
 };
 
-const COLOR_NAME_MAP = {
-  "#000000": "Black", "#FFFFFF": "White", "#FF0000": "Red",
-  "#00FF00": "Lime", "#0000FF": "Blue", "#FFFF00": "Yellow",
-  "#00FFFF": "Cyan", "#FF00FF": "Magenta", "#C0C0C0": "Silver",
-  "#808080": "Gray", "#800000": "Maroon", "#808000": "Olive",
-  "#008000": "Green", "#800080": "Purple", "#008080": "Teal",
-  "#000080": "Navy", "#FFA500": "Orange", "#FFC0CB": "Pink",
-  "#A52A2A": "Brown", "#F5F5DC": "Beige", "#D2691E": "Chocolate",
-  "#DC143C": "Crimson", "#FFD700": "Gold", "#4B0082": "Indigo",
-};
-const getColorName = (hex) => COLOR_NAME_MAP[hex?.toUpperCase()] || hex?.toUpperCase() || "";
-
-const generateColorOptions = () => {
-  const steps = ["00", "33", "66", "99", "CC", "FF"];
-  const colors = [];
-  for (let r of steps) for (let g of steps) for (let b of steps) colors.push(`#${r}${g}${b}`);
-  ["#FFA500","#FFC0CB","#A52A2A","#F5F5DC","#D2691E","#DC143C","#FFD700","#4B0082"].forEach((c) => {
-    if (!colors.includes(c)) colors.push(c);
-  });
-  return colors.map((hex) => ({ value: hex, label: getColorName(hex) }));
-};
-const COLOR_OPTIONS = generateColorOptions();
 const selectPortalTarget = typeof document !== "undefined" ? document.body : null;
 const selectMenuStyles = {
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
   menu: (base) => ({ ...base, zIndex: 9999 }),
 };
+
+const formatColorOptionLabel = (opt) => (
+  <div className="flex items-center gap-2">
+    <span
+      className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
+      style={{ backgroundColor: opt.value }}
+    />
+    <span>{opt.label}</span>
+  </div>
+);
 
 const emptySize  = () => ({ size: "", sku: "", countInStock: "" });
 const makeId     = () => Date.now() + Math.random();
@@ -60,7 +57,7 @@ const dbColorVariantsToState = (dbCVs = []) =>
   dbCVs.map((cv) => ({
     id: makeId(),
     color:     cv.color     || "",
-    colorName: cv.colorName || getColorName(cv.color) || "",
+    colorName: cv.colorName || prettyColorLabel(cv.color) || "",
     images:    (cv.images   || []).map((img) => ({ url: img.url, altText: img.altText || "" })),
     sizes:     (cv.sizes    || []).map((s) => ({
       size:         s.size         || "",
@@ -101,23 +98,32 @@ const EditProductPage = () => {
   const [uploadingColor, setUploadingColor] = useState(null);
   const [deleting, setDeleting]           = useState(null);
   const [metaOptions, setMetaOptions]     = useState({ category: [], collection: [], gender: [], material: [] });
+  const [colorOptions, setColorOptions]   = useState(() => COLOR_OPTIONS);
   const [sizeCharts, setSizeCharts]       = useState([]);
   const [selectedSizeChartId, setSelectedSizeChartId] = useState("");
   // Size chart is selected from library; uploading/creating is done in /admin/size-charts.
 
   // Load meta options
   useEffect(() => {
-    axios.get(`${API_BASE}/api/meta-options`).then(({ data }) => {
-      const b = data.reduce(
-        (acc, { type, value }) => {
-          if (["category","collection","gender","material"].includes(type) && !acc[type].includes(value))
-            acc[type].push(value);
-          return acc;
-        },
-        { category: [], collection: [], gender: [], material: [] }
-      );
-      setMetaOptions(b);
-    }).catch(console.error);
+    const token = localStorage.getItem("userToken");
+    if (!token) return;
+
+    axios
+      .get(`${API_BASE}/api/meta-options`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then(({ data }) => {
+        const b = data.reduce(
+          (acc, { type, value }) => {
+            if (["category", "collection", "gender", "material"].includes(type) && !acc[type].includes(value))
+              acc[type].push(value);
+            return acc;
+          },
+          { category: [], collection: [], gender: [], material: [] }
+        );
+        setMetaOptions(b);
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -174,7 +180,7 @@ const EditProductPage = () => {
           colorMap[col] = {
             id: makeId(),
             color:     col,
-            colorName: getColorName(col),
+            colorName: prettyColorLabel(col),
             images:    selectedProduct.images || [],
             sizes:     [],
           };
@@ -190,7 +196,7 @@ const EditProductPage = () => {
       setColorVariants([{
         id: makeId(),
         color: selectedProduct.colors?.[0] || "",
-        colorName: getColorName(selectedProduct.colors?.[0] || ""),
+        colorName: prettyColorLabel(selectedProduct.colors?.[0] || ""),
         images: selectedProduct.images || [],
         sizes: [{ size: selectedProduct.sizes?.[0] || "", sku: selectedProduct.sku || "", countInStock: selectedProduct.countInStock || "" }],
       }]);
@@ -242,6 +248,23 @@ const EditProductPage = () => {
 
   const updateCV = (id, field, value) =>
     setColorVariants((p) => p.map((cv) => cv.id === id ? { ...cv, [field]: value } : cv));
+
+  const handleCreateColor = (id, inputValue) => {
+    const value = String(inputValue || "").trim();
+    if (!isValidCssColor(value)) {
+      toast.error("Enter a valid CSS color name or hex code.");
+      return;
+    }
+
+    const option = createColorOption(value);
+    setColorOptions((prev) =>
+      prev.some((item) => item.value.toLowerCase() === option.value.toLowerCase())
+        ? prev
+        : [option, ...prev]
+    );
+    updateCV(id, "color", option.value);
+    updateCV(id, "colorName", prettyColorLabel(option.value));
+  };
 
   // Per-color image upload
   const handleColorImageUpload = async (id, files) => {
@@ -301,13 +324,13 @@ const EditProductPage = () => {
     );
 
   // ─── Submit ──────────────────────────────────────────────────────────────
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const normalizedColorVariants = colorVariants
       .map((cv) => ({
         color:     cv.color.trim(),
-        colorName: cv.colorName.trim() || getColorName(cv.color),
+        colorName: cv.colorName.trim() || prettyColorLabel(cv.color),
         images:    cv.images,
         sizes:     cv.sizes
           .map((s) => ({ size: normalizeSize(s.size), sku: s.sku.trim(), countInStock: Number(s.countInStock || 0) }))
@@ -350,9 +373,16 @@ const EditProductPage = () => {
       },
     };
 
-    dispatch(updateProduct({ id, productData: payload }));
-    toast.success("Product updated!");
-    navigate("/admin/products");
+    setUploading(true);
+    try {
+      await dispatch(updateProduct({ id, productData: payload })).unwrap();
+      toast.success("Product updated!");
+      navigate("/admin/products");
+    } catch (err) {
+      toast.error(err?.message || "Failed to update product");
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (loading) return (
@@ -617,24 +647,22 @@ const EditProductPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Color *</label>
-                      <Select
-                        options={COLOR_OPTIONS}
-                        value={cv.color ? { value: cv.color, label: getColorName(cv.color) } : null}
+                      <CreatableSelect
+                        options={colorOptions}
+                        value={findColorOption(cv.color, colorOptions) || (cv.color ? createColorOption(cv.color) : null)}
                         onChange={(sel) => {
                           updateCV(cv.id, "color", sel?.value || "");
-                          updateCV(cv.id, "colorName", getColorName(sel?.value || ""));
+                          updateCV(cv.id, "colorName", sel?.label || prettyColorLabel(sel?.value || ""));
                         }}
+                        onCreateOption={(inputValue) => handleCreateColor(cv.id, inputValue)}
+                        isValidNewOption={(inputValue) => isValidCssColor(inputValue)}
+                        filterOption={colorFilterOption}
+                        formatOptionLabel={formatColorOptionLabel}
                         placeholder="Pick a colour…"
                         menuPortalTarget={selectPortalTarget}
                         menuPosition="fixed"
                         styles={selectMenuStyles}
-                        formatOptionLabel={(opt) => (
-                          <div className="flex items-center gap-2">
-                            <span className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
-                              style={{ backgroundColor: opt.value }} />
-                            <span>{opt.label}</span>
-                          </div>
-                        )}
+                        formatCreateLabel={(inputValue) => `Use "${inputValue}"`}
                       />
                     </div>
                     <div>
