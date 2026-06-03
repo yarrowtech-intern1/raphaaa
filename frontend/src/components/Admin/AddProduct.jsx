@@ -14,6 +14,7 @@ import {
   isValidCssColor,
   prettyColorLabel,
 } from "../../utils/colorCatalog";
+import { moveArrayItem } from "../../utils/reorderArray";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:9000";
 
@@ -61,6 +62,7 @@ const AddProduct = () => {
   const { loading } = useSelector((state) => state.adminProducts);
 
   const [colorVariants, setColorVariants] = useState([emptyColorVariant(0)]);
+  const [draggedImage, setDraggedImage] = useState(null);
   const [productData, setProductData] = useState({
     name: "", description: "", price: "", discountPrice: "",
     offerPercentage: "", sku: "", category: "", brand: "",
@@ -196,6 +198,15 @@ const AddProduct = () => {
       prev.map((cv) =>
         cv.id === colorId
           ? { ...cv, images: cv.images.filter((_, i) => i !== imgIndex) }
+          : cv
+      )
+    );
+
+  const moveColorImage = (colorId, fromIndex, toIndex) =>
+    setColorVariants((prev) =>
+      prev.map((cv) =>
+        cv.id === colorId
+          ? { ...cv, images: moveArrayItem(cv.images, fromIndex, toIndex) }
           : cv
       )
     );
@@ -596,6 +607,7 @@ const AddProduct = () => {
                 key={cv.id} cv={cv} cvIdx={cvIdx}
                 totalColors={colorVariants.length}
                 uploadingColor={uploadingColor}
+                draggedImage={draggedImage}
                 colorOptions={colorOptions}
                 onColorChange={(color) => {
                   updateColorVariant(cv.id, "color", color);
@@ -605,6 +617,9 @@ const AddProduct = () => {
                 onCreateColor={(inputValue) => handleCreateColor(cv.id, inputValue)}
                 onImageUpload={(files) => handleColorImageUpload(cv.id, files)}
                 onImageRemove={(idx) => removeColorImage(cv.id, idx)}
+                onMoveImage={(fromIndex, toIndex) => moveColorImage(cv.id, fromIndex, toIndex)}
+                onDragStartImage={(imageIndex) => setDraggedImage({ colorId: cv.id, imageIndex })}
+                onDragEndImage={() => setDraggedImage(null)}
                 onAddSize={() => addSize(cv.id)}
                 onRemoveSize={(idx) => removeSize(cv.id, idx)}
                 onSizeChange={(idx, field, val) => updateSize(cv.id, idx, field, val)}
@@ -652,9 +667,10 @@ const SectionCard = ({ title, subtitle, children, action }) => (
 // ─── Sub-component: one color variant card ────────────────────────────────────
 const ColorVariantCard = ({
   cv, cvIdx, totalColors, uploadingColor,
-  colorOptions, onCreateColor,
+  draggedImage, colorOptions, onCreateColor,
   onColorChange, onColorNameChange,
   onImageUpload, onImageRemove,
+  onMoveImage, onDragStartImage, onDragEndImage,
   onAddSize, onRemoveSize, onSizeChange,
   onRemoveColor,
 }) => (
@@ -728,7 +744,20 @@ const ColorVariantCard = ({
         {cv.images.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {cv.images.map((img, idx) => (
-              <div key={idx} className="relative group">
+              <div
+                key={idx}
+                className={`relative group ${draggedImage?.colorId === cv.id && draggedImage?.imageIndex === idx ? "opacity-60 scale-95" : ""}`}
+                draggable
+                onDragStart={() => onDragStartImage(idx)}
+                onDragEnd={onDragEndImage}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (draggedImage?.colorId === cv.id) {
+                    onMoveImage(draggedImage.imageIndex, idx);
+                  }
+                  onDragEndImage();
+                }}
+              >
                 <img src={img.url} alt={img.altText}
                   className="w-16 h-16 object-cover rounded-xl border border-gray-200 shadow-sm" />
                 <button type="button" onClick={() => onImageRemove(idx)}
@@ -740,6 +769,9 @@ const ColorVariantCard = ({
                     Main
                   </span>
                 )}
+                <span className="absolute top-0 left-0 bg-black/45 text-white text-[8px] rounded-br-lg px-1.5 py-0.5 font-semibold">
+                  Drag
+                </span>
               </div>
             ))}
           </div>

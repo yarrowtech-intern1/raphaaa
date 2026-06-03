@@ -17,6 +17,7 @@ import {
   isValidCssColor,
   prettyColorLabel,
 } from "../../utils/colorCatalog";
+import { moveArrayItem } from "../../utils/reorderArray";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:9000";
 
@@ -97,6 +98,7 @@ const EditProductPage = () => {
   const [uploading, setUploading]         = useState(false);
   const [uploadingColor, setUploadingColor] = useState(null);
   const [deleting, setDeleting]           = useState(null);
+  const [draggedImage, setDraggedImage]   = useState(null);
   const [metaOptions, setMetaOptions]     = useState({ category: [], collection: [], gender: [], material: [] });
   const [colorOptions, setColorOptions]   = useState(() => COLOR_OPTIONS);
   const [sizeCharts, setSizeCharts]       = useState([]);
@@ -304,6 +306,15 @@ const EditProductPage = () => {
     );
     setDeleting(null);
   };
+
+  const moveColorImage = (colorId, fromIndex, toIndex) =>
+    setColorVariants((prev) =>
+      prev.map((cv) =>
+        cv.id === colorId
+          ? { ...cv, images: moveArrayItem(cv.images, fromIndex, toIndex) }
+          : cv
+      )
+    );
 
   // Sizes
   const addSize = (colorId) =>
@@ -691,7 +702,20 @@ const EditProductPage = () => {
                     {cv.images.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {cv.images.map((img, idx) => (
-                          <div key={idx} className="relative group">
+                          <div
+                            key={idx}
+                            className={`relative group ${draggedImage?.colorId === cv.id && draggedImage?.imageIndex === idx ? "opacity-60 scale-95" : ""}`}
+                            draggable
+                            onDragStart={() => setDraggedImage({ colorId: cv.id, imageIndex: idx })}
+                            onDragEnd={() => setDraggedImage(null)}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() => {
+                              if (draggedImage?.colorId === cv.id) {
+                                moveColorImage(cv.id, draggedImage.imageIndex, idx);
+                              }
+                              setDraggedImage(null);
+                            }}
+                          >
                             <img src={img.url} alt={img.altText}
                               className="w-16 h-16 object-cover rounded-xl border border-gray-200 shadow-sm" />
                             <button type="button"
@@ -707,6 +731,9 @@ const EditProductPage = () => {
                                 Main
                               </span>
                             )}
+                            <span className="absolute top-0 left-0 bg-black/45 text-white text-[8px] rounded-br-lg px-1.5 py-0.5 font-semibold">
+                              Drag
+                            </span>
                           </div>
                         ))}
                       </div>
