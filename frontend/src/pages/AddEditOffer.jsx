@@ -1,41 +1,41 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+const emptyOfferForm = {
+  title: "",
+  description: "",
+  offerPercentage: 0,
+  startDate: "",
+  endDate: "",
+  images: [],
+  bannerImage: "",
+  alertImage: "",
+  productIds: [],
+};
+
 const AddEditOffer = () => {
   const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    offerPercentage: 0,
-    startDate: "",
-    endDate: "",
-    bannerImage: "",
-    alertImage: "",
-    productIds: [],
+    ...emptyOfferForm,
   });
   const [products, setProducts] = useState([]);
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
   const { id } = useParams();
 
-  useEffect(() => {
-    fetchProducts();
-    if (id) fetchOffer();
-  }, [id]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const { data } = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/products`
       );
       setProducts(data);
-    } catch (err) {
+    } catch {
       toast.error("Failed to fetch products");
     }
-  };
+  }, []);
 
-  const fetchOffer = async () => {
+  const fetchOffer = useCallback(async () => {
     try {
       const { data } = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/offers/${id}`,
@@ -45,20 +45,30 @@ const AddEditOffer = () => {
           },
         }
       );
+      const images = Array.isArray(data.images) && data.images.length > 0
+        ? data.images
+        : (data.bannerImage ? [{ url: data.bannerImage, altText: "Offer banner" }] : []);
       setFormData({
+        ...emptyOfferForm,
         title: data.title || "",
         description: data.description || "",
         offerPercentage: data.offerPercentage || 0,
         startDate: data.startDate?.slice(0, 10) || "",
         endDate: data.endDate?.slice(0, 10) || "",
-        bannerImage: data.bannerImage || "",
+        images,
+        bannerImage: data.bannerImage || images[0]?.url || "",
         alertImage: data.alertImage || "",
         productIds: data.productIds?.map((p) => p._id) || [],
       });
-    } catch (err) {
+    } catch {
       toast.error("Failed to fetch offer");
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchProducts();
+    if (id) fetchOffer();
+  }, [fetchProducts, fetchOffer, id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -66,28 +76,50 @@ const AddEditOffer = () => {
   };
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const imgData = new FormData();
-    imgData.append("image", file);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     try {
       setUploading(true);
-      const { data } = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/upload`,
-        imgData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("userToken")}`,
-          },
-        }
-      );
-      setFormData((prev) => ({ ...prev, bannerImage: data.imageUrl }));
+      const uploaded = [];
+      for (const file of files) {
+        const imgData = new FormData();
+        imgData.append("image", file);
+        const { data } = await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL}/api/upload`,
+          imgData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${localStorage.getItem("userToken")}`,
+            },
+          }
+        );
+        uploaded.push({ url: data.imageUrl, altText: file.name });
+      }
+      setFormData((prev) => {
+        const images = [...prev.images, ...uploaded];
+        return {
+          ...prev,
+          images,
+          bannerImage: images[0]?.url || "",
+        };
+      });
     } catch {
       toast.error("Upload failed");
     } finally {
       setUploading(false);
     }
+  };
+
+  const removeOfferImage = (index) => {
+    setFormData((prev) => {
+      const images = prev.images.filter((_, imageIndex) => imageIndex !== index);
+      return {
+        ...prev,
+        images,
+        bannerImage: images[0]?.url || "",
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -99,37 +131,35 @@ const AddEditOffer = () => {
         },
       };
 
+      const payload = {
+        ...formData,
+        bannerImage: formData.images[0]?.url || formData.bannerImage || "",
+      };
+
       if (id) {
         await axios.put(
           `${import.meta.env.VITE_BACKEND_URL}/api/offers/${id}`,
-          formData,
+          payload,
           config
         );
         toast.success("Offer updated");
+        navigate("/admin/offers");
       } else {
         await axios.post(
           `${import.meta.env.VITE_BACKEND_URL}/api/offers`,
-          formData,
+          payload,
           config
         );
         toast.success("Offer created");
 
         // ✅ Clear form after successful creation
-        setFormData({
-          title: "",
-          description: "",
-          offerPercentage: 0,
-          startDate: "",
-          endDate: "",
-          bannerImage: "",
-          alertImage: "",
-          productIds: [],
-        });
+        setFormData({ ...emptyOfferForm });
 
         // ✅ Reset file inputs manually
         document
           .querySelectorAll('input[type="file"]')
           .forEach((input) => (input.value = ""));
+        navigate("/admin/offers");
       }
 
     } catch (error) {
@@ -272,12 +302,30 @@ const AddEditOffer = () => {
             {uploading && (
               <p className="text-sm text-sky-500 mt-2 animate-pulse">Uploading...</p>
             )}
-            {formData.bannerImage && (
-              <img
-                src={formData.bannerImage}
-                alt="Banner"
-                className="mt-3 max-h-48 rounded-xl border shadow-md"
-              />
+            {formData.images.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-3">
+                {formData.images.map((image, index) => (
+                  <div key={`${image.url}-${index}`} className="relative group">
+                    <img
+                      src={image.url}
+                      alt={image.altText || `Offer image ${index + 1}`}
+                      className="w-32 h-32 object-cover rounded-xl border shadow-md"
+                    />
+                    {index === 0 && (
+                      <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center rounded-b-xl py-0.5 font-medium">
+                        Main
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeOfferImage(index)}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow-md"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

@@ -3,6 +3,10 @@ const mongoose = require("mongoose");
 const offerSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: String,
+  images: [{
+    url: { type: String, trim: true },
+    altText: { type: String, trim: true, default: "" },
+  }],
   bannerImage: String, // optional Cloudinary URL
   alertImage: String, // 🆕 Optional portrait image for popup alerts
 
