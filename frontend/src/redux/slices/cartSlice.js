@@ -244,6 +244,9 @@ export const fetchCart = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
+      if (error?.response?.status === 404) {
+        return { products: [], totalPrice: 0 };
+      }
       console.error("Error fetching cart:", error);
       return rejectWithValue({
         status: error?.response?.status,

@@ -1674,13 +1674,14 @@ import axios from "axios";
 import { FiShoppingCart, FiZap } from "react-icons/fi";
 import { FiBell } from "react-icons/fi";
 import { GoDotFill } from "react-icons/go";
-import { FaCartShopping } from "react-icons/fa6";
+import { FaCartShopping, FaRuler, FaRulerHorizontal } from "react-icons/fa6";
 import { flyToCart } from "../../utils/flyToCart";
 import { FiShare2 } from "react-icons/fi";
 import { FiCopy } from "react-icons/fi";
 import ProductQA from "./ProductQA";
 import { Helmet } from "react-helmet-async";
 import { formatCountdown, isSaleLive, isSaleUpcoming } from "../../utils/offerCountdown";
+import { HiScale } from "react-icons/hi2";
 
 // Local CSS for the size-chart drawer animation (kept here to avoid global CSS churn)
 const _sizeChartDrawerAnim = `
@@ -1922,24 +1923,59 @@ const ProductDetails = ({ productId }) => {
       ),
     };
   };
+  const matchingPublicOffer = publicOffers.find((offer) =>
+    Array.isArray(offer.productIds) &&
+    offer.productIds.some((item) => String(item?._id || item) === String(selectedProduct?._id))
+  );
   const timedOffer = resolveTimedOffer(selectedProduct);
-  const saleLive = isSaleLive(timedOffer);
-  const saleUpcoming = isSaleUpcoming(timedOffer);
+  const fallbackOffer = !timedOffer && matchingPublicOffer ? {
+    status: Date.now() >= new Date(matchingPublicOffer.startDate).getTime() && Date.now() <= new Date(matchingPublicOffer.endDate).getTime()
+      ? "live"
+      : Date.now() < new Date(matchingPublicOffer.startDate).getTime()
+      ? "upcoming"
+      : "expired",
+    startsAt: matchingPublicOffer.startDate,
+    endsAt: matchingPublicOffer.endDate,
+    offerPercentage: Number(matchingPublicOffer.offerPercentage || matchingPublicOffer.benefit?.percent || 0),
+    title: matchingPublicOffer.title,
+    originalPrice: Number(selectedProduct?.price || 0),
+    discountPrice: Number(
+      (
+        Number(selectedProduct?.price || 0) -
+        (Number(selectedProduct?.price || 0) * Number(matchingPublicOffer.offerPercentage || matchingPublicOffer.benefit?.percent || 0)) / 100
+      ).toFixed(2)
+    ),
+  } : null;
+  const activeSaleOffer = timedOffer || fallbackOffer;
+  const saleStartAt = activeSaleOffer?.startsAt || activeSaleOffer?.startDate || null;
+  const saleEndAt = activeSaleOffer?.endsAt || activeSaleOffer?.endDate || null;
+  const salePhase = activeSaleOffer && saleStartAt && saleEndAt
+    ? now >= new Date(saleStartAt).getTime() && now <= new Date(saleEndAt).getTime()
+      ? "live"
+      : now < new Date(saleStartAt).getTime()
+      ? "upcoming"
+      : "expired"
+    : activeSaleOffer?.status || null;
+  const saleLabel = activeSaleOffer
+    ? (salePhase === "live"
+        ? "Sale is live now"
+        : salePhase === "upcoming"
+        ? `💥 Sale starts in ${formatCountdown(saleStartAt, now)}`
+        : "")
+    : "";
+  const saleLive = salePhase === "live";
+  const saleUpcoming = salePhase === "upcoming";
   const displayPrice = saleLive
-    ? Number(timedOffer?.discountPrice || selectedProduct?.price || 0)
+    ? Number(activeSaleOffer?.discountPrice || selectedProduct?.price || 0)
     : Number(
-        timedOffer
+        activeSaleOffer
           ? selectedProduct?.price || 0
           : selectedProduct?.discountPrice || selectedProduct?.price || 0
       );
   const showDiscount = saleLive
-    ? Number(timedOffer?.discountPrice || 0) < Number(selectedProduct?.price || 0)
-    : !timedOffer && selectedProduct?.discountPrice && selectedProduct.discountPrice < selectedProduct.price;
-  const timedOfferBadge = saleLive
-    ? "Sale is live now"
-    : saleUpcoming
-    ? `Sale starts in ${formatCountdown(timedOffer?.startsAt, now)}`
-    : "";
+    ? Number(activeSaleOffer?.discountPrice || 0) < Number(selectedProduct?.price || 0)
+    : !activeSaleOffer && selectedProduct?.discountPrice && selectedProduct.discountPrice < selectedProduct.price;
+  const timedOfferBadge = saleLabel;
 
   // Social proof — random "viewers" count, refreshes every 30s
   const [viewersNow, setViewersNow] = React.useState(() => Math.floor(Math.random() * 18) + 4);
@@ -2888,7 +2924,7 @@ const ProductDetails = ({ productId }) => {
                     <div className="flex-1 relative">
                       {/* Badges */}
                       {saleUpcoming && (
-                        <div className="absolute top-3 left-3 z-10 bg-amber-500 text-white text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                        <div className="absolute top-3 left-3 z-10 bg-amber-500 text-white text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full">
                           {timedOfferBadge}
                         </div>
                       )}
@@ -3010,17 +3046,17 @@ const ProductDetails = ({ productId }) => {
                   <h1 className="text-xl md:text-2xl font-semibold text-gray-900 leading-snug">
                     {selectedProduct.name}
                   </h1>
-                  {(saleUpcoming || saleLive) && (
-                    <div className="mt-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide font-mono ${
-                          saleLive ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"
-                        }`}
-                      >
-                        {timedOfferBadge}
-                      </span>
+                  {/* {(saleUpcoming || saleLive) && (
+                    <div
+                      className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                        saleLive
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                      }`}
+                    >
+                      {saleLabel}
                     </div>
-                  )}
+                  )} */}
                 </div>
 
                 {/* Rating row */}
@@ -3060,11 +3096,19 @@ const ProductDetails = ({ productId }) => {
                       You save ₹{Math.floor(Number(selectedProduct.price || 0) - Number(timedOffer?.discountPrice || 0))}
                     </p>
                   )}
-                  {saleUpcoming && (
-                    <p className="text-amber-600 text-sm font-medium font-mono">
-                      {timedOfferBadge}
-                    </p>
-                  )}
+                  {/* {(saleLive || saleUpcoming) && (
+                    <div
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                        saleLive
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {saleLive
+                        ? "Sale is live now"
+                        : `Sale starts in ${formatCountdown(activeSaleOffer?.startsAt, now)}`}
+                    </div>
+                  )} */}
                   {selectedProduct.mrp && selectedProduct.mrp > (displayPrice || selectedProduct.price) && (
                     <p className="text-xs text-gray-500">
                       MRP: <span className="line-through">₹{Math.floor(selectedProduct.mrp).toLocaleString("en-IN")}</span>
@@ -3200,7 +3244,7 @@ const ProductDetails = ({ productId }) => {
                         }}
                         className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2 transition"
                       >
-                        Size Guide
+                        <HiScale className="inline" /> Size Guide
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -3752,7 +3796,7 @@ const ProductDetails = ({ productId }) => {
                   const cardBadgeText = cardSaleLive
                     ? "Sale is live now"
                     : cardSaleSoon
-                    ? `Sale starts in ${formatCountdown(cardTimedOffer?.startsAt, now)}`
+                    ? `💥 Sale starts in ${formatCountdown(cardTimedOffer?.startsAt, now)}`
                     : "";
 
                   return (
@@ -3834,7 +3878,7 @@ const ProductDetails = ({ productId }) => {
                   const cardBadgeText = cardSaleLive
                     ? "Sale is live now"
                     : cardSaleSoon
-                    ? `Sale starts in ${formatCountdown(cardTimedOffer?.startsAt, now)}`
+                    ? `💥 Sale starts in ${formatCountdown(cardTimedOffer?.startsAt, now)}`
                     : "";
 
                   return (
