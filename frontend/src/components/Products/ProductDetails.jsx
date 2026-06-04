@@ -3244,7 +3244,7 @@ const ProductDetails = ({ productId }) => {
                         }}
                         className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 underline underline-offset-2 transition"
                       >
-                        <HiScale className="inline" /> Size Guide
+                        <FaRulerHorizontal className="inline mr-2" size={15}/> Size Guide
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-3">

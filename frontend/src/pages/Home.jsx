@@ -27,6 +27,7 @@ const Home = () => {
   const [bestSellerError, setBestSellerError] = useState(null);
   const [showAlert, setShowAlert] = useState(false);
   const [activeOffer, setActiveOffer] = useState(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
   useEffect(() => {
     // fetch products for a specific collections
@@ -87,6 +88,11 @@ const Home = () => {
 
   useEffect(() => {
     setShowAlert(true); // show every time
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -199,6 +205,21 @@ const Home = () => {
 
     return () => clearInterval(timer);
   }, [activeOffer]);
+
+  const offerStartTime = activeOffer ? new Date(activeOffer.startDate).getTime() : null;
+  const offerEndTime = activeOffer ? new Date(activeOffer.endDate).getTime() : null;
+  const isOfferLive = Boolean(
+    activeOffer &&
+    Number.isFinite(offerStartTime) &&
+    Number.isFinite(offerEndTime) &&
+    currentTime >= offerStartTime &&
+    currentTime <= offerEndTime
+  );
+  const isOfferUpcoming = Boolean(
+    activeOffer &&
+    Number.isFinite(offerStartTime) &&
+    currentTime < offerStartTime
+  );
 
   const [collabActive, setCollabActive] = useState(null);
 
@@ -346,13 +367,13 @@ const Home = () => {
                   </p>
 
                   <div className="flex items-center gap-3 flex-wrap">
-                    {new Date() < new Date(activeOffer.startDate) && (
+                    {isOfferUpcoming && (
                       <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-xl px-4 py-2 text-white text-xs font-semibold">
                         <FiClock className="text-sky-300 text-sm" />
                         Starts in: <span id="offer-timer" className="ml-1 font-mono font-bold text-sky-200" />
                       </div>
                     )}
-                    {new Date() >= new Date(activeOffer.startDate) && (
+                    {isOfferLive && (
                       <Link
                         to="/offers"
                         className="inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-sky-900/30 transition active:scale-95"
@@ -385,7 +406,7 @@ const Home = () => {
                   <p className="text-sky-100 text-sm mb-4">
                     Up to <strong className="text-white text-lg">{activeOffer.offerPercentage}% OFF</strong>
                   </p>
-                  {new Date() >= new Date(activeOffer.startDate) && (
+                  {isOfferLive && (
                     <Link to="/offers" className="inline-flex items-center gap-2 bg-white text-sky-700 hover:bg-sky-50 px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg transition">
                       Shop Now <FiArrowRight />
                     </Link>
@@ -488,12 +509,14 @@ const Home = () => {
                       </p>
                     </div>
                   </div>
-                  <Link
-                    to="/offers"
-                    className="inline-flex items-center gap-2 bg-white text-sky-700 hover:bg-sky-50 px-7 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-sky-900/25 transition active:scale-95 w-full md:w-auto justify-center"
-                  >
-                    Shop Now <FiArrowRight />
-                  </Link>
+                  {isOfferLive && (
+                    <Link
+                      to="/offers"
+                      className="inline-flex items-center gap-2 bg-white text-sky-700 hover:bg-sky-50 px-7 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-sky-900/25 transition active:scale-95 w-full md:w-auto justify-center"
+                    >
+                      Shop Now <FiArrowRight />
+                    </Link>
+                  )}
                 </div>
 
               </div>
