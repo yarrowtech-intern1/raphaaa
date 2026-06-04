@@ -3001,7 +3001,7 @@ const ProductDetails = ({ productId }) => {
                           ref={imgRef}
                           src={effectiveMainImage || selectedProduct.images?.[0]?.url}
                           alt="Main Product"
-                          className="w-full h-full object-contain select-none"
+                          className="bg-white/50 border border-gray-300 rounded-xl w-full h-full object-contain select-none"
                           draggable={false}
                         />
 
@@ -3980,7 +3980,7 @@ const ProductDetails = ({ productId }) => {
 
           {/* Similar Products */}
           {resolvedSimilarProducts.length > 0 && (
-            <div className="border-t border-gray-100 mt-8 pt-8 pb-4 max-w-7xl mx-auto px-4 md:px-6">
+            <div className="border-t border-sky-500 mt-8 pt-8 pb-4 max-w-7xl mx-auto px-4 md:px-6">
               <h3 className="text-[11px] font-bold tracking-[0.15em] text-gray-500 uppercase mb-6">
                 You May Also Like
               </h3>
