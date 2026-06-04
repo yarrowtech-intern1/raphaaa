@@ -91,6 +91,18 @@ const ProductGrid = ({ products = [], loading, error }) => {
       p.variants?.[0]?.sku || p._id
     )}`;
 
+  const getColorVariantCount = (product) => {
+    if (Array.isArray(product?.colorVariants) && product.colorVariants.length > 0) {
+      return new Set(product.colorVariants.map((variant) => String(variant?.color || "").trim()).filter(Boolean)).size;
+    }
+
+    if (Array.isArray(product?.variants) && product.variants.length > 0) {
+      return new Set(product.variants.map((variant) => String(variant?.color || "").trim()).filter(Boolean)).size;
+    }
+
+    return 0;
+  };
+
   const resolveOfferForProduct = (product) => {
     const offerList = [
       ...(product.timedOffer ? [product.timedOffer] : []),
@@ -149,6 +161,7 @@ const ProductGrid = ({ products = [], loading, error }) => {
         {list.map((product) => {
           const img        = product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || demoImg;
           const isNew      = Date.now() - new Date(product.createdAt).getTime() < 2 * 24 * 60 * 60 * 1000;
+          const colorVariantCount = getColorVariantCount(product);
           const timedOffer = resolveOfferForProduct(product);
           const saleLive   = isSaleLive(timedOffer);
           const saleSoon   = isSaleUpcoming(timedOffer);
@@ -177,7 +190,7 @@ const ProductGrid = ({ products = [], loading, error }) => {
                   transition-all duration-200 backdrop-blur-sm border
                   ${wished
                     ? "bg-white border-red-200 text-red-500 shadow-sm"
-                    : "bg-white/70 border-white/50 text-gray-400 hover:bg-white hover:text-red-400 hover:border-red-200 shadow-sm opacity-0 group-hover:opacity-100"
+                    : "bg-white/70 border-white/50 text-gray-400 hover:bg-white hover:text-red-400 hover:border-red-200 shadow-sm"
                   }`}
               >
                 {wished ? <AiFillHeart className="text-sm" /> : <AiOutlineHeart className="text-sm" />}
@@ -227,6 +240,16 @@ const ProductGrid = ({ products = [], loading, error }) => {
                       </span>
                     )}
                   </div>
+
+                  {colorVariantCount > 0 && (
+                    <div className="absolute bottom-3 right-3 z-10 rounded-full bg-black/75 backdrop-blur-sm px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white border border-white/10 shadow-lg">
+                      {colorVariantCount === 2
+                        ? "2 variants"
+                        : colorVariantCount > 2
+                        ? "2+ variants available"
+                        : "1 variant"}
+                    </div>
+                  )}
 
                   {/* Hover overlay — subtle bottom gradient + CTA */}
                   <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
