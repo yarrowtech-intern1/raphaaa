@@ -32,6 +32,15 @@ const normalizeSize = (s) => {
   return t;
 };
 
+const normalizeGenderLabel = (value) => {
+  const gender = String(value || "").trim();
+  const key = gender.toLowerCase();
+  if (key === "male" || key === "men" || key === "man") return "Men";
+  if (key === "female" || key === "women" || key === "woman") return "Women";
+  if (key === "kids" || key === "kid" || key === "children" || key === "child") return "Kids";
+  return gender;
+};
+
 const selectPortalTarget = typeof document !== "undefined" ? document.body : null;
 const selectMenuStyles = {
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -93,12 +102,16 @@ const AddProduct = () => {
         const buckets = data.reduce(
           (acc, { type, value }) => {
             if (["category", "collection", "gender", "material"].includes(type)) {
-              if (!acc[type].includes(value)) acc[type].push(value);
+              const nextValue = type === "gender" ? normalizeGenderLabel(value) : value;
+              if (nextValue && !acc[type].includes(nextValue)) acc[type].push(nextValue);
             }
             return acc;
           },
           { category: [], collection: [], gender: [], material: [] }
         );
+        if (!buckets.gender.includes("Men")) buckets.gender.push("Men");
+        if (!buckets.gender.includes("Women")) buckets.gender.push("Women");
+        if (!buckets.gender.includes("Kids")) buckets.gender.push("Kids");
         setMetaOptions(buckets);
       })
       .catch(console.error);

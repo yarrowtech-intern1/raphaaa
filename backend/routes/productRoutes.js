@@ -29,6 +29,22 @@ const decorateProductsWithTimedOffers = (products, offers) =>
     decorateProductWithTimedOffer(product, offers)
   );
 
+const cleanStr = (v) => {
+  if (v === undefined || v === null) return undefined;
+  const s = String(v).trim();
+  return s === "" ? undefined : s;
+};
+
+const normalizeGender = (v) => {
+  const g = cleanStr(v);
+  if (!g) return undefined;
+  const m = g.toLowerCase();
+  if (m === "male" || m === "men" || m === "man") return "Men";
+  if (m === "female" || m === "women" || m === "woman") return "Women";
+  if (m === "kids" || m === "kid" || m === "children" || m === "child") return "Kids";
+  return g;
+};
+
 // @route GET /api/products/delivery/check?pincode=700001&cod=0&weight=0.5
 // @desc Check delivery serviceability and ETA by pincode via Shiprocket
 // @access Public
@@ -190,20 +206,6 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
       returnPolicy,
     } = req.body;
 
-    const cleanStr = (v) => {
-      if (v === undefined || v === null) return undefined;
-      const s = String(v).trim();
-      return s === "" ? undefined : s;
-    };
-    const normalizeGender = (v) => {
-      const g = cleanStr(v);
-      if (!g) return undefined;
-      const m = g.toLowerCase();
-      if (m === "male" || m === "men" || m === "man") return "Men";
-      if (m === "female" || m === "women" || m === "woman") return "Women";
-      if (m === "kids" || m === "kid" || m === "children" || m === "child") return "Kids";
-      return g;
-    };
     const normalizeSizeChart = (value) => {
       if (!value || typeof value !== "object") return value;
       return {
@@ -849,7 +851,7 @@ router.put("/:id", protect, admin, async (req, res) => {
       product.colors = finalColors;
       product.collections = collections ?? product.collections;
       product.material = material ?? product.material;
-      product.gender = gender ?? product.gender;
+      product.gender = normalizeGender(gender ?? product.gender);
       product.images = images ?? product.images;
       product.isFeatured = isFeatured !== undefined ? isFeatured : product.isFeatured;
       product.isPublished = isPublished !== undefined ? isPublished : product.isPublished;

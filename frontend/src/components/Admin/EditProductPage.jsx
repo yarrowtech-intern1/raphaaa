@@ -34,6 +34,15 @@ const normalizeSize = (s) => {
   return t;
 };
 
+const normalizeGenderLabel = (value) => {
+  const gender = String(value || "").trim();
+  const key = gender.toLowerCase();
+  if (key === "male" || key === "men" || key === "man") return "Men";
+  if (key === "female" || key === "women" || key === "woman") return "Women";
+  if (key === "kids" || key === "kid" || key === "children" || key === "child") return "Kids";
+  return gender;
+};
+
 const selectPortalTarget = typeof document !== "undefined" ? document.body : null;
 const selectMenuStyles = {
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -117,12 +126,17 @@ const EditProductPage = () => {
       .then(({ data }) => {
         const b = data.reduce(
           (acc, { type, value }) => {
-            if (["category", "collection", "gender", "material"].includes(type) && !acc[type].includes(value))
-              acc[type].push(value);
+            if (["category", "collection", "gender", "material"].includes(type)) {
+              const nextValue = type === "gender" ? normalizeGenderLabel(value) : value;
+              if (nextValue && !acc[type].includes(nextValue)) acc[type].push(nextValue);
+            }
             return acc;
           },
           { category: [], collection: [], gender: [], material: [] }
         );
+        if (!b.gender.includes("Men")) b.gender.push("Men");
+        if (!b.gender.includes("Women")) b.gender.push("Women");
+        if (!b.gender.includes("Kids")) b.gender.push("Kids");
         setMetaOptions(b);
       })
       .catch(console.error);
@@ -156,7 +170,7 @@ const EditProductPage = () => {
       brand:          selectedProduct.brand          || "",
       collections:    selectedProduct.collections    || "",
       material:       selectedProduct.material       || "",
-      gender:         selectedProduct.gender         || "",
+      gender:         normalizeGenderLabel(selectedProduct.gender),
       images:         selectedProduct.images         || [],
       sizeChart:      selectedProduct.sizeChart      || { imageUrl: "", title: "Size Chart" },
       offerPercentage: selectedProduct.offerPercentage || 0,
