@@ -1977,6 +1977,48 @@ const ProductDetails = ({ productId }) => {
     : !activeSaleOffer && selectedProduct?.discountPrice && selectedProduct.discountPrice < selectedProduct.price;
   const timedOfferBadge = saleLabel;
 
+  const getCardTimedOffer = (product) => {
+    const timed = product?.timedOffer || null;
+    if (timed) return timed;
+
+    const matched = publicOffers.find((offer) =>
+      Array.isArray(offer.productIds) &&
+      offer.productIds.some((item) => String(item?._id || item) === String(product?._id))
+    );
+    if (!matched) return null;
+
+    const nowTs = Date.now();
+    const startsAt = matched.startDate;
+    const endsAt = matched.endDate;
+    const isLive = nowTs >= new Date(startsAt).getTime() && nowTs <= new Date(endsAt).getTime();
+    const isUpcoming = nowTs < new Date(startsAt).getTime();
+
+    return {
+      status: isLive ? "live" : isUpcoming ? "upcoming" : "expired",
+      startsAt,
+      endsAt,
+      offerPercentage: Number(matched.offerPercentage || matched.benefit?.percent || 0),
+      title: matched.title,
+      originalPrice: Number(product?.price || 0),
+      discountPrice: Number(
+        (
+          Number(product?.price || 0) -
+          (Number(product?.price || 0) * Number(matched.offerPercentage || matched.benefit?.percent || 0)) / 100
+        ).toFixed(2)
+      ),
+    };
+  };
+
+  const getColorVariantCount = (product) => {
+    if (Array.isArray(product?.colorVariants) && product.colorVariants.length > 0) {
+      return new Set(product.colorVariants.map((variant) => String(variant?.color || "").trim()).filter(Boolean)).size;
+    }
+    if (Array.isArray(product?.variants) && product.variants.length > 0) {
+      return new Set(product.variants.map((variant) => String(variant?.color || "").trim()).filter(Boolean)).size;
+    }
+    return 0;
+  };
+
   // Social proof — random "viewers" count, refreshes every 30s
   const [viewersNow, setViewersNow] = React.useState(() => Math.floor(Math.random() * 18) + 4);
   React.useEffect(() => {
@@ -3744,29 +3786,81 @@ const ProductDetails = ({ productId }) => {
                 Frequently Bought Together
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
-                {fbtProducts.slice(0, 8).map((product) => (
-                  <div
-                    key={product._id}
-                    onClick={() =>
-                      navigate(
-                        `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
-                          product.skuCode || product.sku || product._id
-                        )}`
-                      )
-                    }
-                    className="cursor-pointer group"
-                  >
-                    <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2.5">
-                      <img
-                        src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
+                {fbtProducts.slice(0, 8).map((product) => {
+                  const cardTimedOffer = getCardTimedOffer(product);
+                  const cardSaleLive = isSaleLive(cardTimedOffer);
+                  const cardSaleSoon = isSaleUpcoming(cardTimedOffer);
+                  const colorVariantCount = getColorVariantCount(product);
+                  const cardBadgeText = cardSaleLive
+                    ? "Sale is live now"
+                    : cardSaleSoon
+                    ? `💥 Sale starts in ${formatCountdown(cardTimedOffer?.startsAt, now)}`
+                    : "";
+
+                  return (
+                    <div
+                      key={product._id}
+                      onClick={() =>
+                        navigate(
+                          `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
+                            product.skuCode || product.sku || product._id
+                          )}`
+                        )
+                      }
+                      className="cursor-pointer group"
+                    >
+                      <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            isInWishlist(product._id)
+                              ? handleRemoveFromWishlist(product._id)
+                              : handleAddToWishlist(product);
+                          }}
+                          className={`absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full border backdrop-blur-sm transition-all shadow-sm ${
+                            isInWishlist(product._id)
+                              ? "bg-white border-red-200 text-red-500"
+                              : "bg-white/90 border-white/70 text-gray-400 hover:text-red-400 hover:border-red-200"
+                          }`}
+                        >
+                          {isInWishlist(product._id) ? <AiFillHeart className="text-sm" /> : <AiOutlineHeart className="text-sm" />}
+                        </button>
+                        <img
+                          src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        {cardSaleSoon && (
+                          <div className="absolute top-2 left-2 bg-amber-500 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
+                            {cardBadgeText}
+                          </div>
+                        )}
+                        {cardSaleLive && (
+                          <div className="absolute top-2 left-2 bg-emerald-600 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
+                            {cardBadgeText}
+                          </div>
+                        )}
+                        {!cardTimedOffer && product.offerPercentage > 0 && (
+                          <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
+                            {product.offerPercentage}% off
+                          </div>
+                        )}
+                        {colorVariantCount > 0 && (
+                          <div className="absolute bottom-2 right-2 z-10 rounded-full bg-black/75 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white border border-white/10">
+                            {colorVariantCount === 2
+                              ? "2 variants"
+                              : colorVariantCount > 2
+                              ? "2+ variants available"
+                              : "1 variant"}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">{product.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{product.category}</p>
                     </div>
-                    <p className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">{product.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{product.category}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -3784,9 +3878,10 @@ const ProductDetails = ({ productId }) => {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
                 {ctlProducts.map((product) => {
-                  const cardTimedOffer = product.timedOffer || null;
+                  const cardTimedOffer = getCardTimedOffer(product);
                   const cardSaleLive = isSaleLive(cardTimedOffer);
                   const cardSaleSoon = isSaleUpcoming(cardTimedOffer);
+                  const colorVariantCount = getColorVariantCount(product);
                   const cardPrice = cardSaleLive
                     ? Number(cardTimedOffer?.discountPrice || product.price || 0)
                     : Number(product.discountPrice || product.price || 0);
@@ -3809,13 +3904,29 @@ const ProductDetails = ({ productId }) => {
                           )}`
                         )
                       }
-                      className="cursor-pointer group"
-                    >
-                      <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2">
-                        <img
-                          src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="cursor-pointer group"
+                  >
+                    <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          isInWishlist(product._id)
+                            ? handleRemoveFromWishlist(product._id)
+                            : handleAddToWishlist(product);
+                        }}
+                        className={`absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full border backdrop-blur-sm transition-all shadow-sm ${
+                          isInWishlist(product._id)
+                            ? "bg-white border-red-200 text-red-500"
+                            : "bg-white/90 border-white/70 text-gray-400 hover:text-red-400 hover:border-red-200"
+                        }`}
+                      >
+                        {isInWishlist(product._id) ? <AiFillHeart className="text-sm" /> : <AiOutlineHeart className="text-sm" />}
+                      </button>
+                      <img
+                        src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         {cardSaleSoon && (
                           <span className="absolute top-1.5 left-1.5 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
@@ -3830,6 +3941,15 @@ const ProductDetails = ({ productId }) => {
                         {!cardTimedOffer && product.offerPercentage > 0 && (
                           <span className="absolute top-1.5 left-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
                             -{product.offerPercentage}%
+                          </span>
+                        )}
+                        {colorVariantCount > 0 && (
+                          <span className="absolute bottom-1.5 right-1.5 z-10 rounded-full bg-black/75 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white border border-white/10">
+                            {colorVariantCount === 2
+                              ? "2 variants"
+                              : colorVariantCount > 2
+                              ? "2+ variants available"
+                              : "1 variant"}
                           </span>
                         )}
                       </div>
@@ -3866,9 +3986,10 @@ const ProductDetails = ({ productId }) => {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
                 {resolvedSimilarProducts.slice(0, displayCount).map((product) => {
-                  const cardTimedOffer = product.timedOffer || null;
+                  const cardTimedOffer = getCardTimedOffer(product);
                   const cardSaleLive = isSaleLive(cardTimedOffer);
                   const cardSaleSoon = isSaleUpcoming(cardTimedOffer);
+                  const colorVariantCount = getColorVariantCount(product);
                   const cardPrice = cardSaleLive
                     ? Number(cardTimedOffer?.discountPrice || product.price || 0)
                     : Number(product.discountPrice || product.price || 0);
@@ -3891,7 +4012,7 @@ const ProductDetails = ({ productId }) => {
                           )}`
                         )
                       }
-                      className="cursor-pointer group"
+                      className="cursor-pointer group bg-white rounded-xl p-3 hover:shadow-lg transition"
                     >
                       <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2.5">
                         <img
@@ -3912,6 +4033,15 @@ const ProductDetails = ({ productId }) => {
                         {!cardTimedOffer && product.offerPercentage > 0 && (
                           <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
                             {product.offerPercentage}% off
+                          </div>
+                        )}
+                        {colorVariantCount > 0 && (
+                          <div className="absolute bottom-2 right-2 z-10 rounded-full bg-black/75 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white border border-white/10">
+                            {colorVariantCount === 2
+                              ? "2 variants"
+                              : colorVariantCount > 2
+                              ? "2+ variants available"
+                              : "1 variant"}
                           </div>
                         )}
                       </div>
