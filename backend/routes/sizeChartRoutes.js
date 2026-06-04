@@ -1,8 +1,15 @@
 const express = require("express");
 const SizeChart = require("../models/SizeChart");
 const { protect, adminOrMerchantise } = require("../middleware/authMiddleware");
+const { getCanonicalAudience, getAudienceQueryValues } = require("../utils/sizeChartAudience");
 
 const router = express.Router();
+
+const ensureCreatedBy = (chart, userId) => {
+  if (!chart.createdBy && userId) {
+    chart.createdBy = userId;
+  }
+};
 
 // GET /api/size-charts?audience=Men
 router.get("/", async (req, res) => {
@@ -10,7 +17,7 @@ router.get("/", async (req, res) => {
     const audience = String(req.query.audience || "").trim();
     const query = { isActive: true };
     if (audience) {
-      query.audience = { $in: [audience, "Unisex"] };
+      query.audience = { $in: getAudienceQueryValues(audience) };
     }
     const charts = await SizeChart.find(query).sort({ createdAt: -1 });
     res.json(charts);
@@ -30,7 +37,7 @@ router.post("/", protect, adminOrMerchantise, async (req, res) => {
 
     const chart = await SizeChart.create({
       name: String(name).trim(),
-      audience: audience || "Unisex",
+      audience: getCanonicalAudience(audience, "Unisex"),
       chartImageUrl: String(chartImageUrl).trim(),
       measureImageUrl: measureImageUrl ? String(measureImageUrl).trim() : "",
       unit: unit || "in",
@@ -52,6 +59,7 @@ router.put("/:id", protect, adminOrMerchantise, async (req, res) => {
   try {
     const chart = await SizeChart.findById(req.params.id);
     if (!chart) return res.status(404).json({ message: "Size chart not found" });
+    ensureCreatedBy(chart, req.user?._id);
 
     const { name, audience, chartImageUrl, measureImageUrl, unit } = req.body;
 
@@ -64,7 +72,7 @@ router.put("/:id", protect, adminOrMerchantise, async (req, res) => {
     }
 
     if (audience !== undefined) {
-      chart.audience = audience || "Unisex";
+      chart.audience = getCanonicalAudience(audience, "Unisex");
     }
 
     if (chartImageUrl !== undefined) {
@@ -99,6 +107,7 @@ router.delete("/:id", protect, adminOrMerchantise, async (req, res) => {
   try {
     const chart = await SizeChart.findById(req.params.id);
     if (!chart) return res.status(404).json({ message: "Size chart not found" });
+    ensureCreatedBy(chart, req.user?._id);
     chart.isActive = false;
     await chart.save();
     res.json({ message: "Size chart archived" });

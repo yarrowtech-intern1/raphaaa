@@ -15,6 +15,7 @@ const { checkDeliveryServiceability } = require("../utils/shiprocket");
 const { triggerBackInStockForProduct, triggerPriceDropForProduct } = require("../services/alertService");
 const { getJson, setJson } = require("../utils/redisCache");
 const { decorateProductWithTimedOffer } = require("../utils/timedOfferPricing");
+const { getCanonicalAudience } = require("../utils/sizeChartAudience");
 
 const router = express.Router();
 
@@ -203,6 +204,13 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
       if (m === "kids" || m === "kid" || m === "children" || m === "child") return "Kids";
       return g;
     };
+    const normalizeSizeChart = (value) => {
+      if (!value || typeof value !== "object") return value;
+      return {
+        ...value,
+        audience: getCanonicalAudience(value.audience, "Unisex"),
+      };
+    };
 
     // Prefer new colorVariants structure, fall back to legacy variants
     const normalizedColorVariants = normalizeColorVariants(colorVariants);
@@ -247,7 +255,7 @@ router.post("/", protect, admin, adminOrMerchantise, async (req, res) => {
       weight,
       sku: finalSku,
       offerPercentage: Number(offerPercentage || 0),
-      sizeChart,
+      sizeChart: normalizeSizeChart(sizeChart),
       returnPolicy: {
         eligible: returnPolicy?.eligible !== false,
         days: Number.isFinite(Number(returnPolicy?.days)) ? Math.max(0, Number(returnPolicy.days)) : 7,
@@ -792,6 +800,14 @@ router.put("/:id", protect, admin, async (req, res) => {
 
     const product = await Product.findById(req.params.id);
 
+    const normalizeSizeChart = (value) => {
+      if (!value || typeof value !== "object") return value;
+      return {
+        ...value,
+        audience: getCanonicalAudience(value.audience, "Unisex"),
+      };
+    };
+
     if (product) {
       const prevPrice = Number(product.discountPrice || product.price || 0);
       const prevStock = Number(product.countInStock || 0);
@@ -842,7 +858,7 @@ router.put("/:id", protect, admin, async (req, res) => {
       product.weight = weight ?? product.weight;
       product.sku = finalSku;
       product.offerPercentage = offerPercentage ?? 0;
-      product.sizeChart = sizeChart ?? product.sizeChart;
+      product.sizeChart = sizeChart ? normalizeSizeChart(sizeChart) : product.sizeChart;
       if (returnPolicy !== undefined) {
         product.returnPolicy = {
           eligible: returnPolicy?.eligible !== false,
