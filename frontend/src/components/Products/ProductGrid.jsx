@@ -5,6 +5,7 @@ import { AiOutlineHeart, AiFillHeart } from "react-icons/ai";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import axios from "axios";
 import { toast } from "sonner";
+import { formatCountdown, isSaleLive, isSaleUpcoming } from "../../utils/offerCountdown";
 
 /* ── Skeleton ── */
 const Skeleton = () => (
@@ -19,6 +20,8 @@ const Skeleton = () => (
 const ProductGrid = ({ products = [], loading, error }) => {
   const [page,          setPage]          = useState(1);
   const [wishlistItems, setWishlistItems] = useState([]);
+  const [publicOffers, setPublicOffers] = useState([]);
+  const [now, setNow] = useState(Date.now());
   const navigate   = useNavigate();
   const { search } = useLocation();
   const sortBy     = useMemo(() => new URLSearchParams(search).get("sortBy"), [search]);
@@ -41,6 +44,15 @@ const ProductGrid = ({ products = [], loading, error }) => {
   const list       = source.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   useEffect(() => { setPage(1); }, [search, safe.length]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/offers/public`)
+      .then((res) => setPublicOffers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setPublicOffers([]));
+  }, []);
 
   /* ── wishlist ── */
   useEffect(() => {
@@ -79,6 +91,34 @@ const ProductGrid = ({ products = [], loading, error }) => {
       p.variants?.[0]?.sku || p._id
     )}`;
 
+  const resolveOfferForProduct = (product) => {
+    const offerList = [
+      ...(product.timedOffer ? [product.timedOffer] : []),
+      ...publicOffers.filter((offer) =>
+        Array.isArray(offer.productIds) &&
+        offer.productIds.some((item) => String(item?._id || item) === String(product._id))
+      ).map((offer) => ({
+        status: new Date() >= new Date(offer.startDate) && new Date() <= new Date(offer.endDate)
+          ? "live"
+          : new Date() < new Date(offer.startDate)
+          ? "upcoming"
+          : "expired",
+        startsAt: offer.startDate,
+        endsAt: offer.endDate,
+        offerPercentage: offer.offerPercentage || offer.benefit?.percent || 0,
+        title: offer.title,
+        originalPrice: product.price,
+        discountPrice: Number((Number(product.price || 0) - (Number(product.price || 0) * Number(offer.offerPercentage || offer.benefit?.percent || 0)) / 100).toFixed(2)),
+      })),
+    ];
+
+    if (offerList.length === 0) return null;
+    return offerList.sort((a, b) => {
+      const rank = (o) => (o.status === "live" ? 0 : o.status === "upcoming" ? 1 : 2);
+      return rank(a) - rank(b);
+    })[0];
+  };
+
   /* ── states ── */
   if (loading) return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
@@ -109,10 +149,23 @@ const ProductGrid = ({ products = [], loading, error }) => {
         {list.map((product) => {
           const img        = product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || demoImg;
           const isNew      = Date.now() - new Date(product.createdAt).getTime() < 2 * 24 * 60 * 60 * 1000;
-          const hasDis     = product.discountPrice && product.discountPrice < product.price;
+          const timedOffer = resolveOfferForProduct(product);
+          const saleLive   = isSaleLive(timedOffer);
+          const saleSoon   = isSaleUpcoming(timedOffer);
+          const salePrice   = saleLive ? Number(timedOffer?.discountPrice || product.price) : Number(product.discountPrice || product.price);
+          const hasDis     = saleLive
+            ? Number(timedOffer?.discountPrice || 0) < Number(product.price || 0)
+            : !timedOffer && product.discountPrice && product.discountPrice < product.price;
           const wished     = inWishlist(product._id);
           const outOfStock = product.countInStock === 0;
           const lowStock   = !outOfStock && product.countInStock < 5;
+          const badgeText = saleLive
+            ? "Sale is live now"
+            : saleSoon
+            ? `💥 Sale starts in ${formatCountdown(timedOffer?.startsAt, now)}`
+            : hasDis
+            ? `${product.offerPercentage}% off`
+            : "";
 
           return (
             <div key={product._id} className="group relative bg-white rounded-md overflow-hidden shadow-sm flex flex-col items-center justify-between p-2">
@@ -148,9 +201,19 @@ const ProductGrid = ({ products = [], loading, error }) => {
                         New
                       </span>
                     )}
-                    {hasDis && (
+                    {saleSoon && (
+                      <span className="bg-amber-500 text-white text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                        {badgeText}
+                      </span>
+                    )}
+                    {saleLive && (
+                      <span className="bg-emerald-600 text-white text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                        {badgeText}
+                      </span>
+                    )}
+                    {!timedOffer && hasDis && (
                       <span className="bg-red-600 text-white text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
-                        {product.offerPercentage}% off
+                        {badgeText}
                       </span>
                     )}
                     {outOfStock && (
@@ -200,7 +263,7 @@ const ProductGrid = ({ products = [], loading, error }) => {
                   {/* Price */}
                   <div className="flex items-baseline gap-2 pt-1">
                     <span className="text-sm font-bold text-gray-900">
-                      ₹{Math.floor(hasDis ? product.discountPrice : product.price).toLocaleString("en-IN")}
+                      ₹{Math.floor(salePrice).toLocaleString("en-IN")}
                     </span>
                     {hasDis && (
                       <>
@@ -208,7 +271,7 @@ const ProductGrid = ({ products = [], loading, error }) => {
                           ₹{Math.floor(product.price).toLocaleString("en-IN")}
                         </span>
                         <span className="text-xs text-emerald-600 font-semibold">
-                          {product.offerPercentage}% off
+                          {saleLive ? `${timedOffer?.offerPercentage || product.offerPercentage}% off` : `${product.offerPercentage}% off`}
                         </span>
                       </>
                     )}

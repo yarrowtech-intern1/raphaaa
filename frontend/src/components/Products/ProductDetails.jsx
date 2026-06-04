@@ -1680,6 +1680,7 @@ import { FiShare2 } from "react-icons/fi";
 import { FiCopy } from "react-icons/fi";
 import ProductQA from "./ProductQA";
 import { Helmet } from "react-helmet-async";
+import { formatCountdown, isSaleLive, isSaleUpcoming } from "../../utils/offerCountdown";
 
 // Local CSS for the size-chart drawer animation (kept here to avoid global CSS churn)
 const _sizeChartDrawerAnim = `
@@ -1742,6 +1743,8 @@ const ProductDetails = ({ productId }) => {
 
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  const [publicOffers, setPublicOffers] = useState([]);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [fbtProducts, setFbtProducts] = useState([]);
@@ -1774,6 +1777,18 @@ const ProductDetails = ({ productId }) => {
         // ignore
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    axios
+      .get(`${import.meta.env.VITE_BACKEND_URL}/api/offers/public`)
+      .then((res) => setPublicOffers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setPublicOffers([]));
   }, []);
 
   // ── Derived variant data (supports both new colorVariants and legacy variants) ──
@@ -1877,6 +1892,54 @@ const ProductDetails = ({ productId }) => {
     : overallStock;
 
   const isOutOfStock = overallStock <= 0 || (selectedSize ? selectedVariantStock <= 0 : false);
+  const resolveTimedOffer = (product) => {
+    const timed = product?.timedOffer || null;
+    if (timed) return timed;
+
+    const matched = publicOffers.find((offer) =>
+      Array.isArray(offer.productIds) &&
+      offer.productIds.some((item) => String(item?._id || item) === String(product?._id))
+    );
+    if (!matched) return null;
+
+    const nowTs = Date.now();
+    const startsAt = matched.startDate;
+    const endsAt = matched.endDate;
+    const isLive = nowTs >= new Date(startsAt).getTime() && nowTs <= new Date(endsAt).getTime();
+    const isUpcoming = nowTs < new Date(startsAt).getTime();
+    return {
+      status: isLive ? "live" : isUpcoming ? "upcoming" : "expired",
+      startsAt,
+      endsAt,
+      offerPercentage: Number(matched.offerPercentage || matched.benefit?.percent || 0),
+      title: matched.title,
+      originalPrice: Number(product?.price || 0),
+      discountPrice: Number(
+        (
+          Number(product?.price || 0) -
+          (Number(product?.price || 0) * Number(matched.offerPercentage || matched.benefit?.percent || 0)) / 100
+        ).toFixed(2)
+      ),
+    };
+  };
+  const timedOffer = resolveTimedOffer(selectedProduct);
+  const saleLive = isSaleLive(timedOffer);
+  const saleUpcoming = isSaleUpcoming(timedOffer);
+  const displayPrice = saleLive
+    ? Number(timedOffer?.discountPrice || selectedProduct?.price || 0)
+    : Number(
+        timedOffer
+          ? selectedProduct?.price || 0
+          : selectedProduct?.discountPrice || selectedProduct?.price || 0
+      );
+  const showDiscount = saleLive
+    ? Number(timedOffer?.discountPrice || 0) < Number(selectedProduct?.price || 0)
+    : !timedOffer && selectedProduct?.discountPrice && selectedProduct.discountPrice < selectedProduct.price;
+  const timedOfferBadge = saleLive
+    ? "Sale is live now"
+    : saleUpcoming
+    ? `Sale starts in ${formatCountdown(timedOffer?.startsAt, now)}`
+    : "";
 
   // Social proof — random "viewers" count, refreshes every 30s
   const [viewersNow, setViewersNow] = React.useState(() => Math.floor(Math.random() * 18) + 4);
@@ -2678,16 +2741,6 @@ const ProductDetails = ({ productId }) => {
 
   if (error) return <p>Error: {error}</p>;
 
-  const calculateOriginalPrice = () => {
-    if (selectedProduct.discountPrice && selectedProduct.offerPercentage > 0) {
-      return Math.floor(
-        (selectedProduct.discountPrice * 100) /
-        (100 - selectedProduct.offerPercentage)
-      );
-    }
-    return selectedProduct.discountPrice || selectedProduct.price;
-  };
-
   const formatReviewDate = (isoDate) => {
     const options = { day: "2-digit", month: "long", year: "numeric" };
     return new Date(isoDate).toLocaleDateString("en-IN", options);
@@ -2743,7 +2796,7 @@ const ProductDetails = ({ productId }) => {
         offers: {
           "@type": "Offer",
           priceCurrency: "INR",
-          price: selectedProduct.discountPrice || selectedProduct.price,
+          price: displayPrice,
           availability:
             selectedProduct.stock > 0
               ? "https://schema.org/InStock"
@@ -2781,7 +2834,7 @@ const ProductDetails = ({ productId }) => {
               }
             />
             <meta property="og:url" content={typeof window !== "undefined" ? window.location.href : ""} />
-            <meta property="product:price:amount" content={String(selectedProduct.discountPrice || selectedProduct.price)} />
+            <meta property="product:price:amount" content={String(displayPrice)} />
             <meta property="product:price:currency" content="INR" />
             {productSchema && (
               <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
@@ -2834,7 +2887,17 @@ const ProductDetails = ({ productId }) => {
                     {/* Main image + zoom */}
                     <div className="flex-1 relative">
                       {/* Badges */}
-                      {selectedProduct.offerPercentage > 0 && (
+                      {saleUpcoming && (
+                        <div className="absolute top-3 left-3 z-10 bg-amber-500 text-white text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                          {timedOfferBadge}
+                        </div>
+                      )}
+                      {saleLive && (
+                        <div className="absolute top-3 left-3 z-10 bg-emerald-600 text-white text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
+                          {timedOfferBadge}
+                        </div>
+                      )}
+                      {!timedOffer && selectedProduct.offerPercentage > 0 && (
                         <div className="absolute top-3 left-3 z-10 bg-red-600 text-white text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-sm">
                           {selectedProduct.offerPercentage}% off
                         </div>
@@ -2947,6 +3010,17 @@ const ProductDetails = ({ productId }) => {
                   <h1 className="text-xl md:text-2xl font-semibold text-gray-900 leading-snug">
                     {selectedProduct.name}
                   </h1>
+                  {(saleUpcoming || saleLive) && (
+                    <div className="mt-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide font-mono ${
+                          saleLive ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"
+                        }`}
+                      >
+                        {timedOfferBadge}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Rating row */}
@@ -2968,33 +3042,34 @@ const ProductDetails = ({ productId }) => {
                 <div className="space-y-0.5">
                   <div className="flex items-baseline gap-3 flex-wrap">
                     <span className="text-2xl md:text-3xl font-bold text-gray-900">
-                      ₹{Math.floor(
-                        selectedProduct.discountPrice && selectedProduct.offerPercentage > 0
-                          ? selectedProduct.discountPrice
-                          : selectedProduct.price
-                      )}
+                      ₹{Math.floor(displayPrice)}
                     </span>
-                    {selectedProduct.discountPrice && selectedProduct.offerPercentage > 0 && (
+                    {showDiscount && (
                       <>
                         <span className="text-base text-gray-400 line-through">
                           ₹{Math.floor(selectedProduct.price)}
                         </span>
                         <span className="text-sky-600 font-bold text-base">
-                          {selectedProduct.offerPercentage}% off
+                          {saleLive ? `${timedOffer?.offerPercentage || 0}% off` : `${selectedProduct.offerPercentage}% off`}
                         </span>
                       </>
                     )}
                   </div>
-                  {selectedProduct.discountPrice && selectedProduct.offerPercentage > 0 && (
+                  {saleLive && (
                     <p className="text-green-600 text-sm font-medium">
-                      You save ₹{Math.floor(selectedProduct.price - selectedProduct.discountPrice)}
+                      You save ₹{Math.floor(Number(selectedProduct.price || 0) - Number(timedOffer?.discountPrice || 0))}
                     </p>
                   )}
-                  {selectedProduct.mrp && selectedProduct.mrp > (selectedProduct.discountPrice || selectedProduct.price) && (
+                  {saleUpcoming && (
+                    <p className="text-amber-600 text-sm font-medium font-mono">
+                      {timedOfferBadge}
+                    </p>
+                  )}
+                  {selectedProduct.mrp && selectedProduct.mrp > (displayPrice || selectedProduct.price) && (
                     <p className="text-xs text-gray-500">
                       MRP: <span className="line-through">₹{Math.floor(selectedProduct.mrp).toLocaleString("en-IN")}</span>
                       <span className="ml-1.5 text-emerald-600 font-semibold">
-                        {Math.round(100 - ((selectedProduct.discountPrice || selectedProduct.price) / selectedProduct.mrp) * 100)}% off on MRP
+                        {Math.round(100 - ((displayPrice || selectedProduct.price) / selectedProduct.mrp) * 100)}% off on MRP
                       </span>
                     </p>
                   )}
@@ -3664,50 +3739,77 @@ const ProductDetails = ({ productId }) => {
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
-                {ctlProducts.map((product) => (
-                  <div
-                    key={product._id}
-                    onClick={() =>
-                      navigate(
-                        `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
-                          product.skuCode || product.sku || product._id
-                        )}`
-                      )
-                    }
-                    className="cursor-pointer group"
-                  >
-                    <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2">
-                      <img
-                        src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      {product.offerPercentage > 0 && (
-                        <span className="absolute top-1.5 left-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                          -{product.offerPercentage}%
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs font-semibold text-gray-800 leading-snug line-clamp-2">{product.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 capitalize">{product.category}</p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      {product.discountPrice ? (
-                        <>
+                {ctlProducts.map((product) => {
+                  const cardTimedOffer = product.timedOffer || null;
+                  const cardSaleLive = isSaleLive(cardTimedOffer);
+                  const cardSaleSoon = isSaleUpcoming(cardTimedOffer);
+                  const cardPrice = cardSaleLive
+                    ? Number(cardTimedOffer?.discountPrice || product.price || 0)
+                    : Number(product.discountPrice || product.price || 0);
+                  const cardHasDiscount = cardSaleLive
+                    ? Number(cardTimedOffer?.discountPrice || 0) < Number(product.price || 0)
+                    : !cardTimedOffer && product.discountPrice && product.discountPrice < product.price;
+                  const cardBadgeText = cardSaleLive
+                    ? "Sale is live now"
+                    : cardSaleSoon
+                    ? `Sale starts in ${formatCountdown(cardTimedOffer?.startsAt, now)}`
+                    : "";
+
+                  return (
+                    <div
+                      key={product._id}
+                      onClick={() =>
+                        navigate(
+                          `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
+                            product.skuCode || product.sku || product._id
+                          )}`
+                        )
+                      }
+                      className="cursor-pointer group"
+                    >
+                      <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2">
+                        <img
+                          src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        {cardSaleSoon && (
+                          <span className="absolute top-1.5 left-1.5 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                            {cardBadgeText}
+                          </span>
+                        )}
+                        {cardSaleLive && (
+                          <span className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                            {cardBadgeText}
+                          </span>
+                        )}
+                        {!cardTimedOffer && product.offerPercentage > 0 && (
+                          <span className="absolute top-1.5 left-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                            -{product.offerPercentage}%
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-gray-800 leading-snug line-clamp-2">{product.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 capitalize">{product.category}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        {cardHasDiscount ? (
+                          <>
+                            <span className="text-xs font-bold text-gray-900">
+                              ₹{Math.floor(cardPrice).toLocaleString("en-IN")}
+                            </span>
+                            <span className="text-[10px] line-through text-gray-400">
+                              ₹{Math.floor(product.price).toLocaleString("en-IN")}
+                            </span>
+                          </>
+                        ) : (
                           <span className="text-xs font-bold text-gray-900">
-                            ₹{Math.floor(product.discountPrice).toLocaleString("en-IN")}
+                            ₹{Math.floor(cardPrice).toLocaleString("en-IN")}
                           </span>
-                          <span className="text-[10px] line-through text-gray-400">
-                            ₹{Math.floor(product.price).toLocaleString("en-IN")}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-xs font-bold text-gray-900">
-                          ₹{Math.floor(product.price).toLocaleString("en-IN")}
-                        </span>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -3719,55 +3821,82 @@ const ProductDetails = ({ productId }) => {
                 You May Also Like
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
-                {resolvedSimilarProducts.slice(0, displayCount).map((product) => (
-                  <div
-                    key={product._id}
-                    onClick={() =>
-                      navigate(
-                        `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
-                          product.skuCode || product.sku || product._id
-                        )}`
-                      )
-                    }
-                    className="cursor-pointer group"
-                  >
-                    <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2.5">
-                      <img
-                        src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      {product.offerPercentage > 0 && (
-                        <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
-                          {product.offerPercentage}% off
-                        </div>
-                      )}
-                    </div>
-                    <div className="pt-0.5">
-                      {product.brand && (
-                        <p className="text-[10px] font-bold tracking-[0.12em] text-gray-400 uppercase mb-0.5 truncate">
-                          {product.brand}
-                        </p>
-                      )}
-                      <h4 className="text-sm font-medium text-gray-800 line-clamp-1">{product.name}</h4>
-                      <div className="flex items-baseline gap-1.5 mt-1">
-                        <span className="font-bold text-sm text-gray-900">
-                          ₹{Math.floor(product.discountPrice || product.price).toLocaleString("en-IN")}
-                        </span>
-                        {product.discountPrice && product.discountPrice < product.price && (
-                          <span className="text-xs line-through text-gray-400">
-                            ₹{Math.floor(product.price).toLocaleString("en-IN")}
-                          </span>
+                {resolvedSimilarProducts.slice(0, displayCount).map((product) => {
+                  const cardTimedOffer = product.timedOffer || null;
+                  const cardSaleLive = isSaleLive(cardTimedOffer);
+                  const cardSaleSoon = isSaleUpcoming(cardTimedOffer);
+                  const cardPrice = cardSaleLive
+                    ? Number(cardTimedOffer?.discountPrice || product.price || 0)
+                    : Number(product.discountPrice || product.price || 0);
+                  const cardHasDiscount = cardSaleLive
+                    ? Number(cardTimedOffer?.discountPrice || 0) < Number(product.price || 0)
+                    : !cardTimedOffer && product.discountPrice && product.discountPrice < product.price;
+                  const cardBadgeText = cardSaleLive
+                    ? "Sale is live now"
+                    : cardSaleSoon
+                    ? `Sale starts in ${formatCountdown(cardTimedOffer?.startsAt, now)}`
+                    : "";
+
+                  return (
+                    <div
+                      key={product._id}
+                      onClick={() =>
+                        navigate(
+                          `/product/${product.name.toLowerCase().replace(/\s+/g, "-")}/p/${encodeURIComponent(
+                            product.skuCode || product.sku || product._id
+                          )}`
+                        )
+                      }
+                      className="cursor-pointer group"
+                    >
+                      <div className="relative overflow-hidden bg-gray-50 aspect-3/4 rounded-sm mb-2.5">
+                        <img
+                          src={product.colorVariants?.[0]?.images?.[0]?.url || product.images?.[0]?.url || "/no-image.png"}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        {cardSaleSoon && (
+                          <div className="absolute top-2 left-2 bg-amber-500 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
+                            {cardBadgeText}
+                          </div>
                         )}
-                        {product.offerPercentage > 0 && (
-                          <span className="text-emerald-600 text-[10px] font-semibold">
+                        {cardSaleLive && (
+                          <div className="absolute top-2 left-2 bg-emerald-600 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
+                            {cardBadgeText}
+                          </div>
+                        )}
+                        {!cardTimedOffer && product.offerPercentage > 0 && (
+                          <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
                             {product.offerPercentage}% off
-                          </span>
+                          </div>
                         )}
                       </div>
+                      <div className="pt-0.5">
+                        {product.brand && (
+                          <p className="text-[10px] font-bold tracking-[0.12em] text-gray-400 uppercase mb-0.5 truncate">
+                            {product.brand}
+                          </p>
+                        )}
+                        <h4 className="text-sm font-medium text-gray-800 line-clamp-1">{product.name}</h4>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                          <span className="font-bold text-sm text-gray-900">
+                            ₹{Math.floor(cardPrice).toLocaleString("en-IN")}
+                          </span>
+                          {cardHasDiscount && (
+                            <span className="text-xs line-through text-gray-400">
+                              ₹{Math.floor(product.price).toLocaleString("en-IN")}
+                            </span>
+                          )}
+                          {cardHasDiscount && (
+                            <span className="text-emerald-600 text-[10px] font-semibold">
+                              {cardSaleLive ? `${cardTimedOffer?.offerPercentage || 0}% off` : `${product.offerPercentage}% off`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {resolvedSimilarProducts.length > displayCount && (
                 <div className="flex justify-center mt-6">
@@ -4077,7 +4206,7 @@ const ProductDetails = ({ productId }) => {
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-bold text-gray-800 truncate flex-1">{selectedProduct.name}</p>
               <span className="text-sm font-extrabold text-sky-700 shrink-0">
-                ₹{Math.floor(selectedProduct.discountPrice || selectedProduct.price).toLocaleString("en-IN")}
+                ₹{Math.floor(displayPrice).toLocaleString("en-IN")}
               </span>
             </div>
            
@@ -4116,9 +4245,9 @@ const ProductDetails = ({ productId }) => {
               <p className="text-sm font-bold text-gray-800 truncate">{selectedProduct.name}</p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-base font-extrabold text-sky-700">
-                  ₹{Math.floor(selectedProduct.discountPrice || selectedProduct.price).toLocaleString("en-IN")}
+                  ₹{Math.floor(displayPrice).toLocaleString("en-IN")}
                 </span>
-                {selectedProduct.discountPrice && selectedProduct.price > selectedProduct.discountPrice && (
+                {showDiscount && (
                   <span className="text-xs text-gray-400 line-through">
                     ₹{Math.floor(selectedProduct.price).toLocaleString("en-IN")}
                   </span>

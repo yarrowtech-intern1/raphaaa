@@ -2,6 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const mongoose = require("mongoose");
 const Product = require("../models/Product");
+const Offer = require("../models/offer");
 const {
   protect,
   admin,
@@ -13,8 +14,19 @@ const User = require("../models/User");
 const { checkDeliveryServiceability } = require("../utils/shiprocket");
 const { triggerBackInStockForProduct, triggerPriceDropForProduct } = require("../services/alertService");
 const { getJson, setJson } = require("../utils/redisCache");
+const { decorateProductWithTimedOffer } = require("../utils/timedOfferPricing");
 
 const router = express.Router();
+
+const getTimedOffersForDisplay = async () =>
+  Offer.find()
+    .select("_id title startDate endDate isActive offerPercentage benefit priority productIds createdAt")
+    .lean();
+
+const decorateProductsWithTimedOffers = (products, offers) =>
+  (Array.isArray(products) ? products : []).map((product) =>
+    decorateProductWithTimedOffer(product, offers)
+  );
 
 // @route GET /api/products/delivery/check?pincode=700001&cod=0&weight=0.5
 // @desc Check delivery serviceability and ETA by pincode via Shiprocket
@@ -418,6 +430,9 @@ router.get("/", async (req, res) => {
         .limit(safeLimit);
     }
 
+    const timedOffers = await getTimedOffersForDisplay();
+    products = decorateProductsWithTimedOffers(products, timedOffers);
+
     // If user has a valid coupon, apply discount
     if (userId) {
       const user = await User.findById(userId);
@@ -435,7 +450,7 @@ router.get("/", async (req, res) => {
           const discountPrice = parseFloat(
             (p.price * (1 - discount / 100)).toFixed(2)
           );
-          return { ...p._doc, discountPrice };
+          return { ...p, discountPrice };
         });
       }
     }
@@ -621,7 +636,8 @@ router.get("/by-ids", async (req, res) => {
     const docs = await Product.find({ _id: { $in: objectIds }, isPublished: true });
     const byId = new Map(docs.map((d) => [String(d._id), d]));
     const ordered = ids.map((id) => byId.get(String(id))).filter(Boolean);
-    res.json(ordered);
+    const timedOffers = await getTimedOffersForDisplay();
+    res.json(decorateProductsWithTimedOffers(ordered, timedOffers));
   } catch (err) {
     console.error("by-ids error:", err);
     res.status(500).json({ message: "Failed to fetch products" });
@@ -706,7 +722,8 @@ router.get("/new-arrivals", async (req, res) => {
     const newArrivals = await Product.find({ isPublished: true })
       .sort({ createdAt: -1 })
       .limit(8);
-    res.json(newArrivals);
+    const timedOffers = await getTimedOffersForDisplay();
+    res.json(decorateProductsWithTimedOffers(newArrivals, timedOffers));
   } catch (error) {
     console.error(error);
     res.status(500).send("Internal server error");
@@ -733,7 +750,8 @@ router.get("/similar/:id", async (req, res) => {
       isPublished: true,
     }).limit(50);
 
-    res.json(similarProducts);
+    const timedOffers = await getTimedOffersForDisplay();
+    res.json(decorateProductsWithTimedOffers(similarProducts, timedOffers));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
@@ -888,7 +906,8 @@ router.get("/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (product) {
-      res.json(product);
+      const timedOffers = await getTimedOffersForDisplay();
+      res.json(decorateProductWithTimedOffer(product, timedOffers));
     } else {
       res.status(404).json({ message: "Product not found" });
     }
